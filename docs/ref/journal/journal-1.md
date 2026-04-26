@@ -26,3 +26,9 @@
 - Single table `inspections` mapping CSV columns (skip `_id`, use own SERIAL PK)
 - Single route `/` showing date, establishment, violations yes/no
 - Spec written to `docs/superpowers/specs/2026-04-26-poc-design.md`
+
+### 2026-04-26 00:10 — Implementation plan written
+- Plan saved to `docs/superpowers/plans/2026-04-26-poc-implementation.md`
+- 4 tasks: DB init script, Docker Compose, Flask app, smoke test
+- Key discovery: CSV has Windows line endings and ~1954 rows with quoted fields (commas in addresses). Postgres COPY CSV handles both natively.
+- Decided on staging table approach to skip `_id` column and convert `'None'` strings to actual NULLs during import.
