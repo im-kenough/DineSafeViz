@@ -1,10 +1,10 @@
 services:
   db:
-    image: postgres:17
+    image: postgres:17.9
     environment:
-      POSTGRES_USER: dinesafe
-      POSTGRES_PASSWORD: dinesafe
-      POSTGRES_DB: dinesafe
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./src/db/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -22,9 +22,9 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: 5432
-      DB_NAME: dinesafe
-      DB_USER: dinesafe
-      DB_PASSWORD: dinesafe
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
     depends_on:
       db:
         condition: service_healthy
