@@ -6,7 +6,8 @@ Instructions for first time setup of the application
 
 ## Install required software
 
-...
+### Install postgresql
+
 
 ## Setup python
 

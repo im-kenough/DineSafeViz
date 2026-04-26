@@ -1,4 +1,10 @@
-# Architecture
+# DineSafeViz Proof of Concept — Design Spec
+
+## Goal
+
+Load Toronto DineSafe inspection data from CSV into a Postgres database and display it via a simple Flask web app. Both services run in Docker Compose.
+
+## Architecture
 
 Two Docker Compose services on a shared network:
 
@@ -78,3 +84,7 @@ DineSafeViz/
 - Map visualization
 - CI/CD
 - Production hardening (gunicorn, TLS, etc.)
+
+## Notes
+
+- `src/tools/create_db.py` exists but is empty and unused by this design.
