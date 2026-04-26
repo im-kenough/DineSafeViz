@@ -81,6 +81,6 @@ current journal to orient yourself. If this is a fresh attempt at a
 task you've tried before, skim the previous `journal-*.md` files
 too.
 
----
+## 6. Workflow
 
-**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+- Before editing any file, read it first. Before modifying a function, grep for all callers. Research before you edit.
