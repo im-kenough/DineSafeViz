@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DineSafeViz</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>DineSafe Inspections</h1>
+
+    <div class="tabs">
+        {% for y in valid_years %}
+        <a href="/?year={{ y }}"
+           class="{{ 'active' if y == selected_year else '' }}">{{ y }}</a>
+        {% endfor %}
+    </div>
+
+    <div class="tabs">
+        {% for q in valid_quarters %}
+        <a href="/?year={{ selected_year }}&q={{ q }}"
+           class="{{ 'active' if q == selected_q else '' }}">Q{{ q }}</a>
+        {% endfor %}
+    </div>
+
+    {% set sev_class = {
+        'C - Crucial':     'sev-crucial',
+        'S - Significant': 'sev-significant',
+        'M - Minor':       'sev-minor',
+        'NA':              'sev-na',
+        'None':            'sev-none'
+    } %}
+
+    {% for day, rows in days %}
+    <div class="day-box">
+        <h2>{{ day.strftime('%A, %B %-d, %Y') }}</h2>
+        {% if rows %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Severity</th>
+                    <th>Action</th>
+                    <th>Infraction Details</th>
+                    <th>Establishment Name</th>
+                    <th>Address</th>
+                    <th>Outcome</th>
+                    <th>Outcome Date</th>
+                    <th>Amount Fined</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr class="{{ sev_class.get(row.severity, '') }}">
+                    <td>{{ row.severity or '—' }}</td>
+                    <td>{{ row.action or '—' }}</td>
+                    <td>{{ row.infraction_details or '—' }}</td>
+                    <td>{{ row.establishment_name or '—' }}</td>
+                    <td>{{ row.establishment_address or '—' }}</td>
+                    <td>{{ row.outcome or '—' }}</td>
+                    <td>{{ row.outcome_date or '—' }}</td>
+                    <td>{{ row.amount_fined or '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="no-data">No data</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+</body>
+</html>
