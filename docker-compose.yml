@@ -28,6 +28,28 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      grafana:
+        condition: service_started
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    environment:
+      GF_SERVER_ROOT_URL: /grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/dinesafe.json
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./src/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   pgdata:
