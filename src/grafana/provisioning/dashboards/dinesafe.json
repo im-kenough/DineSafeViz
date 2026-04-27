@@ -1,0 +1,283 @@
+{
+  "uid": "dinesafe",
+  "title": "DineSafe Inspections",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Total Inspections",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) AS \"Total\" FROM inspections;",
+          "format": "table",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "steps": [{ "color": "#4a7aff", "value": null }] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Crucial Infractions",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) AS \"Crucial\" FROM inspections WHERE severity = 'C - Crucial';",
+          "format": "table",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "steps": [{ "color": "#dc2626", "value": null }] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Total Fines Collected",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "targets": [
+        {
+          "rawSql": "SELECT COALESCE(SUM(amount_fined::numeric), 0) AS \"Fines\" FROM inspections WHERE amount_fined IS NOT NULL AND amount_fined != '';",
+          "format": "table",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "thresholds": { "steps": [{ "color": "#ca8a04", "value": null }] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Inspections Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "rawSql": "SELECT date_trunc('week', inspection_date) AS \"time\", COUNT(*) AS \"Inspections\" FROM inspections WHERE inspection_date IS NOT NULL GROUP BY 1 ORDER BY 1;",
+          "format": "table",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 10, "lineWidth": 2 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "single" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Fines Issued Over Time",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [
+        {
+          "rawSql": "SELECT date_trunc('month', inspection_date) AS \"time\", SUM(amount_fined::numeric) AS \"Fines\" FROM inspections WHERE amount_fined IS NOT NULL AND amount_fined != '' AND inspection_date IS NOT NULL GROUP BY 1 ORDER BY 1;",
+          "format": "table",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "color": { "mode": "fixed", "fixedColor": "#ca8a04" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "single" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Severity Breakdown",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "targets": [
+        {
+          "rawSql": "SELECT COALESCE(severity, 'None') AS \"Severity\", COUNT(*) AS \"Count\" FROM inspections GROUP BY 1 ORDER BY 2 DESC;",
+          "format": "table",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
+        "pieType": "donut",
+        "tooltip": { "mode": "single" }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Outcome Distribution",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [
+        {
+          "rawSql": "SELECT COALESCE(outcome, 'None') AS \"Outcome\", COUNT(*) AS \"Count\" FROM inspections WHERE outcome IS NOT NULL AND outcome != 'None' GROUP BY 1 ORDER BY 2 DESC;",
+          "format": "table",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
+        "pieType": "donut",
+        "tooltip": { "mode": "single" }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Top 10 Most-Inspected Establishments",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "targets": [
+        {
+          "rawSql": "SELECT establishment_name AS \"Establishment\", COUNT(*) AS \"Inspections\" FROM inspections WHERE establishment_name IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "format": "table",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "#4a7aff" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "tooltip": { "mode": "single" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Actions Taken Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "targets": [
+        {
+          "rawSql": "SELECT date_trunc('month', inspection_date) AS \"time\", action AS \"Action\", COUNT(*) AS \"Count\" FROM inspections WHERE action IS NOT NULL AND action != 'None' AND inspection_date IS NOT NULL GROUP BY 1, 2 ORDER BY 1;",
+          "format": "table",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 50, "stacking": { "mode": "normal" }, "lineWidth": 1 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "transformations": [
+        {
+          "id": "prepareTimeSeries",
+          "options": { "format": "multi" }
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Crucial Infractions by Establishment Type",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "targets": [
+        {
+          "rawSql": "SELECT establishment_type AS \"Type\", COUNT(*) AS \"Crucial\" FROM inspections WHERE severity = 'C - Crucial' AND establishment_type IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "format": "table",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "#dc2626" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "tooltip": { "mode": "single" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      }
+    },
+    {
+      "id": 11,
+      "title": "Inspections by Day of Week",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "targets": [
+        {
+          "rawSql": "SELECT CASE EXTRACT(dow FROM inspection_date) WHEN 0 THEN 'Sun' WHEN 1 THEN 'Mon' WHEN 2 THEN 'Tue' WHEN 3 THEN 'Wed' WHEN 4 THEN 'Thu' WHEN 5 THEN 'Fri' WHEN 6 THEN 'Sat' END AS \"Day\", COUNT(*) AS \"Inspections\" FROM inspections WHERE inspection_date IS NOT NULL GROUP BY EXTRACT(dow FROM inspection_date), 1 ORDER BY EXTRACT(dow FROM inspection_date);",
+          "format": "table",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "#4a7aff" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "single" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      }
+    }
+  ],
+  "time": { "from": "2023-11-01T00:00:00.000Z", "to": "now" },
+  "refresh": "",
+  "templating": { "list": [] },
+  "annotations": { "list": [] }
+}

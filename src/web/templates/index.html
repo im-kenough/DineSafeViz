@@ -10,6 +10,11 @@
     <h1>DineSafe Inspections</h1>
 
     <div class="tabs">
+        <a href="/" class="active">Inspections</a>
+        <a href="/dashboard">Dashboard</a>
+    </div>
+
+    <div class="tabs">
         {% for y in valid_years %}
         <a href="/?year={{ y }}"
            class="{{ 'active' if y == selected_year else '' }}">{{ y }}</a>

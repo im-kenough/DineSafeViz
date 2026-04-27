@@ -15,6 +15,15 @@ def _mock_db(rows):
     return mock_conn
 
 
+def test_home_has_dashboard_link():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+        resp = client.get("/")
+    assert b'href="/dashboard"' in resp.data
+    assert b"Dashboard" in resp.data
+
+
 def test_route_returns_200():
     app_module.app.config["TESTING"] = True
     client = app_module.app.test_client()
