@@ -87,22 +87,41 @@ DB_CONFIG = {
 
 @app.route("/")
 def index():
+    year, q = parse_year_quarter(request.args)
+    start, end = get_quarter_bounds(year, q)
+
     conn = psycopg2.connect(**DB_CONFIG)
     cur = conn.cursor()
     cur.execute(
-        "SELECT inspection_date, establishment_name, severity "
-        "FROM inspections ORDER BY inspection_date DESC"
+        "SELECT inspection_date, severity, action, infraction_details,"
+        "       establishment_name, establishment_address, outcome,"
+        "       outcome_date, amount_fined"
+        " FROM inspections"
+        " WHERE inspection_date BETWEEN %s AND %s",
+        (start, end),
     )
-    rows = cur.fetchall()
+    rows = [
+        {
+            "inspection_date": r[0],
+            "severity": r[1],
+            "action": r[2],
+            "infraction_details": r[3],
+            "establishment_name": r[4],
+            "establishment_address": r[5],
+            "outcome": r[6],
+            "outcome_date": r[7],
+            "amount_fined": r[8],
+        }
+        for r in cur.fetchall()
+    ]
     cur.close()
     conn.close()
 
-    inspections = []
-    for date, name, severity in rows:
-        if severity:
-            violation = f"Yes — {severity}"
-        else:
-            violation = "No"
-        inspections.append({"date": date, "name": name, "violation": violation})
-
-    return render_template("index.html", inspections=inspections)
+    return render_template(
+        "index.html",
+        days=build_days(rows, start, end),
+        selected_year=year,
+        selected_q=q,
+        valid_years=get_valid_years(),
+        valid_quarters=get_valid_quarters(year),
+    )
