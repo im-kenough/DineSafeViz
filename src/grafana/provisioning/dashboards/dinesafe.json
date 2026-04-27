@@ -648,6 +648,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
+      "description": "There are three types of infractions that have been developed under the DineSafe Food Safety Inspection and Disclosure Program (Crucial, Significant and Minor) covering all of the requirements under the Ontario Food Premises Regulation (493/17).  These infractions will be identified on the Food Safety Inspection Report at the time of inspection.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -797,6 +798,11 @@
       "type": "row"
     },
     {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "dinesafe-postgres"
+      },
+      "description": "Crucial Infractions - Immediate Health Hazard\n\nThese infractions must be corrected immediately. An order to close the premises may be issued and/or immediate action must be taken to remove or eliminate the health hazard. A Closed Notice will be issued and must be posted, and other enforcement action will be taken. Crucial infractions are conditions that endanger food directly, such as contamination, time-temperature abuse or lack of safe-to-drink water or any other condition that constitutes a health hazard.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -889,6 +895,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
+      "description": "Crucial Infractions - Immediate Health Hazard\n\nThese infractions must be corrected immediately. An order to close the premises may be issued and/or immediate action must be taken to remove or eliminate the health hazard. A Closed Notice will be issued and must be posted, and other enforcement action will be taken. Crucial infractions are conditions that endanger food directly, such as contamination, time-temperature abuse or lack of safe-to-drink water or any other condition that constitutes a health hazard.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1000,6 +1007,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
+      "description": "Crucial Infractions - Immediate Health Hazard\n\nThese infractions must be corrected immediately. An order to close the premises may be issued and/or immediate action must be taken to remove or eliminate the health hazard. A Closed Notice will be issued and must be posted, and other enforcement action will be taken. Crucial infractions are conditions that endanger food directly, such as contamination, time-temperature abuse or lack of safe-to-drink water or any other condition that constitutes a health hazard.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1087,6 +1095,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
+      "description": "Crucial Infractions - Immediate Health Hazard\n\nThese infractions must be corrected immediately. An order to close the premises may be issued and/or immediate action must be taken to remove or eliminate the health hazard. A Closed Notice will be issued and must be posted, and other enforcement action will be taken. Crucial infractions are conditions that endanger food directly, such as contamination, time-temperature abuse or lack of safe-to-drink water or any other condition that constitutes a health hazard.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1187,6 +1196,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
+      "description": "Significant infractions - Potential Health Hazard\n\nThese infractions must be corrected immediately and a re-inspection to check for compliance will be conducted within 24 to 48 hours. Legal action may be taken should these infractions remain outstanding. Under exceptional circumstances a re-inspection to check for compliance may be extended beyond 48 hours. Significant infractions concern food handling, preparation, storage and/or service.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1298,6 +1308,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
+      "description": "Significant infractions - Potential Health Hazard\n\nThese infractions must be corrected immediately and a re-inspection to check for compliance will be conducted within 24 to 48 hours. Legal action may be taken should these infractions remain outstanding. Under exceptional circumstances a re-inspection to check for compliance may be extended beyond 48 hours. Significant infractions concern food handling, preparation, storage and/or service.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1409,6 +1420,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
+      "description": "Significant infractions - Potential Health Hazard\n\nThese infractions must be corrected immediately and a re-inspection to check for compliance will be conducted within 24 to 48 hours. Legal action may be taken should these infractions remain outstanding. Under exceptional circumstances a re-inspection to check for compliance may be extended beyond 48 hours. Significant infractions concern food handling, preparation, storage and/or service.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1496,6 +1508,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
+      "description": "Significant infractions - Potential Health Hazard\n\nThese infractions must be corrected immediately and a re-inspection to check for compliance will be conducted within 24 to 48 hours. Legal action may be taken should these infractions remain outstanding. Under exceptional circumstances a re-inspection to check for compliance may be extended beyond 48 hours. Significant infractions concern food handling, preparation, storage and/or service.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1596,6 +1609,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
+      "description": "Minor Infractions - Minimal Health Risk\n\nThese infractions must be corrected immediately. A follow-up compliance check will be conducted at the next scheduled inspection.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1707,6 +1721,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
+      "description": "Minor Infractions - Minimal Health Risk\n\nThese infractions must be corrected immediately. A follow-up compliance check will be conducted at the next scheduled inspection.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1818,6 +1833,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
+      "description": "Minor Infractions - Minimal Health Risk\n\nThese infractions must be corrected immediately. A follow-up compliance check will be conducted at the next scheduled inspection.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1905,6 +1921,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
+      "description": "Minor Infractions - Minimal Health Risk\n\nThese infractions must be corrected immediately. A follow-up compliance check will be conducted at the next scheduled inspection.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1996,12 +2013,16 @@
     "list": []
   },
   "time": {
-    "from": "now-90d",
+    "from": "now-1y",
     "to": "now"
   },
-  "timepicker": {},
+  "timepicker": {
+    "refresh_intervals": [
+      "1d"
+    ]
+  },
   "timezone": "browser",
   "title": "DineSafe Inspections Metrics",
   "uid": "dinesafe-1-2",
-  "version": 2
+  "version": 18
 }
