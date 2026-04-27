@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DineSafeViz — Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .dashboard-frame {
+            width: 100%;
+            height: calc(100vh - 120px);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--surface);
+        }
+    </style>
+</head>
+<body>
+    <h1>DineSafe Dashboard</h1>
+    <div class="tabs">
+        <a href="/">Inspections</a>
+        <a href="/dashboard" class="active">Dashboard</a>
+    </div>
+    <iframe class="dashboard-frame"
+            src="/grafana/d/dinesafe/dinesafe-inspections?kiosk"
+            frameborder="0"></iframe>
+</body>
+</html>
