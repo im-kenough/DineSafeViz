@@ -14,4 +14,4 @@ datasources:
       sslmode: disable
       postgresVersion: 1700
     isDefault: true
-    editable: false
+    editable: true
