@@ -47,3 +47,21 @@ def test_grafana_proxy_returns_grafana_status_code():
     with patch("app.http_requests.request", return_value=mock_resp):
         resp = client.get("/grafana/nonexistent")
     assert resp.status_code == 404
+
+
+def test_grafana_proxy_forwards_post():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+    mock_resp = _mock_grafana_response(content=b"{\"results\":{}}",
+                                       headers={"Content-Type": "application/json"})
+    payload = b'{"queries":[]}'
+    with patch("app.http_requests.request", return_value=mock_resp) as mock_req:
+        resp = client.post("/grafana/api/ds/query",
+                           data=payload,
+                           headers={"Content-Type": "application/json"})
+    kwargs = mock_req.call_args.kwargs
+    assert kwargs["method"] == "POST"
+    assert kwargs["data"] == payload
+    assert kwargs["headers"]["Content-Type"] == "application/json"
+    assert resp.status_code == 200
+    assert resp.data == b"{\"results\":{}}"

@@ -237,8 +237,8 @@ def dashboard():
 GRAFANA_URL = "http://grafana:3000"
 
 
-@app.route("/grafana/", defaults={"path": ""})
-@app.route("/grafana/<path:path>")
+@app.route("/grafana/", defaults={"path": ""}, methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+@app.route("/grafana/<path:path>", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 def grafana_proxy(path):
     """Reverse-proxy requests to the internal Grafana container."""
     url = f"{GRAFANA_URL}/grafana/{path}"
