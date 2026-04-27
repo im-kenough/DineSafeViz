@@ -66,3 +66,22 @@ def test_route_no_data_day_shows_no_data_text():
     with patch("app.psycopg2.connect", return_value=_mock_db([])):
         resp = client.get("/?year=2024&q=1")
     assert b"No data" in resp.data
+
+
+def test_severity_class_on_row():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+    rows = [(
+        date(2024, 2, 14),   # inspection_date
+        "C - Crucial",       # severity
+        "Court Order",       # action
+        "Rats observed",     # infraction_details
+        "Risky Bistro",      # establishment_name
+        "1 Main St",         # establishment_address
+        "Pass",              # outcome
+        "2024-02-20",        # outcome_date
+        "500.00",            # amount_fined
+    )]
+    with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
+        resp = client.get("/?year=2024&q=1")
+    assert b'class="sev-crucial"' in resp.data
