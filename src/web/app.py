@@ -9,6 +9,7 @@ from datetime import date, timedelta
 from typing import Dict, List, Tuple
 
 import psycopg2
+import requests as http_requests
 from flask import Flask, render_template, request
 
 app = Flask(__name__)
@@ -225,3 +226,31 @@ def index():
         valid_years=get_valid_years(),
         valid_quarters=get_valid_quarters(year),
     )
+
+
+@app.route("/dashboard")
+def dashboard():
+    """Render the Grafana dashboard iframe page."""
+    return render_template("dashboard.html")
+
+
+GRAFANA_URL = "http://grafana:3000"
+
+
+@app.route("/grafana/", defaults={"path": ""})
+@app.route("/grafana/<path:path>")
+def grafana_proxy(path):
+    """Reverse-proxy requests to the internal Grafana container."""
+    url = f"{GRAFANA_URL}/grafana/{path}"
+    if request.query_string:
+        url = f"{url}?{request.query_string.decode()}"
+    resp = http_requests.request(
+        method=request.method,
+        url=url,
+        headers={k: v for k, v in request.headers if k.lower() != "host"},
+        data=request.get_data(),
+        allow_redirects=False,
+    )
+    excluded_headers = {"content-encoding", "content-length", "transfer-encoding", "connection"}
+    headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded_headers}
+    return resp.content, resp.status_code, headers
