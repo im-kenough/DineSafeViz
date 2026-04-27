@@ -58,6 +58,24 @@ def parse_year_quarter(args):
     return year, q
 
 
+def sort_rows(rows):
+    return sorted(rows, key=lambda r: SEVERITY_ORDER.get(r.get("severity"), 3))
+
+
+def build_days(rows, start, end):
+    """Return list of (date, sorted_rows) from end to start (newest first)."""
+    from collections import defaultdict
+    by_date = defaultdict(list)
+    for row in rows:
+        by_date[row["inspection_date"]].append(row)
+    days = []
+    d = end
+    while d >= start:
+        days.append((d, sort_rows(by_date.get(d, []))))
+        d -= timedelta(days=1)
+    return days
+
+
 DB_CONFIG = {
     "host": os.environ.get("DB_HOST", "db"),
     "port": os.environ.get("DB_PORT", "5432"),

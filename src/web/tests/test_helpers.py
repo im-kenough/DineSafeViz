@@ -83,3 +83,63 @@ def test_parse_invalid_q_for_2023_returns_4():
 def test_parse_non_numeric_params():
     year, q = parse_year_quarter({"year": "abc", "q": "xyz"})
     assert year in get_valid_years()
+
+
+from app import sort_rows, build_days
+
+
+def test_sort_rows_crucial_first():
+    rows = [
+        {"severity": "M - Minor", "action": "a"},
+        {"severity": "C - Crucial", "action": "b"},
+        {"severity": "S - Significant", "action": "c"},
+        {"severity": None, "action": "d"},
+    ]
+    result = sort_rows(rows)
+    assert [r["severity"] for r in result] == [
+        "C - Crucial", "S - Significant", "M - Minor", None
+    ]
+
+
+def test_sort_rows_na_last():
+    rows = [
+        {"severity": "NA", "action": "a"},
+        {"severity": "M - Minor", "action": "b"},
+    ]
+    result = sort_rows(rows)
+    assert result[0]["severity"] == "M - Minor"
+    assert result[1]["severity"] == "NA"
+
+
+def test_build_days_newest_first():
+    rows = [
+        {"inspection_date": date(2024, 1, 2), "severity": "M - Minor"},
+        {"inspection_date": date(2024, 1, 1), "severity": "C - Crucial"},
+    ]
+    start = date(2024, 1, 1)
+    end = date(2024, 1, 3)
+    days = build_days(rows, start, end)
+    assert len(days) == 3
+    assert days[0][0] == date(2024, 1, 3)
+    assert days[1][0] == date(2024, 1, 2)
+    assert days[2][0] == date(2024, 1, 1)
+
+
+def test_build_days_no_data_day_is_empty_list():
+    rows = [{"inspection_date": date(2024, 1, 1), "severity": "M - Minor"}]
+    start = date(2024, 1, 1)
+    end = date(2024, 1, 2)
+    days = build_days(rows, start, end)
+    assert days[0][0] == date(2024, 1, 2)
+    assert days[0][1] == []  # Jan 2 has no data
+
+
+def test_build_days_rows_sorted_within_day():
+    rows = [
+        {"inspection_date": date(2024, 1, 1), "severity": "M - Minor"},
+        {"inspection_date": date(2024, 1, 1), "severity": "C - Crucial"},
+    ]
+    start = end = date(2024, 1, 1)
+    days = build_days(rows, start, end)
+    assert days[0][1][0]["severity"] == "C - Crucial"
+    assert days[0][1][1]["severity"] == "M - Minor"
