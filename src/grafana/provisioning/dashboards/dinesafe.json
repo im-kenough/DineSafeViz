@@ -13,7 +13,7 @@
       "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
       "targets": [
         {
-          "rawSql": "SELECT COUNT(*) AS \"Total\" FROM inspections;",
+          "rawSql": "SELECT COUNT(*) AS \"Total\" FROM inspections WHERE $__timeFilter(inspection_date);",
           "format": "table",
           "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
           "refId": "A"
@@ -38,7 +38,7 @@
       "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
       "targets": [
         {
-          "rawSql": "SELECT COUNT(*) AS \"Crucial\" FROM inspections WHERE severity = 'C - Crucial';",
+          "rawSql": "SELECT COUNT(*) AS \"Crucial\" FROM inspections WHERE severity = 'C - Crucial' AND $__timeFilter(inspection_date);",
           "format": "table",
           "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
           "refId": "A"
@@ -63,7 +63,7 @@
       "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
       "targets": [
         {
-          "rawSql": "SELECT COALESCE(SUM(amount_fined::numeric), 0) AS \"Fines\" FROM inspections WHERE amount_fined IS NOT NULL AND amount_fined != '';",
+          "rawSql": "SELECT COALESCE(SUM(amount_fined::numeric), 0) AS \"Fines\" FROM inspections WHERE amount_fined IS NOT NULL AND amount_fined != '' AND $__timeFilter(inspection_date);",
           "format": "table",
           "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
           "refId": "A"
@@ -89,7 +89,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
       "targets": [
         {
-          "rawSql": "SELECT date_trunc('week', inspection_date) AS \"time\", COUNT(*) AS \"Inspections\" FROM inspections WHERE inspection_date IS NOT NULL GROUP BY 1 ORDER BY 1;",
+          "rawSql": "SELECT date_trunc('week', inspection_date) AS \"time\", COUNT(*) AS \"Inspections\" FROM inspections WHERE $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 1;",
           "format": "table",
           "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
           "refId": "A"
@@ -113,7 +113,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
       "targets": [
         {
-          "rawSql": "SELECT date_trunc('month', inspection_date) AS \"time\", SUM(amount_fined::numeric) AS \"Fines\" FROM inspections WHERE amount_fined IS NOT NULL AND amount_fined != '' AND inspection_date IS NOT NULL GROUP BY 1 ORDER BY 1;",
+          "rawSql": "SELECT date_trunc('month', inspection_date) AS \"time\", SUM(amount_fined::numeric) AS \"Fines\" FROM inspections WHERE amount_fined IS NOT NULL AND amount_fined != '' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 1;",
           "format": "table",
           "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
           "refId": "A"
@@ -138,7 +138,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
       "targets": [
         {
-          "rawSql": "SELECT COALESCE(severity, 'None') AS \"Severity\", COUNT(*) AS \"Count\" FROM inspections GROUP BY 1 ORDER BY 2 DESC;",
+          "rawSql": "SELECT COALESCE(severity, 'None') AS \"Severity\", COUNT(*) AS \"Count\" FROM inspections WHERE $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC;",
           "format": "table",
           "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
           "refId": "A"
@@ -158,7 +158,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
       "targets": [
         {
-          "rawSql": "SELECT COALESCE(outcome, 'None') AS \"Outcome\", COUNT(*) AS \"Count\" FROM inspections WHERE outcome IS NOT NULL AND outcome != 'None' GROUP BY 1 ORDER BY 2 DESC;",
+          "rawSql": "SELECT COALESCE(outcome, 'None') AS \"Outcome\", COUNT(*) AS \"Count\" FROM inspections WHERE outcome IS NOT NULL AND outcome != 'None' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC;",
           "format": "table",
           "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
           "refId": "A"
@@ -178,7 +178,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
       "targets": [
         {
-          "rawSql": "SELECT establishment_name AS \"Establishment\", COUNT(*) AS \"Inspections\" FROM inspections WHERE establishment_name IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT establishment_name AS \"Establishment\", COUNT(*) AS \"Inspections\" FROM inspections WHERE establishment_name IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "format": "table",
           "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
           "refId": "A"
@@ -203,7 +203,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
       "targets": [
         {
-          "rawSql": "SELECT date_trunc('month', inspection_date) AS \"time\", action AS \"Action\", COUNT(*) AS \"Count\" FROM inspections WHERE action IS NOT NULL AND action != 'None' AND inspection_date IS NOT NULL GROUP BY 1, 2 ORDER BY 1;",
+          "rawSql": "SELECT date_trunc('month', inspection_date) AS \"time\", action AS \"Action\", COUNT(*) AS \"Count\" FROM inspections WHERE action IS NOT NULL AND action != 'None' AND $__timeFilter(inspection_date) GROUP BY 1, 2 ORDER BY 1;",
           "format": "table",
           "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
           "refId": "A"
@@ -233,7 +233,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
       "targets": [
         {
-          "rawSql": "SELECT establishment_type AS \"Type\", COUNT(*) AS \"Crucial\" FROM inspections WHERE severity = 'C - Crucial' AND establishment_type IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT establishment_type AS \"Type\", COUNT(*) AS \"Crucial\" FROM inspections WHERE severity = 'C - Crucial' AND establishment_type IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "format": "table",
           "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
           "refId": "A"
@@ -258,7 +258,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
       "targets": [
         {
-          "rawSql": "SELECT CASE EXTRACT(dow FROM inspection_date) WHEN 0 THEN 'Sun' WHEN 1 THEN 'Mon' WHEN 2 THEN 'Tue' WHEN 3 THEN 'Wed' WHEN 4 THEN 'Thu' WHEN 5 THEN 'Fri' WHEN 6 THEN 'Sat' END AS \"Day\", COUNT(*) AS \"Inspections\" FROM inspections WHERE inspection_date IS NOT NULL GROUP BY EXTRACT(dow FROM inspection_date), 1 ORDER BY EXTRACT(dow FROM inspection_date);",
+          "rawSql": "SELECT CASE EXTRACT(dow FROM inspection_date) WHEN 0 THEN 'Sun' WHEN 1 THEN 'Mon' WHEN 2 THEN 'Tue' WHEN 3 THEN 'Wed' WHEN 4 THEN 'Thu' WHEN 5 THEN 'Fri' WHEN 6 THEN 'Sat' END AS \"Day\", COUNT(*) AS \"Inspections\" FROM inspections WHERE $__timeFilter(inspection_date) GROUP BY EXTRACT(dow FROM inspection_date), 1 ORDER BY EXTRACT(dow FROM inspection_date);",
           "format": "table",
           "datasource": { "type": "grafana-postgresql-datasource", "uid": "dinesafe-postgres" },
           "refId": "A"
