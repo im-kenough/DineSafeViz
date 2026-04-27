@@ -1,0 +1,80 @@
+/* ── custom properties ──────────────────────────────────── */
+:root {
+    --bg:              #0e1016;
+    --surface:         #161920;
+    --surface-2:       #1d2028;
+    --border:          #262a35;
+    --text:            #dde1ec;
+    --text-muted:      #5e6478;
+    --accent:          #4a7aff;
+
+    --sev-crucial:     rgba(220,  38,  38, 0.6);
+    --sev-significant: rgba(234,  88,  12, 0.6);
+    --sev-minor:       rgba(202, 138,   4, 0.6);
+    --sev-na:          rgba( 22, 163,  74, 0.6);
+    --sev-none:        rgba( 37,  99, 235, 0.6);
+}
+
+/* ── base ───────────────────────────────────────────────── */
+body {
+    font-family: sans-serif;
+    margin: 2rem;
+    max-width: 1200px;
+    background: var(--bg);
+    color: var(--text);
+}
+
+/* ── tabs ───────────────────────────────────────────────── */
+.tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+.tabs a {
+    padding: 0.4rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    text-decoration: none;
+    color: var(--text-muted);
+    background: var(--surface);
+}
+.tabs a.active {
+    background: var(--surface-2);
+    color: var(--text);
+    border-color: var(--accent);
+}
+.tabs a:hover:not(.active) { background: var(--surface-2); }
+
+/* ── day box ────────────────────────────────────────────── */
+.day-box {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+    background: var(--surface);
+}
+.day-box h2 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+    font-weight: bold;
+    color: var(--text-muted);
+}
+.no-data { margin: 0; color: var(--text-muted); font-style: italic; }
+
+/* ── table ──────────────────────────────────────────────── */
+table { border-collapse: collapse; width: 100%; }
+th, td {
+    border: 1px solid var(--border);
+    padding: 0.35rem 0.6rem;
+    text-align: left;
+    font-size: 0.875rem;
+}
+th {
+    background: var(--surface-2);
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--text-muted);
+}
+
+/* ── severity rows ──────────────────────────────────────── */
+tr.sev-crucial     { background-color: var(--sev-crucial); }
+tr.sev-significant { background-color: var(--sev-significant); }
+tr.sev-minor       { background-color: var(--sev-minor); }
+tr.sev-na          { background-color: var(--sev-na); }
+tr.sev-none        { background-color: var(--sev-none); }
