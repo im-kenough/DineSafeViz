@@ -220,6 +220,26 @@ footer {
 
 .flyout a { display: block; }
 
+/* ── mobile (≤ 600px: all phones in portrait) ───────────── */
+@media (max-width: 600px) {
+    body {
+        margin: 0.75rem auto;
+        padding: 0 0.75rem;
+    }
+
+    .social-links { margin-left: 0; }
+
+    .link-label { display: none; }
+}
+
+/* ── tablet (601px – 1023px: iPad portrait, phone landscape) */
+@media (min-width: 601px) and (max-width: 1023px) {
+    body {
+        margin: 1.25rem auto;
+        padding: 0 1.25rem;
+    }
+}
+
 /* ── QHD spacing ────────────────────────────────────────── */
 @media (min-width: 2200px) {
     .day-box { padding: 1.5rem 2rem; }
