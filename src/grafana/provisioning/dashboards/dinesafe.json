@@ -29,9 +29,9 @@
         "x": 0,
         "y": 0
       },
-      "id": 13,
+      "id": 1,
       "panels": [],
-      "title": "Summary - Inspection pass rates",
+      "title": "Inspection Overview",
       "type": "row"
     },
     {
@@ -59,7 +59,7 @@
         "x": 0,
         "y": 1
       },
-      "id": 14,
+      "id": 2,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -115,7 +115,7 @@
       "datasource": {
         "type": "grafana-postgresql-datasource"
       },
-      "description": "A Pass notice will be issued when only minor or no infractions are observed during an inspection.\n\nIf minor infractions are repeated at the next inspection, the Public Health Inspector may issue a ticket to obtain compliance. Fines range from $55 to $465 depending on the severity of the infraction.\nMinor infraction type\n\n    Infractions that present a minimal health risk\n    These items must be corrected by the next inspection\n\nExamples\n\n    Walls, floors or other non-food contact surfaces or equipment need cleaning or repair (e.g., cracked or missing floor tiles, cracked or peeling paint not directly over food preparation area)\n    Inadequate ventilation and lighting systems\n    Hair constraints not worn\n",
+      "description": "A Pass notice will be issued when only minor or no infractions are observed during an inspection.\n\nIf minor infractions are repeated at the next inspection, the Public Health Inspector may issue a ticket to obtain compliance. Fines range from $55 to $465 depending on the severity of the infraction.\n\nMinor infraction type:\n- Infractions that present a minimal health risk\n- These items must be corrected by the next inspection\n\nExamples:\n- Walls, floors or other non-food contact surfaces or equipment need cleaning or repair (e.g., cracked or missing floor tiles, cracked or peeling paint not directly over food preparation area)\n- Inadequate ventilation and lighting systems\n- Hair constraints not worn",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -136,7 +136,7 @@
         "x": 6,
         "y": 1
       },
-      "id": 19,
+      "id": 3,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -190,9 +190,84 @@
     },
     {
       "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "dinesafe-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "green",
+            "mode": "fixed"
+          },
+          "decimals": 1,
+          "mappings": [],
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 9,
+        "y": 1
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "dinesafe-postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(*)::numeric AS total,\n    COUNT(*) FILTER (WHERE severity = 'S - Significant')::numeric AS conditional_pass,\n    COUNT(*) FILTER (WHERE severity = 'C - Crucial')::numeric AS closed\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE((total - conditional_pass - closed) / NULLIF(total, 0), 0) AS \"Pass %\"\nFROM counts;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Pass %",
+      "type": "stat"
+    },
+    {
+      "datasource": {
         "type": "grafana-postgresql-datasource"
       },
-      "description": "A conditional pass notice will be issued when one or more significant infractions are observed during an inspection.\n\nSignificant infraction types\n\n    Infractions that present a potential health hazard\n    These items must be corrected within 24-48 hours or legal action may be take\n    These items indirectly involve food, through handling, preparation, storage and/or service\n\nExamples\n\n    Food contact surfaces or equipment require cleaning or repair\n    Repair of refrigeration and mechanical dish washing equipment require\n    Accurate indicating thermometers not provided\n    Lack of hand wash basin with the necessary supplies\n    Garbage not stored in a sanitary manner\n    Improper cleaning and sanitizing of equipment and utensils\n    Washroom cleanliness not maintained, supplies not provided",
+      "description": "A conditional pass notice will be issued when one or more significant infractions are observed during an inspection.\n\nSignificant infraction types:\n- Infractions that present a potential health hazard\n- These items must be corrected within 24-48 hours or legal action may be taken\n- These items indirectly involve food, through handling, preparation, storage and/or service\n\nExamples:\n- Food contact surfaces or equipment require cleaning or repair\n- Repair of refrigeration and mechanical dish washing equipment required\n- Accurate indicating thermometers not provided\n- Lack of hand wash basin with the necessary supplies\n- Garbage not stored in a sanitary manner\n- Improper cleaning and sanitizing of equipment and utensils\n- Washroom cleanliness not maintained, supplies not provided",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -213,7 +288,7 @@
         "x": 12,
         "y": 1
       },
-      "id": 18,
+      "id": 5,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -267,9 +342,84 @@
     },
     {
       "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "dinesafe-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#eab308",
+            "mode": "fixed"
+          },
+          "decimals": 1,
+          "mappings": [],
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 15,
+        "y": 1
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "dinesafe-postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(*)::numeric AS total,\n    COUNT(*) FILTER (WHERE severity = 'S - Significant')::numeric AS conditional_pass\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE(conditional_pass / NULLIF(total, 0), 0) AS \"Conditional Pass %\"\nFROM counts;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Conditional Pass %",
+      "type": "stat"
+    },
+    {
+      "datasource": {
         "type": "grafana-postgresql-datasource"
       },
-      "description": "A closed notice will be issued when one or more crucial infractions observed during an inspection are not corrected immediately. A food establishment can only be closed when a health hazard is present.\n\nCrucial infraction type\n\n    Infractions that present an immediate health hazard\n    These items directly involve food, such as contamination, time-temperature abuse or lack of safe (potable) water or any other condition that is a health hazard\n    These items must be corrected immediately or an Order to Close the premises can be issued and/or immediate action must be taken to remove or eliminate the health hazard\n    Enforcement action will be taken\n\nExamples\n\n    No hot and cold running water under pressure in food preparation area or where utensils are washed\n    Rodent or insect infestation without effective method of pest control\n    Inadequate refrigeration\n    Sewage back-up\n    Lack of safe potable water\n    Food contaminated or adulterated",
+      "description": "A closed notice will be issued when one or more crucial infractions observed during an inspection are not corrected immediately. A food establishment can only be closed when a health hazard is present.\n\nCrucial infraction type:\n- Infractions that present an immediate health hazard\n- These items directly involve food, such as contamination, time-temperature abuse or lack of safe (potable) water or any other condition that is a health hazard\n- These items must be corrected immediately or an Order to Close the premises can be issued and/or immediate action must be taken to remove or eliminate the health hazard\n- Enforcement action will be taken\n\nExamples:\n- No hot and cold running water under pressure in food preparation area or where utensils are washed\n- Rodent or insect infestation without effective method of pest control\n- Inadequate refrigeration\n- Sewage back-up\n- Lack of safe potable water\n- Food contaminated or adulterated",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -290,7 +440,7 @@
         "x": 18,
         "y": 1
       },
-      "id": 17,
+      "id": 7,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -350,156 +500,6 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "fixedColor": "green",
-            "mode": "fixed"
-          },
-          "decimals": 1,
-          "mappings": [],
-          "unit": "percentunit"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 3,
-        "x": 9,
-        "y": 1
-      },
-      "id": 21,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "dinesafe-postgres"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(*)::numeric AS total,\n    COUNT(*) FILTER (WHERE severity = 'S - Significant')::numeric AS conditional_pass,\n    COUNT(*) FILTER (WHERE severity = 'C - Crucial')::numeric AS closed\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE((total - conditional_pass - closed) / NULLIF(total, 0), 0) AS \"Pass %\"\nFROM counts;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Pass %",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "dinesafe-postgres"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "#eab308",
-            "mode": "fixed"
-          },
-          "decimals": 1,
-          "mappings": [],
-          "unit": "percentunit"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 3,
-        "x": 15,
-        "y": 1
-      },
-      "id": 22,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "dinesafe-postgres"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(*)::numeric AS total,\n    COUNT(*) FILTER (WHERE severity = 'S - Significant')::numeric AS conditional_pass\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE(conditional_pass / NULLIF(total, 0), 0) AS \"Conditional Pass %\"\nFROM counts;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Conditional Pass %",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "dinesafe-postgres"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
             "fixedColor": "#dc2626",
             "mode": "fixed"
           },
@@ -515,7 +515,7 @@
         "x": 21,
         "y": 1
       },
-      "id": 23,
+      "id": 8,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -632,7 +632,7 @@
         "x": 0,
         "y": 5
       },
-      "id": 4,
+      "id": 9,
       "options": {
         "legend": {
           "calcs": [],
@@ -662,6 +662,10 @@
       "type": "timeseries"
     },
     {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "dinesafe-postgres"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -711,7 +715,7 @@
         "x": 12,
         "y": 5
       },
-      "id": 15,
+      "id": 10,
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
@@ -757,7 +761,7 @@
         "x": 0,
         "y": 13
       },
-      "id": 20,
+      "id": 11,
       "panels": [],
       "title": "Inspection enforcement",
       "type": "row"
@@ -815,7 +819,7 @@
         "x": 0,
         "y": 14
       },
-      "id": 26,
+      "id": 12,
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
@@ -841,6 +845,10 @@
       "pluginVersion": "11.6.0",
       "targets": [
         {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "dinesafe-postgres"
+          },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
@@ -873,7 +881,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
-      "description": "There are three types of infractions that have been developed under the DineSafe Food Safety Inspection and Disclosure Program (Crucial, Significant and Minor) covering all of the requirements under the Ontario Food Premises Regulation (493/17).  These infractions will be identified on the Food Safety Inspection Report at the time of inspection.",
+      "description": "There are three types of infractions that have been developed under the DineSafe Food Safety Inspection and Disclosure Program (Crucial, Significant and Minor) covering all of the requirements under the Ontario Food Premises Regulation (493/17). These infractions will be identified on the Food Safety Inspection Report at the time of inspection.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -949,7 +957,7 @@
         "x": 12,
         "y": 14
       },
-      "id": 6,
+      "id": 13,
       "options": {
         "displayLabels": [
           "value"
@@ -1017,7 +1025,7 @@
         "x": 0,
         "y": 22
       },
-      "id": 38,
+      "id": 14,
       "panels": [],
       "title": "Infraction Details - Crucial",
       "type": "row"
@@ -1077,7 +1085,7 @@
         "x": 0,
         "y": 23
       },
-      "id": 10,
+      "id": 15,
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
@@ -1170,7 +1178,7 @@
         "x": 12,
         "y": 23
       },
-      "id": 33,
+      "id": 16,
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
@@ -1268,7 +1276,7 @@
         "x": 0,
         "y": 31
       },
-      "id": 31,
+      "id": 17,
       "options": {
         "cellHeight": "sm",
         "footer": {
@@ -1356,7 +1364,7 @@
         "x": 12,
         "y": 31
       },
-      "id": 32,
+      "id": 18,
       "options": {
         "cellHeight": "sm",
         "footer": {
@@ -1411,7 +1419,7 @@
         "x": 0,
         "y": 39
       },
-      "id": 39,
+      "id": 19,
       "panels": [],
       "title": "Infraction Details - Significant",
       "type": "row"
@@ -1471,7 +1479,7 @@
         "x": 0,
         "y": 40
       },
-      "id": 28,
+      "id": 20,
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
@@ -1583,7 +1591,7 @@
         "x": 12,
         "y": 40
       },
-      "id": 34,
+      "id": 21,
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
@@ -1681,7 +1689,7 @@
         "x": 0,
         "y": 48
       },
-      "id": 35,
+      "id": 22,
       "options": {
         "cellHeight": "sm",
         "footer": {
@@ -1769,7 +1777,7 @@
         "x": 12,
         "y": 48
       },
-      "id": 36,
+      "id": 23,
       "options": {
         "cellHeight": "sm",
         "footer": {
@@ -1813,7 +1821,7 @@
           }
         }
       ],
-      "title": "Crucial Infractions by Inspection Observations",
+      "title": "Significant Infractions by Inspection Observations",
       "type": "table"
     },
     {
@@ -1824,7 +1832,7 @@
         "x": 0,
         "y": 56
       },
-      "id": 43,
+      "id": 24,
       "panels": [],
       "title": "Infraction Details - Minor",
       "type": "row"
@@ -1884,7 +1892,7 @@
         "x": 0,
         "y": 57
       },
-      "id": 29,
+      "id": 25,
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
@@ -1996,7 +2004,7 @@
         "x": 12,
         "y": 57
       },
-      "id": 40,
+      "id": 26,
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
@@ -2094,7 +2102,7 @@
         "x": 0,
         "y": 65
       },
-      "id": 41,
+      "id": 27,
       "options": {
         "cellHeight": "sm",
         "footer": {
@@ -2182,7 +2190,7 @@
         "x": 12,
         "y": 65
       },
-      "id": 42,
+      "id": 28,
       "options": {
         "cellHeight": "sm",
         "footer": {
