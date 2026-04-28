@@ -193,7 +193,8 @@ footer {
     gap: 0.25rem;
 }
 
-.dropdown:hover .dropdown-menu { display: flex; }
+.dropdown:hover .dropdown-menu,
+.dropdown-menu.is-open { display: flex; }
 
 .dropdown-year {
     position: relative;
@@ -202,9 +203,8 @@ footer {
 
 .dropdown-year .flyout { display: none; }
 
-.dropdown-year:hover .flyout {
-    display: flex;
-}
+.dropdown-year:hover .flyout,
+.flyout.is-open { display: flex; }
 
 .flyout {
     position: absolute;
@@ -230,6 +230,17 @@ footer {
     .social-links { margin-left: 0; }
 
     .link-label { display: none; }
+
+    /* flyout stacks below year row instead of floating right */
+    .flyout {
+        position: static;
+        margin-top: 0.25rem;
+        margin-left: 0.5rem;
+        border-top: none;
+        border-right: none;
+        border-bottom: none;
+        border-radius: 0;
+    }
 }
 
 /* ── tablet (601px – 1023px: iPad portrait, phone landscape) */

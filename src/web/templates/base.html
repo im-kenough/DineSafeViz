@@ -48,6 +48,49 @@
         </div>
     </nav>
     {% block content %}{% endblock %}
+    <script>
+    (function () {
+        var dropdown = document.querySelector('.dropdown');
+        if (!dropdown) return;
+        var menu = dropdown.querySelector('.dropdown-menu');
+        var trigger = dropdown.querySelector('a.nav-btn');
+
+        // Toggle top-level dropdown; prevent the trigger link from navigating
+        trigger.addEventListener('click', function (e) {
+            e.preventDefault();
+            var opening = menu.classList.toggle('is-open');
+            if (opening) {
+                menu.querySelectorAll('.flyout.is-open').forEach(function (f) {
+                    f.classList.remove('is-open');
+                });
+            }
+        });
+
+        // Toggle year flyouts; let quarter <a> clicks through to navigation
+        menu.querySelectorAll('.dropdown-year').forEach(function (yr) {
+            yr.addEventListener('click', function (e) {
+                if (e.target.closest('a')) return;
+                e.stopPropagation();
+                var flyout = yr.querySelector('.flyout');
+                var opening = !flyout.classList.contains('is-open');
+                menu.querySelectorAll('.flyout.is-open').forEach(function (f) {
+                    f.classList.remove('is-open');
+                });
+                if (opening) flyout.classList.add('is-open');
+            });
+        });
+
+        // Close everything on outside click
+        document.addEventListener('click', function (e) {
+            if (!dropdown.contains(e.target)) {
+                menu.classList.remove('is-open');
+                menu.querySelectorAll('.flyout.is-open').forEach(function (f) {
+                    f.classList.remove('is-open');
+                });
+            }
+        });
+    }());
+    </script>
     <footer>
         &copy; {{ current_year }} Kenneth Ho<br>
         DineSafeViz v{{ version }}

@@ -38,6 +38,15 @@ Breakpoints chosen:
 - `style.css`: added `@media (max-width: 600px)` and `@media (601px) and (max-width: 1023px)` blocks.
 - `dashboard.html`: added mobile `@media (max-width: 600px)` inside the inline `<style>` to increase iframe height offset.
 
-### Hover-only dropdowns on touch (not fixed)
+### Hover-only dropdowns on touch (fixed in follow-up)
 
-The Inspections dropdown and year flyouts use `:hover`. On touch devices, the direct `<a>` link still works (navigates to current quarter). Fixing hover-to-tap would require JS; deferred as it is beyond the scope of the resolution support request.
+Added minimal JS inline in base.html to toggle `.is-open` class:
+- "Inspections ▾" click → `e.preventDefault()`, toggle `.dropdown-menu.is-open`
+- Year row click → toggle `.flyout.is-open` (unless click was on a quarter `<a>` link)
+- Outside click → close all
+
+CSS: added `.dropdown-menu.is-open` and `.flyout.is-open` alongside existing `:hover` rules so both desktop and mobile stay consistent.
+
+Mobile flyout layout: overrode `position: absolute; left: 100%` to `position: static` inside the `≤600px` block — flyouts now stack below their year row instead of floating off-screen to the right.
+
+Side-effect: "Inspections ▾" direct click-to-navigate is now intercepted on all devices (desktop hover still works for the menu; the link still functions as a fallback when JS is off).
