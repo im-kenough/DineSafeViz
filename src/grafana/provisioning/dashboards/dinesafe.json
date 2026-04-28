@@ -193,6 +193,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
+      "description": "A Pass notice will be issued when only minor or no infractions are observed during an inspection.\n\nIf minor infractions are repeated at the next inspection, the Public Health Inspector may issue a ticket to obtain compliance. Fines range from $55 to $465 depending on the severity of the infraction.\n\nMinor infraction type:\n- Infractions that present a minimal health risk\n- These items must be corrected by the next inspection\n\nExamples:\n- Walls, floors or other non-food contact surfaces or equipment need cleaning or repair (e.g., cracked or missing floor tiles, cracked or peeling paint not directly over food preparation area)\n- Inadequate ventilation and lighting systems\n- Hair constraints not worn",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -240,6 +241,7 @@
           "format": "table",
           "rawQuery": true,
           "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(*)::numeric AS total,\n    COUNT(*) FILTER (WHERE severity = 'S - Significant')::numeric AS conditional_pass,\n    COUNT(*) FILTER (WHERE severity = 'C - Crucial')::numeric AS closed\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE((total - conditional_pass - closed) / NULLIF(total, 0), 0) AS \"Pass %\"\nFROM counts;",
+
           "refId": "A",
           "sql": {
             "columns": [
@@ -345,6 +347,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
+      "description": "A conditional pass notice will be issued when one or more significant infractions are observed during an inspection.\n\nSignificant infraction types:\n- Infractions that present a potential health hazard\n- These items must be corrected within 24-48 hours or legal action may be taken\n- These items indirectly involve food, through handling, preparation, storage and/or service\n\nExamples:\n- Food contact surfaces or equipment require cleaning or repair\n- Repair of refrigeration and mechanical dish washing equipment required\n- Accurate indicating thermometers not provided\n- Lack of hand wash basin with the necessary supplies\n- Garbage not stored in a sanitary manner\n- Improper cleaning and sanitizing of equipment and utensils\n- Washroom cleanliness not maintained, supplies not provided",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -497,6 +500,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
+      "description": "A closed notice will be issued when one or more crucial infractions observed during an inspection are not corrected immediately. A food establishment can only be closed when a health hazard is present.\n\nCrucial infraction type:\n- Infractions that present an immediate health hazard\n- These items directly involve food, such as contamination, time-temperature abuse or lack of safe (potable) water or any other condition that is a health hazard\n- These items must be corrected immediately or an Order to Close the premises can be issued and/or immediate action must be taken to remove or eliminate the health hazard\n- Enforcement action will be taken\n\nExamples:\n- No hot and cold running water under pressure in food preparation area or where utensils are washed\n- Rodent or insect infestation without effective method of pest control\n- Inadequate refrigeration\n- Sewage back-up\n- Lack of safe potable water\n- Food contaminated or adulterated",
       "fieldConfig": {
         "defaults": {
           "color": {
