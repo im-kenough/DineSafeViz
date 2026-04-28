@@ -40,12 +40,14 @@
 
     --sev-crucial:     rgba(220,  38,  38, 0.6);
     --sev-significant: rgba(234,  88,  12, 0.6);
-    --sev-minor:       rgba(202, 138,   4, 0.6);
+    --sev-minor:       rgba(202, 138,   4, 0.45);
     --sev-na:          rgba( 22, 163,  74, 0.6);
     --sev-none:        rgba( 37,  99, 235, 0.6);
 }
 
 /* ── base ───────────────────────────────────────────────── */
+a { color: var(--accent); }
+
 body {
     font-family: 'IBM Plex Sans', sans-serif;
     margin: 2rem auto;
