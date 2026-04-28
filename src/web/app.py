@@ -115,6 +115,24 @@ def parse_year_quarter(args: Dict[str, str]) -> Tuple[int, int]:
     return year, q
 
 
+def get_version() -> str:
+    """Read the version from VERSION.txt."""
+    try:
+        with open(os.path.join(os.path.dirname(__file__), "VERSION.txt"), "r") as f:
+            return f.read().strip()
+    except Exception:
+        return "0.0.0"
+
+
+@app.context_processor
+def inject_globals():
+    """Inject global variables into all templates."""
+    return {
+        "current_year": date.today().year,
+        "version": get_version(),
+    }
+
+
 def sort_rows(rows: List[Dict]) -> List[Dict]:
     """Sort inspection records by severity level.
 
