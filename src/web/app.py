@@ -241,8 +241,10 @@ def index():
         days=build_days(rows, start, end),
         selected_year=year,
         selected_q=q,
-        valid_years=get_valid_years(),
-        valid_quarters=get_valid_quarters(year),
+        year_quarters=[
+            (valid_year, get_valid_quarters(valid_year))
+            for valid_year in sorted(get_valid_years(), reverse=True)
+        ],
     )
 
 

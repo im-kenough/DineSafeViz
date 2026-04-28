@@ -88,3 +88,72 @@ footer {
     font-size: 0.8rem;
     line-height: 1.4;
 }
+
+/* ── inspections dropdown ───────────────────────────────── */
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 10;
+    min-width: 100px;
+    padding: 0.25rem 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+}
+
+.dropdown:hover .dropdown-menu { display: block; }
+
+.dropdown-year {
+    position: relative;
+    padding: 0.4rem 1.5rem 0.4rem 1rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    cursor: default;
+}
+
+.dropdown-year:hover {
+    background: var(--surface-2);
+    color: var(--text);
+}
+
+.dropdown-year .flyout { display: none; }
+
+.dropdown-year:hover .flyout {
+    display: flex;
+}
+
+.flyout {
+    position: absolute;
+    top: 0;
+    left: 100%;
+    padding: 0.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.flyout a {
+    padding: 0.4rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    text-decoration: none;
+    color: var(--text-muted);
+    background: var(--surface);
+}
+
+.flyout a.active {
+    background: var(--surface-2);
+    color: var(--text);
+    border-color: var(--accent);
+}
+
+.flyout a:hover:not(.active) { background: var(--surface-2); }
