@@ -2238,7 +2238,7 @@
     "list": []
   },
   "time": {
-    "from": "now-1y",
+    "from": "now-90d",
     "to": "now"
   },
   "timepicker": {
@@ -2248,6 +2248,6 @@
   },
   "timezone": "browser",
   "title": "DineSafe Inspections Metrics",
-  "uid": "dinesafe-1-2",
+  "uid": "dinesafe",
   "version": 18
 }
