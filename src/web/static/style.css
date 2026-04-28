@@ -109,19 +109,21 @@ footer {
 .social-links a {
     display: flex;
     align-items: center;
-    justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    border: 1px solid var(--border);
+    gap: 0.4rem;
+    padding: 0.4rem 0.85rem;
+    border: 1px solid var(--accent);
     border-radius: 4px;
     background: var(--surface);
-    color: var(--text-muted);
+    color: var(--text);
     text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
 }
 
 .social-links a:hover {
-    background: var(--surface-2);
-    color: var(--text);
+    background: var(--accent);
+    color: #fff;
 }
 
 /* ── inspections dropdown ───────────────────────────────── */
