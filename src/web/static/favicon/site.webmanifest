@@ -1,0 +1,24 @@
+{
+  "name": "DineSafeViz",
+  "short_name": "DineSafeViz",
+  "icons": [
+    {
+      "src": "/static/favicon/favicon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/favicon/favicon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/favicon/favicon-180x180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#0e1016",
+  "background_color": "#0e1016",
+  "display": "standalone"
+}

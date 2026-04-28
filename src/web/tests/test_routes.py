@@ -1,10 +1,5 @@
-import sys
-import os
 from datetime import date
 from unittest.mock import patch, MagicMock
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-import app as app_module
 
 
 def _mock_db(rows):
@@ -15,25 +10,37 @@ def _mock_db(rows):
     return mock_conn
 
 
-def test_route_returns_200():
-    app_module.app.config["TESTING"] = True
-    client = app_module.app.test_client()
+def test_home_has_dashboard_link(client):
+    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+        resp = client.get("/")
+    assert b'href="/dashboard"' in resp.data
+    assert b"Dashboard" in resp.data
+    assert b'href="/info"' in resp.data
+    assert b"Info" in resp.data
+
+
+def test_info_page(client):
+    resp = client.get("/info")
+    assert resp.status_code == 200
+    assert b"DineSafeViz Info" in resp.data
+    assert b"Data Dictionary" in resp.data
+    assert b"<table>" in resp.data
+    assert b"Establishment ID" in resp.data
+
+
+def test_route_returns_200(client):
     with patch("app.psycopg2.connect", return_value=_mock_db([])):
         resp = client.get("/")
     assert resp.status_code == 200
 
 
-def test_route_renders_day_boxes():
-    app_module.app.config["TESTING"] = True
-    client = app_module.app.test_client()
+def test_route_renders_day_boxes(client):
     with patch("app.psycopg2.connect", return_value=_mock_db([])):
         resp = client.get("/?year=2024&q=1")
     assert b"day-box" in resp.data
 
 
-def test_route_shows_inspection_data():
-    app_module.app.config["TESTING"] = True
-    client = app_module.app.test_client()
+def test_route_shows_inspection_data(client):
     rows = [(
         date(2024, 2, 14),   # inspection_date
         "C - Crucial",       # severity
@@ -52,25 +59,19 @@ def test_route_shows_inspection_data():
     assert b"Rats observed" in resp.data
 
 
-def test_route_invalid_params_returns_200():
-    app_module.app.config["TESTING"] = True
-    client = app_module.app.test_client()
+def test_route_invalid_params_returns_200(client):
     with patch("app.psycopg2.connect", return_value=_mock_db([])):
         resp = client.get("/?year=1900&q=99")
     assert resp.status_code == 200
 
 
-def test_route_no_data_day_shows_no_data_text():
-    app_module.app.config["TESTING"] = True
-    client = app_module.app.test_client()
+def test_route_no_data_day_shows_no_data_text(client):
     with patch("app.psycopg2.connect", return_value=_mock_db([])):
         resp = client.get("/?year=2024&q=1")
     assert b"No data" in resp.data
 
 
-def test_severity_class_on_row():
-    app_module.app.config["TESTING"] = True
-    client = app_module.app.test_client()
+def test_severity_class_on_row(client):
     rows = [(
         date(2024, 2, 14),   # inspection_date
         "C - Crucial",       # severity
@@ -85,3 +86,73 @@ def test_severity_class_on_row():
     with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
         resp = client.get("/?year=2024&q=1")
     assert b'class="sev-crucial"' in resp.data
+
+
+def test_footer_content(client):
+    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+        resp = client.get("/")
+    assert b"&copy; 2026 Kenneth Ho" in resp.data
+    assert b"DineSafeViz v0.1.0" in resp.data
+
+
+def test_dropdown_menu_present(client):
+    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+        resp = client.get("/")
+    assert b'class="dropdown"' in resp.data
+    assert b'class="dropdown-menu"' in resp.data
+
+
+def test_dropdown_has_year_and_quarter_links(client):
+    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+        resp = client.get("/")
+    assert b'href="/?year=2023&q=4"' in resp.data
+    assert b'href="/?year=2023&q=1"' not in resp.data
+    assert b'href="/?year=2024&q=1"' in resp.data
+    assert b'href="/?year=2024&q=4"' in resp.data
+
+
+def test_standalone_year_tabs_removed(client):
+    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+        resp = client.get("/")
+    assert b'href="/?year=2024"' not in resp.data
+    assert b'href="/?year=2023"' not in resp.data
+
+
+def test_dropdown_present_on_dashboard(client):
+    resp = client.get("/dashboard")
+    assert b'class="dropdown"' in resp.data
+    assert b'class="dropdown-menu"' in resp.data
+
+
+def test_dropdown_has_links_on_dashboard(client):
+    resp = client.get("/dashboard")
+    assert b'href="/?year=2023&q=4"' in resp.data
+    assert b'href="/?year=2024&q=1"' in resp.data
+
+
+def test_dropdown_present_on_info(client):
+    resp = client.get("/info")
+    assert b'class="dropdown"' in resp.data
+    assert b'class="dropdown-menu"' in resp.data
+
+
+def test_dropdown_has_links_on_info(client):
+    resp = client.get("/info")
+    assert b'href="/?year=2023&q=4"' in resp.data
+    assert b'href="/?year=2024&q=1"' in resp.data
+
+
+def test_dashboard_nav_active_class(client):
+    resp = client.get("/dashboard")
+    assert b'href="/dashboard" class="nav-btn active"' in resp.data
+
+
+def test_info_nav_active_class(client):
+    resp = client.get("/info")
+    assert b'href="/info" class="nav-btn active"' in resp.data
+
+
+def test_index_nav_active_class(client):
+    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+        resp = client.get("/")
+    assert b'class="nav-btn active">Inspections' in resp.data
