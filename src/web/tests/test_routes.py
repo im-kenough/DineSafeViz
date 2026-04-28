@@ -75,3 +75,10 @@ def test_severity_class_on_row(client):
     with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
         resp = client.get("/?year=2024&q=1")
     assert b'class="sev-crucial"' in resp.data
+
+
+def test_footer_content(client):
+    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+        resp = client.get("/")
+    assert b"&copy; 2026 Kenneth Ho" in resp.data
+    assert b"DineSafeViz v0.1.0" in resp.data

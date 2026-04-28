@@ -78,3 +78,13 @@ tr.sev-significant { background-color: var(--sev-significant); }
 tr.sev-minor       { background-color: var(--sev-minor); }
 tr.sev-na          { background-color: var(--sev-na); }
 tr.sev-none        { background-color: var(--sev-none); }
+
+/* ── footer ─────────────────────────────────────────────── */
+footer {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
