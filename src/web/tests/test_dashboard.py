@@ -13,3 +13,4 @@ def test_dashboard_contains_iframe(client):
 def test_dashboard_has_home_link(client):
     resp = client.get("/dashboard")
     assert b'href="/"' in resp.data
+    assert b'href="/info"' in resp.data
