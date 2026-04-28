@@ -1,28 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DineSafeViz</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-    <h1>DineSafe Inspections</h1>
-
-    <div class="tabs">
-        {% for y in valid_years %}
-        <a href="/?year={{ y }}"
-           class="{{ 'active' if y == selected_year else '' }}">{{ y }}</a>
-        {% endfor %}
-    </div>
-
-    <div class="tabs">
-        {% for q in valid_quarters %}
-        <a href="/?year={{ selected_year }}&q={{ q }}"
-           class="{{ 'active' if q == selected_q else '' }}">Q{{ q }}</a>
-        {% endfor %}
-    </div>
-
+{% extends "base.html" %}
+{% block title %}DineSafeViz{% endblock %}
+{% block content %}
+    <h2 class="page-heading">DineSafe Inspections</h2>
     {% set sev_class = {
         'C - Crucial':     'sev-crucial',
         'S - Significant': 'sev-significant',
@@ -35,6 +14,7 @@
     <div class="day-box">
         <h2>{{ day.strftime('%A, %B %-d, %Y') }}</h2>
         {% if rows %}
+        <div class="table-wrap">
         <table>
             <thead>
                 <tr>
@@ -63,10 +43,10 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
         {% else %}
         <p class="no-data">No data</p>
         {% endif %}
     </div>
     {% endfor %}
-</body>
-</html>
+{% endblock %}

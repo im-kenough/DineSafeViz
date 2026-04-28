@@ -9,6 +9,7 @@ from datetime import date, timedelta
 from typing import Dict, List, Tuple
 
 import psycopg2
+import requests as http_requests
 from flask import Flask, render_template, request
 
 app = Flask(__name__)
@@ -114,6 +115,34 @@ def parse_year_quarter(args: Dict[str, str]) -> Tuple[int, int]:
     return year, q
 
 
+def _read_version() -> str:
+    try:
+        with open(os.path.join(os.path.dirname(__file__), "VERSION.txt"), "r") as f:
+            return f.read().strip()
+    except Exception:
+        return "0.0.0"
+
+
+_VERSION = _read_version()
+
+
+@app.context_processor
+def inject_globals():
+    """Inject global variables into all templates."""
+    year, q = parse_year_quarter(request.args)
+    years = get_valid_years()
+    return {
+        "current_year": date.today().year,
+        "version": _VERSION,
+        "year_quarters": [
+            (y, get_valid_quarters(y))
+            for y in sorted(years, reverse=True)
+        ],
+        "selected_year": year,
+        "selected_q": q,
+    }
+
+
 def sort_rows(rows: List[Dict]) -> List[Dict]:
     """Sort inspection records by severity level.
 
@@ -216,12 +245,43 @@ def index():
     cur.close()
     conn.close()
 
-    # Render template with grouped data and navigation options
+    # Render template with grouped data
     return render_template(
         "index.html",
         days=build_days(rows, start, end),
-        selected_year=year,
-        selected_q=q,
-        valid_years=get_valid_years(),
-        valid_quarters=get_valid_quarters(year),
     )
+
+
+@app.route("/dashboard")
+def dashboard():
+    """Render the Grafana dashboard iframe page."""
+    return render_template("dashboard.html")
+
+
+@app.route("/info")
+def info():
+    """Render the information page about DineSafe and the dataset."""
+    return render_template("info.html")
+
+
+GRAFANA_URL = os.environ.get("GRAFANA_URL", "http://grafana:3000")
+_grafana_session = http_requests.Session()
+
+
+@app.route("/grafana/", defaults={"path": ""}, methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+@app.route("/grafana/<path:path>", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+def grafana_proxy(path):
+    """Reverse-proxy requests to the internal Grafana container."""
+    url = f"{GRAFANA_URL}/grafana/{path}"
+    if request.query_string:
+        url = f"{url}?{request.query_string.decode()}"
+    resp = _grafana_session.request(
+        method=request.method,
+        url=url,
+        headers={k: v for k, v in request.headers if k.lower() != "host"},
+        data=request.get_data(),
+        allow_redirects=False,
+    )
+    _hop_by_hop = {"content-encoding", "content-length", "transfer-encoding", "connection"}
+    headers = {k: v for k, v in resp.headers.items() if k.lower() not in _hop_by_hop}
+    return resp.content, resp.status_code, headers

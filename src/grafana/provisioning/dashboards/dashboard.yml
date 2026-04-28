@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: DineSafe
+    type: file
+    # allowUiUpdates lets admins edit provisioned dashboards in the UI.
+    # Changes are ephemeral — export JSON and commit to dinesafe.json to persist.
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false
