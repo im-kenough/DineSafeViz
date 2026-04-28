@@ -24,6 +24,18 @@ body {
     color: var(--text);
 }
 
+/* ── header ─────────────────────────────────────────────── */
+header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+header h1 {
+    margin: 0;
+    font-size: 2rem;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+}
+
 /* ── tabs ───────────────────────────────────────────────── */
 .tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
 .tabs > a,
