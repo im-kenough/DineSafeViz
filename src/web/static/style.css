@@ -26,20 +26,29 @@ body {
 
 /* ── tabs ───────────────────────────────────────────────── */
 .tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
-.tabs a {
+.tabs > a,
+.tabs > .dropdown {
+    flex: 0 0 9rem;
+}
+.tabs > a,
+.tabs > .dropdown > a {
+    display: block;
     padding: 0.4rem 1rem;
     border: 1px solid var(--border);
     border-radius: 4px;
     text-decoration: none;
     color: var(--text-muted);
     background: var(--surface);
+    text-align: center;
 }
-.tabs a.active {
+.tabs > a.active,
+.tabs > .dropdown > a.active {
     background: var(--surface-2);
     color: var(--text);
     border-color: var(--accent);
 }
-.tabs a:hover:not(.active) { background: var(--surface-2); }
+.tabs > a:hover:not(.active),
+.tabs > .dropdown > a:hover:not(.active) { background: var(--surface-2); }
 
 /* ── day box ────────────────────────────────────────────── */
 .day-box {
