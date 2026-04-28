@@ -27,28 +27,26 @@ body {
 /* ── tabs ───────────────────────────────────────────────── */
 .tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
 .tabs > a,
-.tabs > .dropdown {
-    flex: 0 0 9rem;
-}
-.tabs > a,
 .tabs > .dropdown > a {
     display: block;
-    padding: 0.4rem 1rem;
-    border: 1px solid var(--border);
+    padding: 0.5rem 1.0625rem;
+    border: 1px solid var(--accent);
     border-radius: 4px;
     text-decoration: none;
-    color: var(--text-muted);
+    color: var(--text);
     background: var(--surface);
     text-align: center;
+    font-size: 1.094rem;
+    font-weight: 600;
+    white-space: nowrap;
 }
 .tabs > a.active,
 .tabs > .dropdown > a.active {
-    background: var(--surface-2);
-    color: var(--text);
-    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
 }
 .tabs > a:hover:not(.active),
-.tabs > .dropdown > a:hover:not(.active) { background: var(--surface-2); }
+.tabs > .dropdown > a:hover:not(.active) { background: var(--accent); color: #fff; }
 
 /* ── day box ────────────────────────────────────────────── */
 .day-box {
@@ -109,14 +107,14 @@ footer {
 .social-links a {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.4rem 0.85rem;
+    gap: 0.5rem;
+    padding: 0.5rem 1.0625rem;
     border: 1px solid var(--accent);
     border-radius: 4px;
     background: var(--surface);
     color: var(--text);
     text-decoration: none;
-    font-size: 0.875rem;
+    font-size: 1.094rem;
     font-weight: 600;
     white-space: nowrap;
 }
@@ -138,26 +136,32 @@ footer {
     top: 100%;
     left: 0;
     z-index: 10;
-    min-width: 100px;
-    padding: 0.25rem 0;
+    padding: 0.25rem;
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 1px solid var(--accent);
     border-radius: 4px;
+    flex-direction: column;
+    gap: 0.25rem;
 }
 
-.dropdown:hover .dropdown-menu { display: block; }
+.dropdown:hover .dropdown-menu { display: flex; }
 
 .dropdown-year {
     position: relative;
-    padding: 0.4rem 1.5rem 0.4rem 1rem;
-    color: var(--text-muted);
+    padding: 0.5rem 1.0625rem;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    color: var(--text);
+    background: var(--surface);
+    font-size: 1.094rem;
+    font-weight: 600;
     white-space: nowrap;
-    cursor: default;
+    cursor: pointer;
 }
 
 .dropdown-year:hover {
-    background: var(--surface-2);
-    color: var(--text);
+    background: var(--accent);
+    color: #fff;
 }
 
 .dropdown-year .flyout { display: none; }
@@ -172,25 +176,27 @@ footer {
     left: 100%;
     padding: 0.25rem;
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 1px solid var(--accent);
     border-radius: 4px;
     flex-direction: column;
     gap: 0.25rem;
 }
 
 .flyout a {
-    padding: 0.4rem 1rem;
-    border: 1px solid var(--border);
+    padding: 0.5rem 1.0625rem;
+    border: 1px solid var(--accent);
     border-radius: 4px;
     text-decoration: none;
-    color: var(--text-muted);
+    color: var(--text);
     background: var(--surface);
+    font-size: 1.094rem;
+    font-weight: 600;
+    white-space: nowrap;
 }
 
 .flyout a.active {
-    background: var(--surface-2);
-    color: var(--text);
-    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
 }
 
-.flyout a:hover:not(.active) { background: var(--surface-2); }
+.flyout a:hover:not(.active) { background: var(--accent); color: #fff; }
