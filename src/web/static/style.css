@@ -44,29 +44,28 @@ h2.page-heading {
     color: var(--text);
 }
 
-/* ── tabs ───────────────────────────────────────────────── */
-.tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
-.tabs > a,
-.tabs > .dropdown > a {
-    display: block;
+/* ── nav button (shared by tabs, social links, flyout) ──── */
+.nav-btn {
     padding: 0.5rem 1.0625rem;
     border: 1px solid var(--accent);
     border-radius: 4px;
     text-decoration: none;
     color: var(--text);
     background: var(--surface);
-    text-align: center;
     font-size: 1.094rem;
     font-weight: 600;
     white-space: nowrap;
 }
-.tabs > a.active,
-.tabs > .dropdown > a.active {
-    background: var(--accent);
-    color: #fff;
+.nav-btn.active,
+.nav-btn:hover:not(.active) { background: var(--accent); color: #fff; }
+
+/* ── tabs ───────────────────────────────────────────────── */
+.tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+.tabs > a,
+.tabs > .dropdown > a {
+    display: block;
+    text-align: center;
 }
-.tabs > a:hover:not(.active),
-.tabs > .dropdown > a:hover:not(.active) { background: var(--accent); color: #fff; }
 
 /* ── day box ────────────────────────────────────────────── */
 .day-box {
@@ -128,20 +127,6 @@ footer {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.5rem 1.0625rem;
-    border: 1px solid var(--accent);
-    border-radius: 4px;
-    background: var(--surface);
-    color: var(--text);
-    text-decoration: none;
-    font-size: 1.094rem;
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-.social-links a:hover {
-    background: var(--accent);
-    color: #fff;
 }
 
 /* ── inspections dropdown ───────────────────────────────── */
@@ -168,20 +153,7 @@ footer {
 
 .dropdown-year {
     position: relative;
-    padding: 0.5rem 1.0625rem;
-    border: 1px solid var(--accent);
-    border-radius: 4px;
-    color: var(--text);
-    background: var(--surface);
-    font-size: 1.094rem;
-    font-weight: 600;
-    white-space: nowrap;
     cursor: pointer;
-}
-
-.dropdown-year:hover {
-    background: var(--accent);
-    color: #fff;
 }
 
 .dropdown-year .flyout { display: none; }
@@ -202,21 +174,4 @@ footer {
     gap: 0.25rem;
 }
 
-.flyout a {
-    padding: 0.5rem 1.0625rem;
-    border: 1px solid var(--accent);
-    border-radius: 4px;
-    text-decoration: none;
-    color: var(--text);
-    background: var(--surface);
-    font-size: 1.094rem;
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-.flyout a.active {
-    background: var(--accent);
-    color: #fff;
-}
-
-.flyout a:hover:not(.active) { background: var(--accent); color: #fff; }
+.flyout a { display: block; }

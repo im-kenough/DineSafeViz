@@ -22,7 +22,7 @@ def test_home_has_dashboard_link(client):
 def test_info_page(client):
     resp = client.get("/info")
     assert resp.status_code == 200
-    assert b"DineSafe Information" in resp.data
+    assert b"DineSafeViz Info" in resp.data
     assert b"Data Dictionary" in resp.data
     assert b"<table>" in resp.data
     assert b"Establishment ID" in resp.data
@@ -144,15 +144,15 @@ def test_dropdown_has_links_on_info(client):
 
 def test_dashboard_nav_active_class(client):
     resp = client.get("/dashboard")
-    assert b'href="/dashboard" class="active"' in resp.data
+    assert b'href="/dashboard" class="nav-btn active"' in resp.data
 
 
 def test_info_nav_active_class(client):
     resp = client.get("/info")
-    assert b'href="/info" class="active"' in resp.data
+    assert b'href="/info" class="nav-btn active"' in resp.data
 
 
 def test_index_nav_active_class(client):
     with patch("app.psycopg2.connect", return_value=_mock_db([])):
         resp = client.get("/")
-    assert b'class="active">Inspections' in resp.data
+    assert b'class="nav-btn active">Inspections' in resp.data

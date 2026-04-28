@@ -115,13 +115,15 @@ def parse_year_quarter(args: Dict[str, str]) -> Tuple[int, int]:
     return year, q
 
 
-def get_version() -> str:
-    """Read the version from VERSION.txt."""
+def _read_version() -> str:
     try:
         with open(os.path.join(os.path.dirname(__file__), "VERSION.txt"), "r") as f:
             return f.read().strip()
     except Exception:
         return "0.0.0"
+
+
+_VERSION = _read_version()
 
 
 @app.context_processor
@@ -131,7 +133,7 @@ def inject_globals():
     years = get_valid_years()
     return {
         "current_year": date.today().year,
-        "version": get_version(),
+        "version": _VERSION,
         "year_quarters": [
             (y, get_valid_quarters(y))
             for y in sorted(years, reverse=True)
@@ -280,6 +282,6 @@ def grafana_proxy(path):
         data=request.get_data(),
         allow_redirects=False,
     )
-    excluded_headers = {"content-encoding", "content-length", "transfer-encoding", "connection"}
-    headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded_headers}
+    _hop_by_hop = {"content-encoding", "content-length", "transfer-encoding", "connection"}
+    headers = {k: v for k, v in resp.headers.items() if k.lower() not in _hop_by_hop}
     return resp.content, resp.status_code, headers
