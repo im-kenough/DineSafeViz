@@ -15,6 +15,17 @@ def test_home_has_dashboard_link(client):
         resp = client.get("/")
     assert b'href="/dashboard"' in resp.data
     assert b"Dashboard" in resp.data
+    assert b'href="/info"' in resp.data
+    assert b"Info" in resp.data
+
+
+def test_info_page(client):
+    resp = client.get("/info")
+    assert resp.status_code == 200
+    assert b"DineSafe Information" in resp.data
+    assert b"Data Dictionary" in resp.data
+    assert b"<table>" in resp.data
+    assert b"Establishment ID" in resp.data
 
 
 def test_route_returns_200(client):

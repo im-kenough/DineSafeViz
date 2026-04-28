@@ -252,6 +252,12 @@ def dashboard():
     return render_template("dashboard.html")
 
 
+@app.route("/info")
+def info():
+    """Render the information page about DineSafe and the dataset."""
+    return render_template("info.html")
+
+
 GRAFANA_URL = os.environ.get("GRAFANA_URL", "http://grafana:3000")
 _grafana_session = http_requests.Session()
 
