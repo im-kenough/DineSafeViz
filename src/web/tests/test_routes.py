@@ -1,10 +1,5 @@
-import sys
-import os
 from datetime import date
 from unittest.mock import patch, MagicMock
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-import app as app_module
 
 
 def _mock_db(rows):
@@ -15,34 +10,26 @@ def _mock_db(rows):
     return mock_conn
 
 
-def test_home_has_dashboard_link():
-    app_module.app.config["TESTING"] = True
-    client = app_module.app.test_client()
+def test_home_has_dashboard_link(client):
     with patch("app.psycopg2.connect", return_value=_mock_db([])):
         resp = client.get("/")
     assert b'href="/dashboard"' in resp.data
     assert b"Dashboard" in resp.data
 
 
-def test_route_returns_200():
-    app_module.app.config["TESTING"] = True
-    client = app_module.app.test_client()
+def test_route_returns_200(client):
     with patch("app.psycopg2.connect", return_value=_mock_db([])):
         resp = client.get("/")
     assert resp.status_code == 200
 
 
-def test_route_renders_day_boxes():
-    app_module.app.config["TESTING"] = True
-    client = app_module.app.test_client()
+def test_route_renders_day_boxes(client):
     with patch("app.psycopg2.connect", return_value=_mock_db([])):
         resp = client.get("/?year=2024&q=1")
     assert b"day-box" in resp.data
 
 
-def test_route_shows_inspection_data():
-    app_module.app.config["TESTING"] = True
-    client = app_module.app.test_client()
+def test_route_shows_inspection_data(client):
     rows = [(
         date(2024, 2, 14),   # inspection_date
         "C - Crucial",       # severity
@@ -61,25 +48,19 @@ def test_route_shows_inspection_data():
     assert b"Rats observed" in resp.data
 
 
-def test_route_invalid_params_returns_200():
-    app_module.app.config["TESTING"] = True
-    client = app_module.app.test_client()
+def test_route_invalid_params_returns_200(client):
     with patch("app.psycopg2.connect", return_value=_mock_db([])):
         resp = client.get("/?year=1900&q=99")
     assert resp.status_code == 200
 
 
-def test_route_no_data_day_shows_no_data_text():
-    app_module.app.config["TESTING"] = True
-    client = app_module.app.test_client()
+def test_route_no_data_day_shows_no_data_text(client):
     with patch("app.psycopg2.connect", return_value=_mock_db([])):
         resp = client.get("/?year=2024&q=1")
     assert b"No data" in resp.data
 
 
-def test_severity_class_on_row():
-    app_module.app.config["TESTING"] = True
-    client = app_module.app.test_client()
+def test_severity_class_on_row(client):
     rows = [(
         date(2024, 2, 14),   # inspection_date
         "C - Crucial",       # severity
