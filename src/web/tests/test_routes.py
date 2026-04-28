@@ -116,3 +116,43 @@ def test_standalone_year_tabs_removed(client):
         resp = client.get("/")
     assert b'href="/?year=2024"' not in resp.data
     assert b'href="/?year=2023"' not in resp.data
+
+
+def test_dropdown_present_on_dashboard(client):
+    resp = client.get("/dashboard")
+    assert b'class="dropdown"' in resp.data
+    assert b'class="dropdown-menu"' in resp.data
+
+
+def test_dropdown_has_links_on_dashboard(client):
+    resp = client.get("/dashboard")
+    assert b'href="/?year=2023&q=4"' in resp.data
+    assert b'href="/?year=2024&q=1"' in resp.data
+
+
+def test_dropdown_present_on_info(client):
+    resp = client.get("/info")
+    assert b'class="dropdown"' in resp.data
+    assert b'class="dropdown-menu"' in resp.data
+
+
+def test_dropdown_has_links_on_info(client):
+    resp = client.get("/info")
+    assert b'href="/?year=2023&q=4"' in resp.data
+    assert b'href="/?year=2024&q=1"' in resp.data
+
+
+def test_dashboard_nav_active_class(client):
+    resp = client.get("/dashboard")
+    assert b'href="/dashboard" class="active"' in resp.data
+
+
+def test_info_nav_active_class(client):
+    resp = client.get("/info")
+    assert b'href="/info" class="active"' in resp.data
+
+
+def test_index_nav_active_class(client):
+    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+        resp = client.get("/")
+    assert b'class="active">Inspections' in resp.data
