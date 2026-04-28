@@ -136,26 +136,32 @@ footer {
     top: 100%;
     left: 0;
     z-index: 10;
-    min-width: 100px;
-    padding: 0.25rem 0;
+    padding: 0.25rem;
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 1px solid var(--accent);
     border-radius: 4px;
+    flex-direction: column;
+    gap: 0.25rem;
 }
 
-.dropdown:hover .dropdown-menu { display: block; }
+.dropdown:hover .dropdown-menu { display: flex; }
 
 .dropdown-year {
     position: relative;
-    padding: 0.4rem 1.5rem 0.4rem 1rem;
-    color: var(--text-muted);
+    padding: 0.5rem 1.0625rem;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    color: var(--text);
+    background: var(--surface);
+    font-size: 1.094rem;
+    font-weight: 600;
     white-space: nowrap;
-    cursor: default;
+    cursor: pointer;
 }
 
 .dropdown-year:hover {
-    background: var(--surface-2);
-    color: var(--text);
+    background: var(--accent);
+    color: #fff;
 }
 
 .dropdown-year .flyout { display: none; }
@@ -170,7 +176,7 @@ footer {
     left: 100%;
     padding: 0.25rem;
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 1px solid var(--accent);
     border-radius: 4px;
     flex-direction: column;
     gap: 0.25rem;
