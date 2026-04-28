@@ -18,10 +18,19 @@
 /* ── base ───────────────────────────────────────────────── */
 body {
     font-family: sans-serif;
-    margin: 2rem;
+    margin: 2rem auto;
+    padding: 0 2rem;
     max-width: 1200px;
     background: var(--bg);
     color: var(--text);
+}
+
+@media (min-width: 1400px) {
+    body { max-width: 1400px; }
+}
+
+@media (min-width: 2200px) {
+    body { max-width: 1800px; }
 }
 
 /* ── header ─────────────────────────────────────────────── */
@@ -31,7 +40,7 @@ header {
 }
 header h1 {
     margin: 0;
-    font-size: 2rem;
+    font-size: clamp(1.75rem, 2.5vw, 3rem);
     color: var(--accent);
     letter-spacing: 0.05em;
 }
@@ -52,7 +61,7 @@ h2.page-heading {
     text-decoration: none;
     color: var(--text);
     background: var(--surface);
-    font-size: 1.094rem;
+    font-size: clamp(0.9rem, 1vw, 1.15rem);
     font-weight: 600;
     white-space: nowrap;
 }
@@ -84,12 +93,13 @@ h2.page-heading {
 .no-data { margin: 0; color: var(--text-muted); font-style: italic; }
 
 /* ── table ──────────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; }
 th, td {
     border: 1px solid var(--border);
     padding: 0.35rem 0.6rem;
     text-align: left;
-    font-size: 0.875rem;
+    font-size: clamp(0.8rem, 0.9vw, 1.05rem);
 }
 th {
     background: var(--surface-2);
@@ -175,3 +185,9 @@ footer {
 }
 
 .flyout a { display: block; }
+
+/* ── QHD spacing ────────────────────────────────────────── */
+@media (min-width: 2200px) {
+    .day-box { padding: 1.5rem 2rem; }
+    th, td   { padding: 0.55rem 1rem; }
+}
