@@ -1248,11 +1248,25 @@
             "mode": "fixed"
           },
           "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
             },
-            "inspect": false
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
@@ -1278,16 +1292,26 @@
       },
       "id": 17,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showHeader": true
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
       },
       "pluginVersion": "11.6.0",
       "targets": [
@@ -1321,7 +1345,7 @@
         }
       ],
       "title": "Crucial Infractions by Infraction details",
-      "type": "table"
+      "type": "barchart"
     },
     {
       "datasource": {
@@ -1336,11 +1360,25 @@
             "mode": "fixed"
           },
           "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
             },
-            "inspect": false
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
@@ -1366,16 +1404,26 @@
       },
       "id": 18,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showHeader": true
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
       },
       "pluginVersion": "11.6.0",
       "targets": [
@@ -1387,7 +1435,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT inspection_observation AS \"Type\", COUNT(*) AS \"Crucial\" FROM inspections WHERE severity = 'C - Crucial' AND inspection_observation IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT inspection_observation AS \"Observation\", COUNT(*) AS \"Crucial\" FROM inspections WHERE severity = 'C - Crucial' AND inspection_observation IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1409,7 +1457,7 @@
         }
       ],
       "title": "Crucial Infractions by Inspection Observations",
-      "type": "table"
+      "type": "barchart"
     },
     {
       "collapsed": false,
@@ -1661,11 +1709,25 @@
             "mode": "fixed"
           },
           "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
             },
-            "inspect": false
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
@@ -1691,16 +1753,26 @@
       },
       "id": 22,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showHeader": true
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
       },
       "pluginVersion": "11.6.0",
       "targets": [
@@ -1734,7 +1806,7 @@
         }
       ],
       "title": "Significant Infractions by Infraction details",
-      "type": "table"
+      "type": "barchart"
     },
     {
       "datasource": {
@@ -1745,15 +1817,29 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "fixedColor": "#dc2626",
+            "fixedColor": "orange",
             "mode": "fixed"
           },
           "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
             },
-            "inspect": false
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
@@ -1779,16 +1865,26 @@
       },
       "id": 23,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showHeader": true
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
       },
       "pluginVersion": "11.6.0",
       "targets": [
@@ -1800,7 +1896,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT inspection_observation AS \"Type\", COUNT(*) AS \"Significant\" FROM inspections WHERE severity = 'S - Significant' AND inspection_observation IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT inspection_observation AS \"Observation\", COUNT(*) AS \"Significant\" FROM inspections WHERE severity = 'S - Significant' AND inspection_observation IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1822,7 +1918,7 @@
         }
       ],
       "title": "Significant Infractions by Inspection Observations",
-      "type": "table"
+      "type": "barchart"
     },
     {
       "collapsed": false,
@@ -2070,15 +2166,29 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "fixedColor": "orange",
+            "fixedColor": "yellow",
             "mode": "fixed"
           },
           "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
             },
-            "inspect": false
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
@@ -2104,16 +2214,26 @@
       },
       "id": 27,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showHeader": true
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
       },
       "pluginVersion": "11.6.0",
       "targets": [
@@ -2125,7 +2245,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT infraction_details AS \"Minor Infraction Details\", COUNT(*) AS \"Count\" FROM inspections WHERE severity = 'M - Minor' AND infraction_details IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT infraction_details AS \"Infraction Details\", COUNT(*) AS \"Count\" FROM inspections WHERE severity = 'M - Minor' AND infraction_details IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2147,7 +2267,7 @@
         }
       ],
       "title": "Minor Infractions by Infraction details",
-      "type": "table"
+      "type": "barchart"
     },
     {
       "datasource": {
@@ -2158,15 +2278,29 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "fixedColor": "#dc2626",
+            "fixedColor": "yellow",
             "mode": "fixed"
           },
           "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
             },
-            "inspect": false
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
@@ -2192,16 +2326,26 @@
       },
       "id": 28,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showHeader": true
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
       },
       "pluginVersion": "11.6.0",
       "targets": [
@@ -2213,7 +2357,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT inspection_observation AS \"Type\", COUNT(*) AS \"Count\" FROM inspections WHERE severity = 'M - Minor' AND inspection_observation IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT inspection_observation AS \"Observation\", COUNT(*) AS \"Count\" FROM inspections WHERE severity = 'M - Minor' AND inspection_observation IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2235,7 +2379,7 @@
         }
       ],
       "title": "Minor Infractions by Inspection Observations",
-      "type": "table"
+      "type": "barchart"
     }
   ],
   "preload": false,
@@ -2257,5 +2401,5 @@
   "timezone": "browser",
   "title": "DineSafe Inspections Metrics",
   "uid": "dinesafe",
-  "version": 18
+  "version": 19
 }
