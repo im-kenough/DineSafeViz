@@ -1,3 +1,33 @@
+/* ── fonts ───────────────────────────────────────────────── */
+@font-face {
+    font-family: 'IBM Plex Sans';
+    src: url('fonts/IBMPlexSans-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'IBM Plex Sans';
+    src: url('fonts/IBMPlexSans-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'IBM Plex Sans';
+    src: url('fonts/IBMPlexSans-SemiBold.woff2') format('woff2');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'IBM Plex Sans';
+    src: url('fonts/IBMPlexSans-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
 /* ── custom properties ──────────────────────────────────── */
 :root {
     --bg:              #0e1016;
@@ -5,7 +35,7 @@
     --surface-2:       #1d2028;
     --border:          #262a35;
     --text:            #dde1ec;
-    --text-muted:      #5e6478;
+    --text-muted:      #7a8094;
     --accent:          #4a7aff;
 
     --sev-crucial:     rgba(220,  38,  38, 0.6);
@@ -17,12 +47,13 @@
 
 /* ── base ───────────────────────────────────────────────── */
 body {
-    font-family: sans-serif;
+    font-family: 'IBM Plex Sans', sans-serif;
     margin: 2rem auto;
     padding: 0 2rem;
     max-width: 1200px;
     background: var(--bg);
     color: var(--text);
+    line-height: 1.6;
 }
 
 @media (min-width: 1400px) {
@@ -66,7 +97,7 @@ h2.page-heading {
     white-space: nowrap;
 }
 .nav-btn.active,
-.nav-btn:hover:not(.active) { background: var(--accent); color: #fff; }
+.nav-btn:hover:not(.active) { background: #2952d9; color: #fff; }
 
 /* ── tabs ───────────────────────────────────────────────── */
 .tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
@@ -100,6 +131,7 @@ th, td {
     padding: 0.35rem 0.6rem;
     text-align: left;
     font-size: clamp(0.8rem, 0.9vw, 1.05rem);
+    font-feature-settings: "tnum";
 }
 th {
     background: var(--surface-2);
