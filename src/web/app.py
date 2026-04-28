@@ -115,8 +115,7 @@ def parse_year_quarter(args: Dict[str, str]) -> Tuple[int, int]:
     return year, q
 
 
-def get_version() -> str:
-    """Read the version from VERSION.txt."""
+def _read_version() -> str:
     try:
         with open(os.path.join(os.path.dirname(__file__), "VERSION.txt"), "r") as f:
             return f.read().strip()
@@ -124,12 +123,23 @@ def get_version() -> str:
         return "0.0.0"
 
 
+_VERSION = _read_version()
+
+
 @app.context_processor
 def inject_globals():
     """Inject global variables into all templates."""
+    year, q = parse_year_quarter(request.args)
+    years = get_valid_years()
     return {
         "current_year": date.today().year,
-        "version": get_version(),
+        "version": _VERSION,
+        "year_quarters": [
+            (y, get_valid_quarters(y))
+            for y in sorted(years, reverse=True)
+        ],
+        "selected_year": year,
+        "selected_q": q,
     }
 
 
@@ -235,16 +245,10 @@ def index():
     cur.close()
     conn.close()
 
-    # Render template with grouped data and navigation options
+    # Render template with grouped data
     return render_template(
         "index.html",
         days=build_days(rows, start, end),
-        selected_year=year,
-        selected_q=q,
-        year_quarters=[
-            (valid_year, get_valid_quarters(valid_year))
-            for valid_year in sorted(get_valid_years(), reverse=True)
-        ],
     )
 
 
@@ -278,6 +282,6 @@ def grafana_proxy(path):
         data=request.get_data(),
         allow_redirects=False,
     )
-    excluded_headers = {"content-encoding", "content-length", "transfer-encoding", "connection"}
-    headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded_headers}
+    _hop_by_hop = {"content-encoding", "content-length", "transfer-encoding", "connection"}
+    headers = {k: v for k, v in resp.headers.items() if k.lower() not in _hop_by_hop}
     return resp.content, resp.status_code, headers

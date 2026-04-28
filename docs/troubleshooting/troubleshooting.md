@@ -26,3 +26,11 @@ After the containers restart, open `http://localhost:5000/dashboard` again in a
 browser tab.
 
 
+## Dashboard doesn't load in firefox
+
+I have ublock origin and all kinds of ad blockers turn on firefox, it it doesn't load data from postgres, but the dashboard shows up.
+
+firefox normal mode: doesn't load
+firefox private mode: loads
+chrome normal mode: loads
+chrome incognito mode: loads
