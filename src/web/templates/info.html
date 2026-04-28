@@ -1,10 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DineSafeViz — Info</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+{% extends "base.html" %}
+{% block title %}DineSafeViz - Info{% endblock %}
+{% block head %}
     <style>
         .info-content {
             max-width: 900px;
@@ -32,8 +28,8 @@
             margin-top: 1rem;
         }
     </style>
-</head>
-<body>
+{% endblock %}
+{% block body %}
     <h1>DineSafe Information</h1>
 
     <div class="tabs">
@@ -163,5 +159,4 @@
         &copy; {{ current_year }} Kenneth Ho<br>
         DineSafeViz v{{ version }}
     </footer>
-</body>
-</html>
+{% endblock %}
