@@ -93,3 +93,26 @@ def test_footer_content(client):
         resp = client.get("/")
     assert b"&copy; 2026 Kenneth Ho" in resp.data
     assert b"DineSafeViz v0.1.0" in resp.data
+
+
+def test_dropdown_menu_present(client):
+    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+        resp = client.get("/")
+    assert b'class="dropdown"' in resp.data
+    assert b'class="dropdown-menu"' in resp.data
+
+
+def test_dropdown_has_year_and_quarter_links(client):
+    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+        resp = client.get("/")
+    assert b'href="/?year=2023&q=4"' in resp.data
+    assert b'href="/?year=2023&q=1"' not in resp.data
+    assert b'href="/?year=2024&q=1"' in resp.data
+    assert b'href="/?year=2024&q=4"' in resp.data
+
+
+def test_standalone_year_tabs_removed(client):
+    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+        resp = client.get("/")
+    assert b'href="/?year=2024"' not in resp.data
+    assert b'href="/?year=2023"' not in resp.data

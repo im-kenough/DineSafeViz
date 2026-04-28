@@ -4,23 +4,24 @@
     <h1>DineSafe Inspections</h1>
 
     <div class="tabs">
-        <a href="/" class="active">Inspections</a>
+        <div class="dropdown">
+            <a href="/" class="active">Inspections ▾</a>
+            <div class="dropdown-menu">
+                {% for y, qs in year_quarters %}
+                <div class="dropdown-year">
+                    <span>{{ y }} ›</span>
+                    <div class="flyout">
+                        {% for q in qs %}
+                        <a href="/?year={{ y }}&q={{ q }}"
+                           class="{{ 'active' if y == selected_year and q == selected_q else '' }}">Q{{ q }}</a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
         <a href="/dashboard">Dashboard</a>
         <a href="/info">Info</a>
-    </div>
-
-    <div class="tabs">
-        {% for y in valid_years %}
-        <a href="/?year={{ y }}"
-           class="{{ 'active' if y == selected_year else '' }}">{{ y }}</a>
-        {% endfor %}
-    </div>
-
-    <div class="tabs">
-        {% for q in valid_quarters %}
-        <a href="/?year={{ selected_year }}&q={{ q }}"
-           class="{{ 'active' if q == selected_q else '' }}">Q{{ q }}</a>
-        {% endfor %}
     </div>
 
     {% set sev_class = {
