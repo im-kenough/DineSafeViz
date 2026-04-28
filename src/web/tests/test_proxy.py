@@ -1,13 +1,7 @@
-import sys
-import os
 from unittest.mock import patch, MagicMock
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-import app as app_module
 
-
-def _mock_grafana_response(status_code=200, content=b"grafana html",
-                           headers=None):
+def _mock_grafana_response(status_code=200, content=b"grafana html", headers=None):
     resp = MagicMock()
     resp.status_code = status_code
     resp.content = content
@@ -15,11 +9,9 @@ def _mock_grafana_response(status_code=200, content=b"grafana html",
     return resp
 
 
-def test_grafana_proxy_forwards_get():
-    app_module.app.config["TESTING"] = True
-    client = app_module.app.test_client()
+def test_grafana_proxy_forwards_get(client):
     mock_resp = _mock_grafana_response()
-    with patch("app.http_requests.request", return_value=mock_resp) as mock_req:
+    with patch("app._grafana_session.request", return_value=mock_resp) as mock_req:
         resp = client.get("/grafana/d/dinesafe/dinesafe-inspections")
     mock_req.assert_called_once()
     kwargs = mock_req.call_args.kwargs
@@ -29,39 +21,37 @@ def test_grafana_proxy_forwards_get():
     assert resp.data == b"grafana html"
 
 
-def test_grafana_proxy_passes_query_string():
-    app_module.app.config["TESTING"] = True
-    client = app_module.app.test_client()
+def test_grafana_proxy_passes_query_string(client):
     mock_resp = _mock_grafana_response()
-    with patch("app.http_requests.request", return_value=mock_resp) as mock_req:
+    with patch("app._grafana_session.request", return_value=mock_resp) as mock_req:
         resp = client.get("/grafana/d/dinesafe/x?kiosk&orgId=1")
     url = mock_req.call_args.kwargs["url"]
     assert "kiosk" in url
     assert "orgId=1" in url
 
 
-def test_grafana_proxy_returns_grafana_status_code():
-    app_module.app.config["TESTING"] = True
-    client = app_module.app.test_client()
+def test_grafana_proxy_returns_grafana_status_code(client):
     mock_resp = _mock_grafana_response(status_code=404, content=b"not found")
-    with patch("app.http_requests.request", return_value=mock_resp):
+    with patch("app._grafana_session.request", return_value=mock_resp):
         resp = client.get("/grafana/nonexistent")
     assert resp.status_code == 404
 
 
-def test_grafana_proxy_forwards_post():
-    app_module.app.config["TESTING"] = True
-    client = app_module.app.test_client()
-    mock_resp = _mock_grafana_response(content=b"{\"results\":{}}",
-                                       headers={"Content-Type": "application/json"})
+def test_grafana_proxy_forwards_post(client):
+    mock_resp = _mock_grafana_response(
+        content=b'{"results":{}}',
+        headers={"Content-Type": "application/json"},
+    )
     payload = b'{"queries":[]}'
-    with patch("app.http_requests.request", return_value=mock_resp) as mock_req:
-        resp = client.post("/grafana/api/ds/query",
-                           data=payload,
-                           headers={"Content-Type": "application/json"})
+    with patch("app._grafana_session.request", return_value=mock_resp) as mock_req:
+        resp = client.post(
+            "/grafana/api/ds/query",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+        )
     kwargs = mock_req.call_args.kwargs
     assert kwargs["method"] == "POST"
     assert kwargs["data"] == payload
     assert kwargs["headers"]["Content-Type"] == "application/json"
     assert resp.status_code == 200
-    assert resp.data == b"{\"results\":{}}"
+    assert resp.data == b'{"results":{}}'

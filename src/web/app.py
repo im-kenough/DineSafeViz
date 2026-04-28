@@ -234,7 +234,8 @@ def dashboard():
     return render_template("dashboard.html")
 
 
-GRAFANA_URL = "http://grafana:3000"
+GRAFANA_URL = os.environ.get("GRAFANA_URL", "http://grafana:3000")
+_grafana_session = http_requests.Session()
 
 
 @app.route("/grafana/", defaults={"path": ""}, methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
@@ -244,7 +245,7 @@ def grafana_proxy(path):
     url = f"{GRAFANA_URL}/grafana/{path}"
     if request.query_string:
         url = f"{url}?{request.query_string.decode()}"
-    resp = http_requests.request(
+    resp = _grafana_session.request(
         method=request.method,
         url=url,
         headers={k: v for k, v in request.headers if k.lower() != "host"},
