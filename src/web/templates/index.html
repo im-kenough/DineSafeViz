@@ -33,7 +33,7 @@
                 <tr class="{{ sev_class.get(row.severity, '') }}">
                     <td>{{ row.severity or '—' }}</td>
                     <td>{{ row.infraction_details or '—' }}</td>
-                    <td>{{ row.establishment_name or '—' }}<br>{{ row.establishment_address or '—' }}</td>
+                    <td>{{ row.establishment_name or '—' }}<br>----------<br>{{ row.establishment_address or '—' }}</td>
                     <td>{{ row.establishment_type or '—' }}</td>
                     <td>{{ row.action or '—' }}</td>
                     <td>{{ row.outcome or '—' }}</td>
