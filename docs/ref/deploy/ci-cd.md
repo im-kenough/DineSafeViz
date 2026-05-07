@@ -9,7 +9,6 @@ Create a github issue for planned features and fixes. Apply relevant tags and mi
 Setting up a release:
 
 1. branch main into dev
-2. branch dev into stg
 
 Implementing features:
 
