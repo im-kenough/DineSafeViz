@@ -5,7 +5,7 @@ from Toronto's DineSafe program, grouped by inspection date with severity-based 
 """
 import calendar
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Dict, List, Tuple
 
 import psycopg2
@@ -26,6 +26,8 @@ SEVERITY_ORDER = {
 RECENT_YEARS = 4
 # The recent CSV only covers from Q4 2023 onward; historical data ends 2022.
 RECENT_DATA_START_YEAR = 2023
+_stats_cache = {"data": None, "fetched_at": None}
+_STATS_TTL = timedelta(days=5)
 
 
 def get_quarter_bounds(year: int, q: int) -> Tuple[date, date]:
@@ -200,7 +202,44 @@ DB_CONFIG = {
 }
 
 
+def _get_home_stats() -> Dict[str, int]:
+    now = datetime.now()
+    if (
+        _stats_cache["fetched_at"] is not None and
+        now - _stats_cache["fetched_at"] <= _STATS_TTL
+    ):
+        return _stats_cache["data"]
+
+    conn = psycopg2.connect(**DB_CONFIG)
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT COUNT(*), MIN(inspection_date), MAX(inspection_date) FROM inspections"
+        )
+        total, min_date, max_date = cur.fetchone()
+        cur.close()
+    finally:
+        conn.close()
+
+    years_of_data = 0
+    if min_date is not None and max_date is not None:
+        years_of_data = max_date.year - min_date.year + 1
+
+    stats = {
+        "total_inspections": total,
+        "years_of_data": years_of_data,
+    }
+    _stats_cache["data"] = stats
+    _stats_cache["fetched_at"] = now
+    return stats
+
+
 @app.route("/")
+def home():
+    return render_template("home.html", stats=_get_home_stats())
+
+
+@app.route("/inspections")
 def index():
     """Render the main inspection visualization page.
 
