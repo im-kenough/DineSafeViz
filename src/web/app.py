@@ -24,6 +24,8 @@ SEVERITY_ORDER = {
     "None": 4
     }
 RECENT_YEARS = 4
+# The recent CSV only covers from Q4 2023 onward; historical data ends 2022.
+RECENT_DATA_START_YEAR = 2023
 
 
 def get_quarter_bounds(year: int, q: int) -> Tuple[date, date]:
@@ -69,8 +71,8 @@ def get_valid_quarters(year: int) -> List[int]:
     today = date.today()
     # Calculate current quarter: month 1-3 = Q1, 4-6 = Q2, 7-9 = Q3, 10-12 = Q4
     current_q = (today.month - 1) // 3 + 1
-    if year == 2023:
-        # Data starts in Q4 2023, so only Q4 is available
+    if year == RECENT_DATA_START_YEAR:
+        # Historical data ends 2022; recent CSV only goes back to Q4 2023
         return [4]
     elif year == today.year:
         # For the current year, include only quarters up to (and including) the current quarter
@@ -177,13 +179,10 @@ def build_days(rows: List[Dict], start: date, end: date) -> List[Tuple[date, Lis
         Each tuple contains a date and a severity-sorted list of inspections for that date.
     """
     from collections import defaultdict
-    # Group all inspections by their inspection date
     by_date = defaultdict(list)
     for row in rows:
         by_date[row["inspection_date"]].append(row)
 
-    # Iterate from end date backwards to start date, creating an entry for each day
-    # (even if no inspections occurred that day)
     days = []
     d = end
     while d >= start:
@@ -215,11 +214,9 @@ def index():
     Returns:
         Rendered HTML template with inspections grouped by date.
     """
-    # Parse and validate year/quarter from request parameters
     year, q = parse_year_quarter(request.args)
     start, end = get_quarter_bounds(year, q)
 
-    # Query database for inspections in the selected quarter
     conn = psycopg2.connect(**DB_CONFIG)
     cur = conn.cursor()
     cur.execute(
@@ -230,7 +227,6 @@ def index():
         " WHERE inspection_date BETWEEN %s AND %s",
         (start, end),
     )
-    # Convert database rows to dictionaries for template rendering
     rows = [
         {
             "inspection_date": r[0],
@@ -248,7 +244,6 @@ def index():
     cur.close()
     conn.close()
 
-    # Render template with grouped data
     return render_template(
         "index.html",
         days=build_days(rows, start, end),

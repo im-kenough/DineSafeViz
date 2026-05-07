@@ -15,7 +15,7 @@ from urllib.request import urlretrieve
 import psycopg2
 
 # ---------------------------------------------------------------------------
-# Configuration — future: move to a config file
+# Configuration
 # ---------------------------------------------------------------------------
 
 RECENT_CSV_URL = (
@@ -115,8 +115,7 @@ def normalize(value):
 
 def min_inspection_date(rows):
     """Return the earliest inspection_date string from mapped rows."""
-    dates = [r["inspection_date"] for r in rows if r["inspection_date"] is not None]
-    return min(dates)
+    return min(r["inspection_date"] for r in rows if r["inspection_date"] is not None)
 
 
 def map_row(row, column_map):
@@ -146,8 +145,8 @@ def get_connection():
 def is_empty(conn):
     """Return True if the inspections table has zero rows."""
     with conn.cursor() as cur:
-        cur.execute("SELECT COUNT(*) FROM inspections")
-        return cur.fetchone()[0] == 0
+        cur.execute("SELECT 1 FROM inspections LIMIT 1")
+        return cur.fetchone() is None
 
 
 def bulk_insert(conn, rows):
@@ -198,15 +197,12 @@ def download_and_load_historical(conn):
 
 def _fetch_recent_rows():
     """Download the recent Dinesafe CSV and return parsed rows."""
-    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
-        tmp_path = tmp.name
-    try:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = os.path.join(tmpdir, "recent.csv")
         print(f"Downloading recent data from {RECENT_CSV_URL} ...")
         urlretrieve(RECENT_CSV_URL, tmp_path)
         with open(tmp_path, newline="", encoding="utf-8-sig") as f:
             return [map_row(r, RECENT_COLUMN_MAP) for r in csv.DictReader(f)]
-    finally:
-        os.unlink(tmp_path)
 
 
 def download_and_load_recent(conn):
