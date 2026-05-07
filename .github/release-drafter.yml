@@ -1,24 +1,44 @@
 name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
 categories:
+  - title: '🔒 Security'
+    labels:
+      - 'infosec'
   - title: '🚀 Features'
     labels:
       - 'feature'
       - 'enhancement'
+  - title: '🎨 UI'
+    labels:
+      - 'ui'
   - title: '🐛 Bug Fixes'
     labels:
       - 'bug'
       - 'fix'
+  - title: '🏗️ Infrastructure'
+    labels:
+      - 'infra'
+      - 'iac'
+      - 'ops'
+      - 'dr'
+      - 'db'
   - title: '⚙️ CI/CD'
     labels:
       - 'ci-cd'
+      - 'github_actions'
   - title: '🔨 Build & Dependencies'
     labels:
       - 'build'
       - 'dependencies'
+      - 'python'
+      - 'docker'
   - title: '📚 Documentation'
     labels:
       - 'documentation'
+  - title: '🔧 Maintenance'
+    labels:
+      - 'refactor'
+      - 'chore'
 
 change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
 change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.      
@@ -35,6 +55,7 @@ version-resolver:
     labels:
       - 'bug'
       - 'fix'
+      - 'infosec'
 template: |
   ## What's Changed
 
