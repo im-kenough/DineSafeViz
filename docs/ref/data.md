@@ -38,3 +38,204 @@ Amount Fined	Fine determined in the court outcome
 Latitude	Latitude of establishment
 Longitude	Longitude of establishment
 unique_id	Unique composite key
+
+# Historical data (2001-2015)
+
+The historical dataset lives in
+`src/db/2023-04-11 - Dinesafe Historical data/`. It contains one CSV
+per year (`dinesafe_hist_YYYY.csv`), covering 2001 through 2022. The
+files from 2001 to 2015 are documented here.
+
+All years share the same 16-column schema. There is no schema drift
+across the historical files.
+
+## Row counts (2001-2015)
+
+| Year | Rows  |
+| ---- | ----- |
+| 2001 | 6,066 |
+| 2002 | 6,352 |
+| 2003 | 7,160 |
+| 2004 | 7,181 |
+| 2005 | 8,642 |
+| 2006 | 9,096 |
+| 2007 | 10,130 |
+| 2008 | 11,666 |
+| 2009 | 11,393 |
+| 2010 | 14,920 |
+| 2011 | 16,624 |
+| 2012 | 17,188 |
+| 2013 | 20,392 |
+| 2014 | 23,160 |
+| 2015 | 21,750 |
+
+Row counts include the header line.
+
+## Historical columns
+
+```markdown
+| # | Column                     | Description |
+|---|----------------------------|-------------|
+| 1 | Rec #                      | Sequential row number within the file (not globally unique) |
+| 2 | Establishment ID           | Same as current dataset |
+| 3 | Inspection ID              | Same as current dataset |
+| 4 | Establishment Name         | Same as current dataset |
+| 5 | Establishment Type         | Same as current dataset |
+| 6 | Establishment Address      | Same as current dataset |
+| 7 | Latitude                   | Same as current dataset (position differs: col 7 here, col 15 in current) |
+| 8 | Longitude                  | Same as current dataset (position differs: col 8 here, col 16 in current) |
+| 9 | Establishment Status       | **Not in current dataset.** Values: `Pass`, `Conditional Pass` |
+| 10| Min. Inspections Per Year  | **Not in current dataset.** Values: `1`, `2`, `3` |
+| 11| Infraction Details         | Same as current dataset |
+| 12| Inspection Date            | Same as current dataset. Format: `YYYY-MM-DD` |
+| 13| Severity                   | Same as current dataset |
+| 14| Action                     | Same as current dataset |
+| 15| Outcome                    | Same as current dataset |
+| 16| Amount Fined               | Same as current dataset |
+```
+
+## Schema differences: historical vs. current
+
+| Aspect                       | Historical (2001-2015)           | Current                              |
+|------------------------------|----------------------------------|--------------------------------------|
+| Row identifier               | `Rec #` (per-file counter)       | `_id` (Open Data DB key) + `unique_id` (composite hash) |
+| Establishment Status         | Present (`Pass` / `Conditional Pass`) | Absent                          |
+| Min. Inspections Per Year    | Present (`1` / `2` / `3`)        | Absent                               |
+| Inspection Observation       | Absent                           | Present                              |
+| Outcome Date                 | Absent                           | Present                              |
+| Lat/Lon column position      | Columns 7-8                      | Columns 15-16                        |
+| All values double-quoted     | Yes                              | No                                   |
+
+## Nullability patterns
+
+Roughly 34-40% of rows across all years have empty `Infraction Details`,
+`Severity`, and `Action` — these represent clean inspections with no
+infractions. The three fields are always empty together.
+
+`Outcome` and `Amount Fined` are populated on fewer than 2% of rows
+(only when enforcement reached court).
+
+## Enum values (2001-2015)
+
+<details>
+<summary>Establishment Status</summary>
+
+- Pass
+- Conditional Pass
+
+</details>
+
+<details>
+<summary>Severity</summary>
+
+- _(empty — no infraction)_
+- C - Crucial
+- M - Minor
+- NA - Not Applicable
+- S - Significant
+
+</details>
+
+<details>
+<summary>Action</summary>
+
+- _(empty — no infraction)_
+- Closure Order
+- Corrected During Inspection
+- Education Provided
+- Not in Compliance
+- Notice to Comply
+- Order
+- Recommendations
+- Summons
+- Summons and Health Hazard Order
+- Ticket
+- Warning Letter
+
+</details>
+
+<details>
+<summary>Outcome</summary>
+
+- _(empty — most rows)_
+- Cancelled
+- Charges Dismissed
+- Charges Quashed
+- Charges Withdrawn
+- Conviction - Fined
+- Conviction - Fined & Probationary Order
+- Conviction - Ordered to Close by Court
+- Conviction - Probationary Order
+- Conviction - Suspended Sentence
+- Pending
+
+</details>
+
+<details>
+<summary>Establishment Type (48 distinct values)</summary>
+
+- Bake Shop
+- Bakery
+- Banquet Facility
+- Boarding / Lodging Home - Kitchen
+- Butcher Shop
+- Cafeteria - Private Access
+- Cafeteria - Public Access
+- Chartered Cruise Boats
+- Cheese Plant
+- Child Care - Catered
+- Child Care - Food Preparation
+- Church Banquet Facility
+- Cocktail Bar / Beverage Room
+- College / University Food Services
+- Commissary
+- Community Kitchen (Meal Program)
+- Elementary School Food Services
+- Fish Shop
+- Flea Market
+- Food Bank
+- Food Caterer
+- Food Court Vendor
+- Food Depot
+- Food Processing Plant
+- Food Store (Convenience/Variety)
+- Food Take Out
+- Food Vending Facility
+- Hospitals & Health Facilities
+- Hot Dog Cart
+- Ice Cream / Yogurt Vendors
+- Ice Cream Plant
+- Institutional Food Services
+- Locker Plant
+- Meat Processing Plant
+- Milk Pasteurization Plant
+- Mobile Food Preparation Premises
+- Nursing Home / Home for the Aged
+- Other Educational Facility Food Services
+- Private Club
+- Refreshment Stand (Stationary)
+- Rest Home
+- Restaurant
+- Retirement Homes(Licensed)
+- Retirement Homes(Un-licensed)
+- Secondary School Food Services
+- Serving Kitchen
+- Student Nutrition Site
+- Supermarket
+
+</details>
+
+## Import considerations
+
+When importing historical data into the current DB schema:
+
+- **Column mapping:** `Rec #` has no equivalent in the current schema.
+  Generate `_id` and `unique_id` values during import.
+- **Missing in current schema:** `Establishment Status` and
+  `Min. Inspections Per Year` need either new columns or a separate
+  table to preserve them.
+- **Missing in historical data:** `Inspection Observation` and
+  `Outcome Date` will be null for all historical rows.
+- **CSV quoting:** All historical values are double-quoted. Use a
+  proper CSV parser (not naive comma-splitting) because
+  `Infraction Details` often contains commas.
