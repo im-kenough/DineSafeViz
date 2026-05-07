@@ -1,3 +1,4 @@
+import re
 from datetime import date
 from unittest.mock import patch, MagicMock
 
@@ -198,7 +199,6 @@ def test_column_headers_in_order(client):
     with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
         resp = client.get("/inspections?year=2024&q=1")
     html = resp.data.decode()
-    import re
     headers = re.findall(r'<th[^>]*>([^<]+)</th>', html)
     assert "Severity" in headers
     assert "Infraction Details" in headers
@@ -219,14 +219,14 @@ def test_establishment_type_rendered(client):
         "Improper storage",
         "Pasta Palace",
         "99 King St W",
-        "Restaurant",         # establishment_type
+        "UNIQUE_EST_TYPE_XYZ",  # establishment_type
         "Pass",
         "2024-02-20",
         "0.00",
     )]
     with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
         resp = client.get("/inspections?year=2024&q=1")
-    assert b"Restaurant" in resp.data
+    assert b"UNIQUE_EST_TYPE_XYZ" in resp.data
 
 
 def test_establishment_cell_contains_name_and_address(client):
@@ -244,5 +244,4 @@ def test_establishment_cell_contains_name_and_address(client):
     )]
     with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
         resp = client.get("/inspections?year=2024&q=1")
-    assert b"Pasta Palace" in resp.data
-    assert b"99 King St W" in resp.data
+    assert b"Pasta Palace<br>99 King St W" in resp.data
