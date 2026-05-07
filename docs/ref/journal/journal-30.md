@@ -24,3 +24,4 @@ Original v0.1.0 release was missing early PRs (#7, #8, #17, #18, #19) that were 
 
 - `.github/release-drafter.yml`: added CI/CD, Build & Dependencies, Documentation categories; reordered so specific types (CI/CD, build, docs) take priority over generic `enhancement` label
 - v0.1.0 release body: rewrote with proper grouped headings via `gh release edit`
+2026-05-07 12:00 — Updated release.md and identified release-drafter.yml gap

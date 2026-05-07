@@ -42,8 +42,13 @@ template: |
 
   ## Deployment Notes
 
-  - [Install guide](docs/ref/deploy/install.md)
-  - [Deployment guide](docs/ref/deploy/deploy.md)
+  - [Install guide](docs/how-to/install-guide.md): How to provision and install DineSafeViz.
+  - [Deployment guide](docs/how-to/deploy/deploy.md): How to deploy DineSafeViz on existing infrastructure.
+  - [Administration guide](docs/how-to/admin-guide.md): How to configure and manage DineSafeViz.
+
+  ## Post Implementation Verification (PIV)
+
+  - [PIV guide](docs/how-to/operations/piv.md): How to verify DineSafeViz is working as expected after deployment.
 
   ## Rollback Instructions
 
