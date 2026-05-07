@@ -32,9 +32,9 @@ def test_q4_full_quarter():
 
 
 def test_q4_2023_clips_to_data_start():
-    # Q4 2023 is Oct 1–Dec 31, but data starts 2023-11-09
+    # Q4 2023 is Oct 1–Dec 31; DATA_START (2001-01-01) no longer clips
     start, end = get_quarter_bounds(2023, 4)
-    assert start == date(2023, 11, 9)
+    assert start == date(2023, 10, 1)
     assert end == date(2023, 12, 31)
 
 
@@ -48,9 +48,9 @@ def test_end_does_not_exceed_today():
 from app import get_valid_years, get_valid_quarters, parse_year_quarter
 
 
-def test_valid_years_includes_2023_and_current():
+def test_valid_years_includes_2001_and_current():
     years = get_valid_years()
-    assert 2023 in years
+    assert 2001 in years
     assert date.today().year in years
 
 
