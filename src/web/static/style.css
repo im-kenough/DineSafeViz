@@ -201,9 +201,15 @@ footer {
     cursor: pointer;
 }
 
-.dropdown-year .flyout { display: none; }
+.dropdown-year > .flyout { display: none; }
 
-.dropdown-year:hover .flyout,
+.archive-item {
+    margin-top: 0.25rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+}
+
+.dropdown-year:hover > .flyout,
 .flyout.is-open { display: flex; }
 
 .flyout {
@@ -219,6 +225,9 @@ footer {
 }
 
 .flyout a { display: block; }
+
+/* year→quarters flyouts (regular and archive) display horizontally */
+.dropdown-year:not(.archive-item) > .flyout { flex-direction: row; }
 
 /* ── mobile (≤ 600px: all phones in portrait) ───────────── */
 @media (max-width: 600px) {

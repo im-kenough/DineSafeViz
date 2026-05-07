@@ -23,6 +23,7 @@ SEVERITY_ORDER = {
     "NA": 3,
     "None": 4
     }
+RECENT_YEARS = 4
 
 
 def get_quarter_bounds(year: int, q: int) -> Tuple[date, date]:
@@ -131,13 +132,15 @@ def inject_globals():
     """Inject global variables into all templates."""
     year, q = parse_year_quarter(request.args)
     years = get_valid_years()
+    year_quarters = [
+        (y, get_valid_quarters(y))
+        for y in sorted(years, reverse=True)
+    ]
     return {
         "current_year": date.today().year,
         "version": _VERSION,
-        "year_quarters": [
-            (y, get_valid_quarters(y))
-            for y in sorted(years, reverse=True)
-        ],
+        "recent_year_quarters": year_quarters[:RECENT_YEARS],
+        "archive_year_quarters": year_quarters[RECENT_YEARS:],
         "selected_year": year,
         "selected_q": q,
     }
