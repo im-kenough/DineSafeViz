@@ -14,7 +14,7 @@ from flask import Flask, render_template, request
 
 app = Flask(__name__)
 
-DATA_START = date(2023, 11, 9)
+DATA_START = date(2001, 1, 1)
 _QUARTER_MONTHS = {1: (1, 3), 2: (4, 6), 3: (7, 9), 4: (10, 12)}
 SEVERITY_ORDER = {
     "C - Crucial": 0,
@@ -50,7 +50,7 @@ def get_valid_years() -> List[int]:
     Returns:
         A list of years for which DineSafe data is available.
     """
-    return list(range(2023, date.today().year + 1))
+    return list(range(2001, date.today().year + 1))
 
 
 def get_valid_quarters(year: int) -> List[int]:
