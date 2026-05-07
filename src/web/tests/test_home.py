@@ -16,10 +16,7 @@ def _mock_stats_db(total, min_date, max_date):
     mock_conn = MagicMock()
     mock_cur = MagicMock()
     mock_conn.cursor.return_value = mock_cur
-    mock_cur.fetchone.side_effect = [
-        (total,),
-        (min_date, max_date),
-    ]
+    mock_cur.fetchone.return_value = (total, min_date, max_date)
     return mock_conn, mock_cur
 
 
@@ -35,7 +32,7 @@ def test_get_home_stats_fetches_and_caches_results():
     assert stats == {"total_inspections": 12345, "years_of_data": 25}
     assert app_module._stats_cache["data"] == stats
     assert app_module._stats_cache["fetched_at"] == now
-    assert mock_cur.execute.call_count == 2
+    assert mock_cur.execute.call_count == 1
     mock_conn.close.assert_called_once()
     mock_cur.close.assert_called_once()
 
@@ -67,7 +64,6 @@ def test_get_home_stats_refreshes_expired_cache():
 
 
 def test_home_route_renders_stats(client):
-    _reset_cache()
     with patch("app._get_home_stats", return_value={"total_inspections": 12345, "years_of_data": 25}):
         resp = client.get("/")
 

@@ -203,29 +203,30 @@ DB_CONFIG = {
 
 
 def _get_home_stats() -> Dict[str, int]:
-    """Fetch and cache home-page summary stats."""
     now = datetime.now()
     if (
-        _stats_cache["data"] is not None and
         _stats_cache["fetched_at"] is not None and
         now - _stats_cache["fetched_at"] <= _STATS_TTL
     ):
         return _stats_cache["data"]
 
     conn = psycopg2.connect(**DB_CONFIG)
-    cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM inspections")
-    total_inspections = cur.fetchone()[0] or 0
-    cur.execute("SELECT MIN(inspection_date), MAX(inspection_date) FROM inspections")
-    min_date, max_date = cur.fetchone()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT COUNT(*), MIN(inspection_date), MAX(inspection_date) FROM inspections"
+        )
+        total, min_date, max_date = cur.fetchone()
+        cur.close()
+    finally:
+        conn.close()
+
     years_of_data = 0
     if min_date is not None and max_date is not None:
         years_of_data = max_date.year - min_date.year + 1
-    cur.close()
-    conn.close()
 
     stats = {
-        "total_inspections": total_inspections,
+        "total_inspections": total,
         "years_of_data": years_of_data,
     }
     _stats_cache["data"] = stats
@@ -235,7 +236,6 @@ def _get_home_stats() -> Dict[str, int]:
 
 @app.route("/")
 def home():
-    """Render the home page."""
     return render_template("home.html", stats=_get_home_stats())
 
 
