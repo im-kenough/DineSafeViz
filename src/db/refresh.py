@@ -18,8 +18,6 @@ import psycopg2
 # Configuration — future: move to a config file
 # ---------------------------------------------------------------------------
 
-CKAN_BASE_URL = "https://ckan0.cf.opendata.inter.prod-toronto.ca"
-
 RECENT_CSV_URL = (
     "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/"
     "b6b4f3fb-2e2c-47e7-931d-b87d22806948/resource/"
@@ -34,8 +32,6 @@ HISTORICAL_ZIP_URL = (
 )
 
 RECENT_DATA_START_DATE = "2023-11-01"
-
-HISTORICAL_FILE_PATTERN = "dinesafe_hist_{year}.csv"
 
 DB_HOST = os.environ.get("DB_HOST", "db")
 DB_PORT = os.environ.get("DB_PORT", "5432")
@@ -119,18 +115,10 @@ def normalize(value):
     return value
 
 
-def map_historical_row(row):
-    """Map a historical CSV row dict to the unified inspections schema."""
+def map_row(row, column_map):
+    """Map a CSV row dict to the unified inspections schema using the given column map."""
     mapped = {col: None for col in INSPECTIONS_COLUMNS}
-    for csv_col, db_col in HISTORICAL_COLUMN_MAP.items():
-        mapped[db_col] = normalize(row.get(csv_col))
-    return mapped
-
-
-def map_recent_row(row):
-    """Map a recent CSV row dict to the unified inspections schema."""
-    mapped = {col: None for col in INSPECTIONS_COLUMNS}
-    for csv_col, db_col in RECENT_COLUMN_MAP.items():
+    for csv_col, db_col in column_map.items():
         mapped[db_col] = normalize(row.get(csv_col))
     return mapped
 
@@ -199,24 +187,29 @@ def download_and_load_historical(conn):
                     continue
                 csv_path = os.path.join(tmpdir, name)
                 with open(csv_path, newline="", encoding="utf-8-sig") as f:
-                    rows = [map_historical_row(r) for r in csv.DictReader(f)]
+                    rows = [map_row(r, HISTORICAL_COLUMN_MAP) for r in csv.DictReader(f)]
                 bulk_insert(conn, rows)
                 print(f"  Loaded {name}: {len(rows)} rows")
 
 
-def download_and_load_recent(conn):
-    """Download the recent Dinesafe CSV and insert all rows."""
+def _fetch_recent_rows():
+    """Download the recent Dinesafe CSV and return parsed rows."""
     with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
         tmp_path = tmp.name
     try:
         print(f"Downloading recent data from {RECENT_CSV_URL} ...")
         urlretrieve(RECENT_CSV_URL, tmp_path)
         with open(tmp_path, newline="", encoding="utf-8-sig") as f:
-            rows = [map_recent_row(r) for r in csv.DictReader(f)]
-        bulk_insert(conn, rows)
-        print(f"  Loaded recent CSV: {len(rows)} rows")
+            return [map_row(r, RECENT_COLUMN_MAP) for r in csv.DictReader(f)]
     finally:
         os.unlink(tmp_path)
+
+
+def download_and_load_recent(conn):
+    """Download the recent Dinesafe CSV and insert all rows."""
+    rows = _fetch_recent_rows()
+    bulk_insert(conn, rows)
+    print(f"  Loaded recent CSV: {len(rows)} rows")
 
 
 def seed(conn):
@@ -238,18 +231,7 @@ def refresh(conn):
     Downloads the CSV first, then deletes + inserts inside one
     transaction so the table is never in a partial state.
     """
-    # Download and parse before touching the DB
-    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
-        tmp_path = tmp.name
-    try:
-        print(f"Downloading recent data from {RECENT_CSV_URL} ...")
-        urlretrieve(RECENT_CSV_URL, tmp_path)
-        with open(tmp_path, newline="", encoding="utf-8-sig") as f:
-            rows = [map_recent_row(r) for r in csv.DictReader(f)]
-    finally:
-        os.unlink(tmp_path)
-
-    # Single transaction: delete stale rows, insert fresh ones
+    rows = _fetch_recent_rows()
     with conn.cursor() as cur:
         cur.execute(
             "DELETE FROM inspections WHERE inspection_date >= %s",

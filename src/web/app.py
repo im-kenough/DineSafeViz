@@ -266,6 +266,7 @@ def info():
 
 GRAFANA_URL = os.environ.get("GRAFANA_URL", "http://grafana:3000")
 _grafana_session = http_requests.Session()
+_HOP_BY_HOP = {"content-encoding", "content-length", "transfer-encoding", "connection"}
 
 
 @app.route("/grafana/", defaults={"path": ""}, methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
@@ -282,6 +283,5 @@ def grafana_proxy(path):
         data=request.get_data(),
         allow_redirects=False,
     )
-    _hop_by_hop = {"content-encoding", "content-length", "transfer-encoding", "connection"}
-    headers = {k: v for k, v in resp.headers.items() if k.lower() not in _hop_by_hop}
+    headers = {k: v for k, v in resp.headers.items() if k.lower() not in _HOP_BY_HOP}
     return resp.content, resp.status_code, headers

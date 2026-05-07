@@ -5,8 +5,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from refresh import (
     normalize,
-    map_historical_row,
-    map_recent_row,
+    map_row,
+    HISTORICAL_COLUMN_MAP,
+    RECENT_COLUMN_MAP,
     INSPECTIONS_COLUMNS,
 )
 
@@ -46,32 +47,32 @@ class TestMapHistoricalRow:
     }
 
     def test_maps_establishment_id(self):
-        result = map_historical_row(self.SAMPLE_ROW)
+        result = map_row(self.SAMPLE_ROW, HISTORICAL_COLUMN_MAP)
         assert result["establishment_id"] == "10500438"
 
     def test_discards_rec_number(self):
-        result = map_historical_row(self.SAMPLE_ROW)
+        result = map_row(self.SAMPLE_ROW, HISTORICAL_COLUMN_MAP)
         assert "Rec #" not in result
 
     def test_maps_historical_only_columns(self):
-        result = map_historical_row(self.SAMPLE_ROW)
+        result = map_row(self.SAMPLE_ROW, HISTORICAL_COLUMN_MAP)
         assert result["establishment_status"] == "Pass"
         assert result["min_inspections_per_year"] == "2"
 
     def test_recent_only_columns_are_none(self):
-        result = map_historical_row(self.SAMPLE_ROW)
+        result = map_row(self.SAMPLE_ROW, HISTORICAL_COLUMN_MAP)
         assert result["inspection_observation"] is None
         assert result["outcome_date"] is None
         assert result["unique_id"] is None
 
     def test_empty_values_become_none(self):
-        result = map_historical_row(self.SAMPLE_ROW)
+        result = map_row(self.SAMPLE_ROW, HISTORICAL_COLUMN_MAP)
         assert result["infraction_details"] is None
         assert result["severity"] is None
         assert result["action"] is None
 
     def test_all_inspections_columns_present(self):
-        result = map_historical_row(self.SAMPLE_ROW)
+        result = map_row(self.SAMPLE_ROW, HISTORICAL_COLUMN_MAP)
         for col in INSPECTIONS_COLUMNS:
             assert col in result, f"Missing column: {col}"
 
@@ -98,29 +99,29 @@ class TestMapRecentRow:
     }
 
     def test_maps_establishment_id(self):
-        result = map_recent_row(self.SAMPLE_ROW)
+        result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
         assert result["establishment_id"] == "10752656"
 
     def test_discards_id(self):
-        result = map_recent_row(self.SAMPLE_ROW)
+        result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
         assert "_id" not in result
 
     def test_maps_recent_only_columns(self):
-        result = map_recent_row(self.SAMPLE_ROW)
+        result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
         assert result["inspection_observation"] == "One or more minor infractions"
         assert result["unique_id"] == "168f86274045194142c0e7c381ccb75d"
 
     def test_historical_only_columns_are_none(self):
-        result = map_recent_row(self.SAMPLE_ROW)
+        result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
         assert result["establishment_status"] is None
         assert result["min_inspections_per_year"] is None
 
     def test_none_string_becomes_none(self):
-        result = map_recent_row(self.SAMPLE_ROW)
+        result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
         assert result["inspection_id"] is None
         assert result["outcome"] is None
 
     def test_all_inspections_columns_present(self):
-        result = map_recent_row(self.SAMPLE_ROW)
+        result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
         for col in INSPECTIONS_COLUMNS:
             assert col in result, f"Missing column: {col}"

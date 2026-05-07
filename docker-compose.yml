@@ -95,7 +95,7 @@ services:
       - |
         i=0; until curl -s http://grafana:3000/grafana/api/health | grep -q '"database": "ok"'; do sleep 2; i=$$(($$i+1)); [ $$i -ge 30 ] && echo "Grafana did not start in time" && exit 1; done
         DASH_ID=$$(curl -s "http://$$GF_ADMIN_USER:$$GF_ADMIN_PASSWORD@grafana:3000/grafana/api/dashboards/uid/dinesafe" | grep -oE '"id":[0-9]+' | head -1 | grep -oE '[0-9]+')
-        [ -z "$$DASH_ID" ] && echo "Dashboard not found, skipping permissions grant" && exit 1
+        [ -z "$$DASH_ID" ] && echo "Dashboard not found, skipping permissions grant" && exit 0
         curl -sf -X POST "http://$$GF_ADMIN_USER:$$GF_ADMIN_PASSWORD@grafana:3000/grafana/api/dashboards/id/$$DASH_ID/permissions" -H "Content-Type: application/json" -d '{"items":[{"role":"Viewer","permission":1}]}'
     restart: "no"
 
