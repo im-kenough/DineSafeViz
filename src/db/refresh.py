@@ -224,3 +224,62 @@ def seed(conn):
     download_and_load_recent(conn)
     conn.commit()
     print("Seed complete.")
+
+
+# ---------------------------------------------------------------------------
+# Refresh path — daily cron, table already has data
+# ---------------------------------------------------------------------------
+
+
+def refresh(conn):
+    """Replace all recent data in a single transaction.
+
+    Downloads the CSV first, then deletes + inserts inside one
+    transaction so the table is never in a partial state.
+    """
+    # Download and parse before touching the DB
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
+        tmp_path = tmp.name
+    try:
+        print(f"Downloading recent data from {RECENT_CSV_URL} ...")
+        urlretrieve(RECENT_CSV_URL, tmp_path)
+        with open(tmp_path, newline="", encoding="utf-8-sig") as f:
+            rows = [map_recent_row(r) for r in csv.DictReader(f)]
+    finally:
+        os.unlink(tmp_path)
+
+    # Single transaction: delete stale rows, insert fresh ones
+    with conn.cursor() as cur:
+        cur.execute(
+            "DELETE FROM inspections WHERE inspection_date >= %s",
+            (RECENT_DATA_START_DATE,),
+        )
+        deleted = cur.rowcount
+    bulk_insert(conn, rows)
+    conn.commit()
+    print(f"Refresh complete: deleted {deleted}, inserted {len(rows)} rows.")
+
+
+# ---------------------------------------------------------------------------
+# CLI entrypoint
+# ---------------------------------------------------------------------------
+
+
+def main():
+    conn = get_connection()
+    try:
+        if is_empty(conn):
+            print("Table is empty — running full seed...")
+            seed(conn)
+        else:
+            print("Table has data — running daily refresh...")
+            refresh(conn)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+if __name__ == "__main__":
+    main()
