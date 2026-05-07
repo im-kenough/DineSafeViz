@@ -202,13 +202,15 @@ def test_column_headers_in_order(client):
     headers = re.findall(r'<th[^>]*>([^<]+)</th>', html)
     assert "Severity" in headers
     assert "Infraction Details" in headers
+    assert "Establishment" in headers
     assert "Establishment Type" in headers
     assert "Action" in headers
     severity_idx = headers.index("Severity")
     infraction_idx = headers.index("Infraction Details")
+    establishment_idx = headers.index("Establishment")
     est_type_idx = headers.index("Establishment Type")
     action_idx = headers.index("Action")
-    assert severity_idx < infraction_idx < est_type_idx < action_idx
+    assert severity_idx < infraction_idx < establishment_idx < est_type_idx < action_idx
 
 
 def test_establishment_type_rendered(client):
