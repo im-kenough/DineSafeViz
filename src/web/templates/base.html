@@ -21,7 +21,7 @@
         <div class="dropdown">
             <a href="{{ url_for('index') }}" class="nav-btn {{ 'active' if request.endpoint == 'index' else '' }}">Inspections ▾</a>
             <div class="dropdown-menu">
-                {% for y, qs in year_quarters %}
+                {% for y, qs in recent_year_quarters %}
                 <div class="nav-btn dropdown-year">
                     <span>{{ y }} ›</span>
                     <div class="flyout">
@@ -32,6 +32,24 @@
                     </div>
                 </div>
                 {% endfor %}
+                {% if archive_year_quarters %}
+                <div class="nav-btn dropdown-year archive-item">
+                    <span>Archive ›</span>
+                    <div class="flyout">
+                        {% for y, qs in archive_year_quarters %}
+                        <div class="nav-btn dropdown-year">
+                            <span>{{ y }} ›</span>
+                            <div class="flyout">
+                                {% for q in qs %}
+                                <a href="{{ url_for('index', year=y, q=q) | safe }}"
+                                   class="nav-btn {{ 'active' if y == selected_year and q == selected_q else '' }}">Q{{ q }}</a>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
         <a href="{{ url_for('dashboard') }}" class="nav-btn {{ 'active' if request.endpoint == 'dashboard' else '' }}">Dashboard</a>
@@ -66,14 +84,16 @@
             }
         });
 
-        // Toggle year flyouts; let quarter <a> clicks through to navigation
+        // Toggle year/archive flyouts at any nesting depth.
+        // Sibling-close is scoped to the immediate parent so nested archive
+        // interactions do not close ancestor flyouts.
         menu.querySelectorAll('.dropdown-year').forEach(function (yr) {
             yr.addEventListener('click', function (e) {
                 if (e.target.closest('a')) return;
                 e.stopPropagation();
                 var flyout = yr.querySelector('.flyout');
                 var opening = !flyout.classList.contains('is-open');
-                menu.querySelectorAll('.flyout.is-open').forEach(function (f) {
+                yr.parentElement.querySelectorAll(':scope > .dropdown-year > .flyout.is-open').forEach(function (f) {
                     f.classList.remove('is-open');
                 });
                 if (opening) flyout.classList.add('is-open');

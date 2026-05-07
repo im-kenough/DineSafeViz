@@ -156,3 +156,22 @@ def test_index_nav_active_class(client):
     with patch("app.psycopg2.connect", return_value=_mock_db([])):
         resp = client.get("/")
     assert b'class="nav-btn active">Inspections' in resp.data
+
+
+def test_dropdown_has_archive_item(client):
+    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+        resp = client.get("/")
+    assert b'archive-item' in resp.data
+    assert b'Archive' in resp.data
+
+
+def test_archive_contains_old_year_links(client):
+    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+        resp = client.get("/")
+    assert b'href="/?year=2022&q=1"' in resp.data
+
+
+def test_recent_years_not_in_archive(client):
+    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+        resp = client.get("/")
+    assert b'href="/?year=2023&q=4"' in resp.data
