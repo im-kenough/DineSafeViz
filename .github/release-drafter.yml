@@ -42,6 +42,7 @@ template: |
 
   ## Deployment Notes
 
+  - [Install guide](docs/ref/deploy/install.md)
   - [Deployment guide](docs/ref/deploy/deploy.md)
 
   ## Rollback Instructions
