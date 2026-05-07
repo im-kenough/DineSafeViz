@@ -40,4 +40,12 @@ template: |
 
   $CHANGES
 
+  ## Deployment Notes
+
+  - [Deployment guide](docs/ref/deploy/deploy.md)
+
+  ## Rollback Instructions
+
+  - Rollback guide - TBD
+
   **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
