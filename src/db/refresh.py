@@ -133,3 +133,47 @@ def map_recent_row(row):
     for csv_col, db_col in RECENT_COLUMN_MAP.items():
         mapped[db_col] = normalize(row.get(csv_col))
     return mapped
+
+
+# ---------------------------------------------------------------------------
+# Database utilities
+# ---------------------------------------------------------------------------
+
+
+def get_connection():
+    """Return a psycopg2 connection using the module-level config."""
+    return psycopg2.connect(
+        host=DB_HOST,
+        port=DB_PORT,
+        dbname=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD,
+    )
+
+
+def is_empty(conn):
+    """Return True if the inspections table has zero rows."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM inspections")
+        return cur.fetchone()[0] == 0
+
+
+def bulk_insert(conn, rows):
+    """Insert mapped row dicts into inspections via COPY for speed.
+
+    Uses a tab-separated StringIO buffer. None values become \\N
+    (Postgres COPY null marker). Tabs in data values are replaced
+    with spaces to avoid column-delimiter collisions.
+    """
+    if not rows:
+        return
+    buf = io.StringIO()
+    for row in rows:
+        line = "\t".join(
+            "\\N" if row[col] is None else str(row[col]).replace("\t", " ")
+            for col in INSPECTIONS_COLUMNS
+        )
+        buf.write(line + "\n")
+    buf.seek(0)
+    with conn.cursor() as cur:
+        cur.copy_from(buf, "inspections", columns=INSPECTIONS_COLUMNS)
