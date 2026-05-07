@@ -177,3 +177,50 @@ def bulk_insert(conn, rows):
     buf.seek(0)
     with conn.cursor() as cur:
         cur.copy_from(buf, "inspections", columns=INSPECTIONS_COLUMNS)
+
+
+# ---------------------------------------------------------------------------
+# Seed path — first deploy, table is empty
+# ---------------------------------------------------------------------------
+
+
+def download_and_load_historical(conn):
+    """Download the historical ZIP and insert all CSVs (2001-2022)."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        zip_path = os.path.join(tmpdir, "historical.zip")
+        print(f"Downloading historical data from {HISTORICAL_ZIP_URL} ...")
+        urlretrieve(HISTORICAL_ZIP_URL, zip_path)
+
+        with zipfile.ZipFile(zip_path) as zf:
+            zf.extractall(tmpdir)
+            for name in sorted(zf.namelist()):
+                if not name.endswith(".csv"):
+                    continue
+                csv_path = os.path.join(tmpdir, name)
+                with open(csv_path, newline="", encoding="utf-8-sig") as f:
+                    rows = [map_historical_row(r) for r in csv.DictReader(f)]
+                bulk_insert(conn, rows)
+                print(f"  Loaded {name}: {len(rows)} rows")
+
+
+def download_and_load_recent(conn):
+    """Download the recent Dinesafe CSV and insert all rows."""
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
+        tmp_path = tmp.name
+    try:
+        print(f"Downloading recent data from {RECENT_CSV_URL} ...")
+        urlretrieve(RECENT_CSV_URL, tmp_path)
+        with open(tmp_path, newline="", encoding="utf-8-sig") as f:
+            rows = [map_recent_row(r) for r in csv.DictReader(f)]
+        bulk_insert(conn, rows)
+        print(f"  Loaded recent CSV: {len(rows)} rows")
+    finally:
+        os.unlink(tmp_path)
+
+
+def seed(conn):
+    """Full seed: load historical data then recent data. Commits once."""
+    download_and_load_historical(conn)
+    download_and_load_recent(conn)
+    conn.commit()
+    print("Seed complete.")
