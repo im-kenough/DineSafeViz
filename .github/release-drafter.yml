@@ -9,6 +9,19 @@ categories:
     labels:
       - 'bug'
       - 'fix'
+  - title: '⚙️ CI/CD'
+    labels:
+      - 'ci-cd'
+  - title: '🔨 Build & Dependencies'
+    labels:
+      - 'build'
+      - 'dependencies'
+  - title: '📚 Documentation'
+    labels:
+      - 'documentation'
+
+change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
+change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.      
 version-resolver:
   major:
     labels:
@@ -17,11 +30,14 @@ version-resolver:
   minor:
     labels:
       - 'feature'
+      - 'enhancement'
   patch:
     labels:
       - 'bug'
       - 'fix'
 template: |
-  ## What’s Changed
+  ## What's Changed
 
   $CHANGES
+
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
