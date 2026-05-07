@@ -31,8 +31,6 @@ HISTORICAL_ZIP_URL = (
     "Dinesafe%20Historical%20Data.zip"
 )
 
-RECENT_DATA_START_DATE = "2023-11-01"
-
 DB_HOST = os.environ.get("DB_HOST", "db")
 DB_PORT = os.environ.get("DB_PORT", "5432")
 DB_NAME = os.environ.get("DB_NAME", "dinesafe")
@@ -113,6 +111,12 @@ def normalize(value):
     if value in ("None", ""):
         return None
     return value
+
+
+def min_inspection_date(rows):
+    """Return the earliest inspection_date string from mapped rows."""
+    dates = [r["inspection_date"] for r in rows if r["inspection_date"] is not None]
+    return min(dates)
 
 
 def map_row(row, column_map):
@@ -230,12 +234,15 @@ def refresh(conn):
 
     Downloads the CSV first, then deletes + inserts inside one
     transaction so the table is never in a partial state.
+    The delete cutoff is derived from the earliest date in the
+    fresh CSV so it tracks the upstream data window automatically.
     """
     rows = _fetch_recent_rows()
+    cutoff = min_inspection_date(rows)
     with conn.cursor() as cur:
         cur.execute(
             "DELETE FROM inspections WHERE inspection_date >= %s",
-            (RECENT_DATA_START_DATE,),
+            (cutoff,),
         )
         deleted = cur.rowcount
     bulk_insert(conn, rows)

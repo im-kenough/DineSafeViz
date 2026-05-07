@@ -269,6 +269,14 @@ are NULL.
 | 18| establishment_status       | TEXT             | populated              | NULL                  |
 | 19| min_inspections_per_year   | TEXT             | populated              | NULL                  |
 
+## Data gap: Jan–Nov 2023
+
+The historical archive (published 2023-04-11) covers through 2022-12-30.
+The recent CSV's rolling window currently starts at 2023-11-10. Neither
+source covers **2023-01-01 through 2023-11-09** (~11 months). This is an
+upstream Toronto Open Data limitation — the data was never published in
+either dataset.
+
 ## Data ingestion
 
 Data loading is handled by `src/db/refresh.py`, not by `init.sql`.
@@ -280,9 +288,10 @@ Data loading is handled by `src/db/refresh.py`, not by `init.sql`.
 
 **Daily refresh (table has data):**
 1. Downloads the recent Dinesafe.csv
-2. Deletes all rows with `inspection_date >= 2023-11-01`
-3. Inserts the fresh CSV rows
-4. All within a single transaction
+2. Derives the delete cutoff from the earliest `inspection_date` in the fresh CSV
+3. Deletes all rows at or after that cutoff
+4. Inserts the fresh CSV rows
+5. All within a single transaction
 
 **Cron example:**
 ```

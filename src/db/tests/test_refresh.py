@@ -6,6 +6,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from refresh import (
     normalize,
     map_row,
+    min_inspection_date,
     HISTORICAL_COLUMN_MAP,
     RECENT_COLUMN_MAP,
     INSPECTIONS_COLUMNS,
@@ -24,6 +25,24 @@ class TestNormalize:
 
     def test_whitespace_only_preserved(self):
         assert normalize("  ") == "  "
+
+
+class TestMinInspectionDate:
+    def test_returns_earliest_date(self):
+        rows = [
+            {"inspection_date": "2024-03-06"},
+            {"inspection_date": "2023-11-10"},
+            {"inspection_date": "2024-01-15"},
+        ]
+        assert min_inspection_date(rows) == "2023-11-10"
+
+    def test_skips_none_dates(self):
+        rows = [
+            {"inspection_date": None},
+            {"inspection_date": "2024-03-06"},
+            {"inspection_date": "2023-11-10"},
+        ]
+        assert min_inspection_date(rows) == "2023-11-10"
 
 
 class TestMapHistoricalRow:
