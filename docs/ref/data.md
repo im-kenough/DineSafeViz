@@ -239,3 +239,52 @@ When importing historical data into the current DB schema:
 - **CSV quoting:** All historical values are double-quoted. Use a
   proper CSV parser (not naive comma-splitting) because
   `Infraction Details` often contains commas.
+
+# Unified schema (inspections table)
+
+The Postgres `inspections` table merges both historical (2001–2022)
+and recent (2023–present) data into a single schema. Two columns from
+the historical dataset are preserved; columns absent in a given era
+are NULL.
+
+| # | Column                     | Type             | Historical (2001–2022) | Recent (2023–present) |
+|---|----------------------------|------------------|------------------------|-----------------------|
+| 1 | id                         | SERIAL (PK)      | auto-generated         | auto-generated        |
+| 2 | establishment_id           | TEXT             | populated              | populated             |
+| 3 | inspection_id              | TEXT             | populated              | populated             |
+| 4 | establishment_name         | TEXT             | populated              | populated             |
+| 5 | establishment_type         | TEXT             | populated              | populated             |
+| 6 | establishment_address      | TEXT             | populated              | populated             |
+| 7 | infraction_details         | TEXT             | populated              | populated             |
+| 8 | inspection_observation     | TEXT             | NULL                   | populated             |
+| 9 | inspection_date            | DATE             | populated              | populated             |
+| 10| severity                   | TEXT             | populated              | populated             |
+| 11| action                     | TEXT             | populated              | populated             |
+| 12| outcome                    | TEXT             | populated              | populated             |
+| 13| outcome_date               | TEXT             | NULL                   | populated             |
+| 14| amount_fined               | TEXT             | populated              | populated             |
+| 15| latitude                   | DOUBLE PRECISION | populated              | populated             |
+| 16| longitude                  | DOUBLE PRECISION | populated              | populated             |
+| 17| unique_id                  | TEXT             | NULL                   | populated             |
+| 18| establishment_status       | TEXT             | populated              | NULL                  |
+| 19| min_inspections_per_year   | TEXT             | populated              | NULL                  |
+
+## Data ingestion
+
+Data loading is handled by `src/db/refresh.py`, not by `init.sql`.
+
+**Initial seed (empty table):**
+1. Downloads the historical ZIP (2001–2022 CSVs)
+2. Downloads the recent Dinesafe.csv (2023–present)
+3. Inserts both into the `inspections` table in a single transaction
+
+**Daily refresh (table has data):**
+1. Downloads the recent Dinesafe.csv
+2. Deletes all rows with `inspection_date >= 2023-11-01`
+3. Inserts the fresh CSV rows
+4. All within a single transaction
+
+**Cron example:**
+```
+0 6 * * * cd /path/to/DineSafeViz && python3 src/db/refresh.py
+```
