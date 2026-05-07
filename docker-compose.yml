@@ -8,7 +8,6 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./src/db/init.sql:/docker-entrypoint-initdb.d/init.sql
-      - ./src/db/Dinesafe.csv:/data/Dinesafe.csv
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dinesafe"]
       interval: 5s
