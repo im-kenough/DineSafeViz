@@ -260,8 +260,8 @@ def index():
     cur = conn.cursor()
     cur.execute(
         "SELECT inspection_date, severity, action, infraction_details,"
-        "       establishment_name, establishment_address, outcome,"
-        "       outcome_date, amount_fined"
+        "       establishment_name, establishment_address, establishment_type,"
+        "       outcome, outcome_date, amount_fined"
         " FROM inspections"
         " WHERE inspection_date BETWEEN %s AND %s",
         (start, end),
@@ -274,9 +274,10 @@ def index():
             "infraction_details": r[3],
             "establishment_name": r[4],
             "establishment_address": r[5],
-            "outcome": r[6],
-            "outcome_date": r[7],
-            "amount_fined": r[8],
+            "establishment_type": r[6],
+            "outcome": r[7],
+            "outcome_date": r[8],
+            "amount_fined": r[9],
         }
         for r in cur.fetchall()
     ]
