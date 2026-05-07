@@ -162,15 +162,16 @@ def bulk_insert(conn, rows):
     """Insert mapped row dicts into inspections via COPY for speed.
 
     Uses a tab-separated StringIO buffer. None values become \\N
-    (Postgres COPY null marker). Tabs in data values are replaced
-    with spaces to avoid column-delimiter collisions.
+    (Postgres COPY null marker). Tabs, carriage returns, and newlines
+    in data values are replaced with spaces to avoid COPY format errors.
     """
     if not rows:
         return
     buf = io.StringIO()
     for row in rows:
         line = "\t".join(
-            "\\N" if row[col] is None else str(row[col]).replace("\t", " ")
+            "\\N" if row[col] is None
+            else str(row[col]).replace("\t", " ").replace("\r", " ").replace("\n", " ")
             for col in INSPECTIONS_COLUMNS
         )
         buf.write(line + "\n")
