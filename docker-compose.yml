@@ -64,6 +64,21 @@ services:
       db:
         condition: service_healthy
 
+  # One-shot service: seeds the DB on first run, refreshes recent data on subsequent runs.
+  # Mirrors the init-grafana pattern — exits after completion, never restarts.
+  init-db:
+    build: ./src/db
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
   # Grafana 11 RBAC requires explicit dashboard permissions even for anonymous Viewer role.
   # This service runs once on startup to grant Viewer access to the provisioned dashboard.
   init-grafana:
