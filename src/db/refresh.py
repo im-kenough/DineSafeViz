@@ -15,7 +15,7 @@ from urllib.request import urlretrieve
 import psycopg2
 
 # ---------------------------------------------------------------------------
-# Configuration — future: move to a config file
+# Configuration
 # ---------------------------------------------------------------------------
 
 RECENT_CSV_URL = (
@@ -30,8 +30,6 @@ HISTORICAL_ZIP_URL = (
     "c0a5f6b0-534a-47c3-867d-d4b5cc84a656/download/"
     "Dinesafe%20Historical%20Data.zip"
 )
-
-RECENT_DATA_START_DATE = "2023-11-01"
 
 DB_HOST = os.environ.get("DB_HOST", "db")
 DB_PORT = os.environ.get("DB_PORT", "5432")
@@ -115,6 +113,11 @@ def normalize(value):
     return value
 
 
+def min_inspection_date(rows):
+    """Return the earliest inspection_date string from mapped rows."""
+    return min(r["inspection_date"] for r in rows if r["inspection_date"] is not None)
+
+
 def map_row(row, column_map):
     """Map a CSV row dict to the unified inspections schema using the given column map."""
     mapped = {col: None for col in INSPECTIONS_COLUMNS}
@@ -142,8 +145,8 @@ def get_connection():
 def is_empty(conn):
     """Return True if the inspections table has zero rows."""
     with conn.cursor() as cur:
-        cur.execute("SELECT COUNT(*) FROM inspections")
-        return cur.fetchone()[0] == 0
+        cur.execute("SELECT 1 FROM inspections LIMIT 1")
+        return cur.fetchone() is None
 
 
 def bulk_insert(conn, rows):
@@ -194,15 +197,12 @@ def download_and_load_historical(conn):
 
 def _fetch_recent_rows():
     """Download the recent Dinesafe CSV and return parsed rows."""
-    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
-        tmp_path = tmp.name
-    try:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = os.path.join(tmpdir, "recent.csv")
         print(f"Downloading recent data from {RECENT_CSV_URL} ...")
         urlretrieve(RECENT_CSV_URL, tmp_path)
         with open(tmp_path, newline="", encoding="utf-8-sig") as f:
             return [map_row(r, RECENT_COLUMN_MAP) for r in csv.DictReader(f)]
-    finally:
-        os.unlink(tmp_path)
 
 
 def download_and_load_recent(conn):
@@ -230,12 +230,15 @@ def refresh(conn):
 
     Downloads the CSV first, then deletes + inserts inside one
     transaction so the table is never in a partial state.
+    The delete cutoff is derived from the earliest date in the
+    fresh CSV so it tracks the upstream data window automatically.
     """
     rows = _fetch_recent_rows()
+    cutoff = min_inspection_date(rows)
     with conn.cursor() as cur:
         cur.execute(
             "DELETE FROM inspections WHERE inspection_date >= %s",
-            (RECENT_DATA_START_DATE,),
+            (cutoff,),
         )
         deleted = cur.rowcount
     bulk_insert(conn, rows)
