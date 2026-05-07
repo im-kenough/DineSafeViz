@@ -9,16 +9,41 @@ For dev testing purposes
 docker compose up -d
 ```
 
+### Deploy app & follow db logs
+
+Track successful data fetch and db load
+```bash
+docker compose up -d && docker container logs -f dinesafeviz-init-db
+docker compose up -d && docker container logs -f dinesafeviz-db-1
+```
+
+```bash
+# wipes pgdata volume, clears the partial load
+docker compose down -v      
+
+# picks up changes    
+docker compose build init-db
+docker compose up -d
+
+```
+
 ## Follow logs
 
-### Follow poastgres logs
+### Follow webapp logs
+
 ```bash
-docker container logs -f dinesafeviz_pgdata
+docker container logs -f dinesafeviz-web-1
+```
+
+### Follow poastgres logs
+
+```bash
+docker container logs -f dinesafeviz-db-1
 ```
 
 ### Follow ds-dashboard logs
 ```bash
-docker container logs -f dinesafeviz_grafana_data
+docker container logs -f dinesafeviz-grafana-1
 ```
 
 
@@ -26,7 +51,8 @@ docker container logs -f dinesafeviz_grafana_data
 
 ```bash
 docker compose down
-docker volume rm dinesafeviz_grafana_data dinesafeviz_pgdata
+docker volume rm dinesafeviz_grafana_data
+docker volume rm dinesafeviz_pgdata
 ```
 
 
