@@ -19,10 +19,10 @@
             <thead>
                 <tr>
                     <th>Severity</th>
-                    <th>Action</th>
                     <th>Infraction Details</th>
-                    <th>Establishment Name</th>
-                    <th>Address</th>
+                    <th>Establishment</th>
+                    <th>Establishment Type</th>
+                    <th>Action</th>
                     <th>Outcome</th>
                     <th>Outcome Date</th>
                     <th>Amount Fined</th>
@@ -32,10 +32,10 @@
                 {% for row in rows %}
                 <tr class="{{ sev_class.get(row.severity, '') }}">
                     <td>{{ row.severity or '—' }}</td>
-                    <td>{{ row.action or '—' }}</td>
                     <td>{{ row.infraction_details or '—' }}</td>
-                    <td>{{ row.establishment_name or '—' }}</td>
-                    <td>{{ row.establishment_address or '—' }}</td>
+                    <td>{{ row.establishment_name or '—' }}<br>----------<br>{{ row.establishment_address or '—' }}</td>
+                    <td>{{ row.establishment_type or '—' }}</td>
+                    <td>{{ row.action or '—' }}</td>
                     <td>{{ row.outcome or '—' }}</td>
                     <td>{{ row.outcome_date or '—' }}</td>
                     <td>{{ row.amount_fined or '—' }}</td>
