@@ -1,7 +1,11 @@
 # DineSafeViz
-Is a dockerized web app that vizualizes data from Toronto Public Health's food safety and inspection program, DineSafe.
 
 ![alt text](docs/img/root-readme/dsv-home-1.png)
+Is a dockerized web app that vizualizes data from Toronto Public Health's food safety and inspection program, DineSafe.
+
+# Tech Stack
+
+Modern, well documented and supports a full [devops](docs/ref/devops.md) toolchain
 
 # Features
 
