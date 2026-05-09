@@ -4,7 +4,7 @@
 
 Task: Review diff of home page changes (app.py, templates, tests) for code reuse opportunities against existing patterns in the codebase.
 
-Read full app.py at /home/sam/SCM/github/DineSafeViz/src/web/app.py to assess:
+Read full app.py at /home/sam/SCM/github/DineSafeViz/src/dsv-app/app.py to assess:
 1. Whether `_get_home_stats()` duplicates existing DB connection/query patterns
 2. Whether a caching utility already exists
 3. Whether the two-query approach duplicates existing data-fetch patterns

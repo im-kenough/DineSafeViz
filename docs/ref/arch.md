@@ -4,7 +4,7 @@ The runtime stack uses four Docker Compose services on a shared network:
 
 - **`dsv-db`** — `postgres:17` (latest LTS). On first start, an init
   script creates the table and loads the CSV via `COPY`. Data persists in a
-  named volume (`pgdata`).
+  named volume (`dsv-db-data`).
 - **`dsv-app`** — `python:3.12-slim` (latest LTS). Runs the Flask app on
   port 5000. Connects to `dsv-db:5432`. Depends on the database healthcheck
   and on the analytics service being started.
@@ -20,7 +20,7 @@ See [data](../data.md)
 
 ## CSV Loading
 
-- The init script (`src/db/init.sql`) runs automatically via Postgres's
+- The init script (`src/dsv-db/init.sql`) runs automatically via Postgres's
   `/docker-entrypoint-initdb.d/` mechanism.
 - It creates the table, then uses `COPY inspections(...) FROM '/data/Dinesafe.csv' CSV HEADER` to bulk-load the data.
 - The CSV file is mounted into the `dsv-db` container at `/data/Dinesafe.csv`
@@ -42,12 +42,12 @@ See [data](../data.md)
 DineSafeViz/
 ├── docker-compose.yml
 └── src/
-    ├── db/
+    ├── dsv-db/
     │   ├── Dinesafe.csv          (existing)
     │   └── init.sql
-    ├── grafana/
+    ├── dsv-analytics/
     │   └── provisioning/
-    └── web/
+    └── dsv-app/
         ├── Dockerfile
         ├── requirements.txt      (flask, psycopg2-binary)
         ├── app.py

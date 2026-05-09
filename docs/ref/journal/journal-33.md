@@ -22,4 +22,4 @@ This targets only the third-level flyout (archive flyout → year item → quart
 Q1–Q4 display side-by-side at the same Y as the hovered year, so they're never occluded.
 
 ### Files changed
-- `src/web/static/style.css` — one rule added after `.flyout a { display: block; }`
+- `src/dsv-app/static/style.css` — one rule added after `.flyout a { display: block; }`

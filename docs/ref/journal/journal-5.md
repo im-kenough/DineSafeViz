@@ -21,5 +21,5 @@ Design and spec a day-grouped display for the DineSafe inspection data.
 - **Implementation**: server-side Flask only, URL params, no JS, no new endpoints
 
 ### Files to change
-- `src/web/app.py` — read year/q params, query by date range, build day-map
-- `src/web/templates/index.html` — replace flat table with day-box layout
+- `src/dsv-app/app.py` — read year/q params, query by date range, build day-map
+- `src/dsv-app/templates/index.html` — replace flat table with day-box layout

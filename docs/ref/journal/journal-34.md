@@ -21,8 +21,8 @@
 - Added 2 tests for `min_inspection_date`
 
 **Files edited**:
-- `src/db/refresh.py` — removed constant, added helper, updated refresh()
-- `src/db/tests/test_refresh.py` — added TestMinInspectionDate class
+- `src/dsv-db/refresh.py` — removed constant, added helper, updated refresh()
+- `src/dsv-db/tests/test_refresh.py` — added TestMinInspectionDate class
 
 **Verification**: All 18 db tests + 47 web tests pass.
 

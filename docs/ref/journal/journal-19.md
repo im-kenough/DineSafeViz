@@ -28,7 +28,7 @@ Task: optimize `style.css` and `base.html` for three desktop breakpoints:
 ## 2026-04-28 — Implemented responsive changes
 
 Files edited:
-- `src/web/static/style.css`: centered body (margin auto + padding), added ≥1400px and ≥2200px max-width breakpoints, clamp() on h1/nav-btn/th-td font sizes, .table-wrap overflow rule, QHD spacing block
-- `src/web/templates/index.html`: wrapped `<table>` in `<div class="table-wrap">`
+- `src/dsv-app/static/style.css`: centered body (margin auto + padding), added ≥1400px and ≥2200px max-width breakpoints, clamp() on h1/nav-btn/th-td font sizes, .table-wrap overflow rule, QHD spacing block
+- `src/dsv-app/templates/index.html`: wrapped `<table>` in `<div class="table-wrap">`
 
 Changes: 6 edits, ~20 lines added to CSS, 2 lines added to index.html

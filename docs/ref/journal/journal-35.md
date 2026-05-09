@@ -2,14 +2,14 @@
 
 ## 2026-05-07 10:00
 
-**Task**: Review `src/db/refresh.py` and `src/web/app.py` for quality issues:
+**Task**: Review `src/dsv-db/refresh.py` and `src/dsv-app/app.py` for quality issues:
 redundant state, parameter sprawl, copy-paste with variation, leaky abstractions,
 stringly-typed code, unnecessary comments.
 
 **Files read**:
-- `src/db/refresh.py` (276 lines)
-- `src/web/app.py` (291 lines)
-- `src/db/tests/test_refresh.py` (verified context)
+- `src/dsv-db/refresh.py` (276 lines)
+- `src/dsv-app/app.py` (291 lines)
+- `src/dsv-db/tests/test_refresh.py` (verified context)
 - `docs/ref/journal/journal-34.md` (previous session context)
 
 **Findings**: Documented in final assistant response to the user.

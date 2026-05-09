@@ -227,7 +227,7 @@ infra/k8s/
 | `services.grafana` | Deployment (1 replica) + NodePort Service + Longhorn PVC |
 | `services.init-grafana` | Job (runs once, `restartPolicy: Never`) |
 | `.env` variables | K8s Secrets + ConfigMaps |
-| Named volumes (`pgdata`, `grafana_data`) | Longhorn PersistentVolumeClaims |
+| Named volumes (`dsv-db-data`, `dsv-analytics-data`) | Longhorn PersistentVolumeClaims |
 | `depends_on` + healthchecks | Init containers + readiness probes |
 | Docker Compose network | K8s Services (ClusterIP for internal, NodePort for external) |
 
@@ -275,7 +275,7 @@ Extends existing `.github/workflows/release.yml`:
 ```
 Push tag (v*) → GitHub Actions:
   1. Run tests (pytest)
-  2. Build Docker image from src/web/Dockerfile
+  2. Build Docker image from src/dsv-app/Dockerfile
   3. Tag as ghcr.io/<owner>/dinesafeviz:<version> and :latest
   4. Push to ghcr.io
 ```

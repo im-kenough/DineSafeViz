@@ -3,7 +3,7 @@
 ## 2026-05-05 14:00
 
 **Task:** Examine historical CSV files (2001-2015) in
-`src/db/2023-04-11 - Dinesafe Historical data/` and document their
+`src/dsv-db/2023-04-11 - Dinesafe Historical data/` and document their
 structure in `docs/ref/data.md`.
 
 ### Actions

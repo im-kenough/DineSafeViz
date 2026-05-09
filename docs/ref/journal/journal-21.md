@@ -32,6 +32,6 @@ Read style.css and all four templates (base.html, index.html, dashboard.html, in
 
 ### Changes made
 
-`src/web/static/style.css`:
+`src/dsv-app/static/style.css`:
 - Added `a { color: var(--accent); }` after body styles; fixes bare links in info.html
 - Changed `--sev-minor` from `rgba(202, 138, 4, 0.6)` to `rgba(202, 138, 4, 0.45)`

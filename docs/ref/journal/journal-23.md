@@ -76,7 +76,7 @@ User chose: ghcr.io (GitHub Container Registry)
 
 Wrote full implementation plan to docs/superpowers/plans/2026-05-01-homelab-k8s.md
 - 16 tasks covering: scaffold, Terraform, DB Dockerfile, Ansible (config, 4 roles, playbooks, vault), K8s manifests (namespace, db, web, grafana, init-grafana), GitHub Actions, final validation
-- Key deviation from spec: Dinesafe.csv is 6.5MB, exceeds 1MB ConfigMap limit. Used custom postgres Docker image (src/db/Dockerfile) instead of ConfigMap.
+- Key deviation from spec: Dinesafe.csv is 6.5MB, exceeds 1MB ConfigMap limit. Used custom postgres Docker image (src/dsv-db/Dockerfile) instead of ConfigMap.
 - Self-review fixes: PostgreSQL readiness probe needed shell wrapper for env var expansion; Grafana deployment was missing dinesafe.json dashboard volume mount.
 
 ## 2026-05-01 14:35

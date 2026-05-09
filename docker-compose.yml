@@ -1,3 +1,5 @@
+name: dsv
+
 services:
   dsv-db:
     image: postgres:17.9
@@ -6,8 +8,8 @@ services:
       POSTGRES_PASSWORD: ${DSV_DB_PASSWORD}
       POSTGRES_DB: ${DSV_DB_NAME}
     volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./src/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - dsv-db-data:/var/lib/postgresql/data
+      - ./src/dsv-db/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dinesafe"]
       interval: 5s
@@ -15,7 +17,7 @@ services:
       retries: 5
 
   dsv-app:
-    build: ./src/web
+    build: ./src/dsv-app
     ports:
       - "5000:5000"
     environment:
@@ -58,8 +60,8 @@ services:
       DSV_DB_USER: ${DSV_DB_USER}
       DSV_DB_PASSWORD: ${DSV_DB_PASSWORD}
     volumes:
-      - ./src/grafana/provisioning:/etc/grafana/provisioning
-      - grafana_data:/var/lib/grafana
+      - ./src/dsv-analytics/provisioning:/etc/grafana/provisioning
+      - dsv-analytics-data:/var/lib/grafana
     depends_on:
       dsv-db:
         condition: service_healthy
@@ -67,7 +69,7 @@ services:
   # One-shot service: seeds the DB on first run, refreshes recent data on subsequent runs.
   # Mirrors the init-grafana pattern — exits after completion, never restarts.
   dsv-init-db:
-    build: ./src/db
+    build: ./src/dsv-db
     environment:
       DSV_DB_HOST: dsv-db
       DSV_DB_PORT: 5432
@@ -100,5 +102,5 @@ services:
     restart: "no"
 
 volumes:
-  pgdata:
-  grafana_data:
+  dsv-db-data:
+  dsv-analytics-data:

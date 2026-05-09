@@ -42,7 +42,7 @@ unique_id	Unique composite key
 # Historical data (2001-2015)
 
 The historical dataset lives in
-`src/db/2023-04-11 - Dinesafe Historical data/`. It contains one CSV
+`src/dsv-db/2023-04-11 - Dinesafe Historical data/`. It contains one CSV
 per year (`dinesafe_hist_YYYY.csv`), covering 2001 through 2022. The
 files from 2001 to 2015 are documented here.
 
@@ -279,7 +279,7 @@ either dataset.
 
 ## Data ingestion
 
-Data loading is handled by `src/db/refresh.py`, not by `init.sql`.
+Data loading is handled by `src/dsv-db/refresh.py`, not by `init.sql`.
 
 **Initial seed (empty table):**
 1. Downloads the historical ZIP (2001–2022 CSVs)
@@ -295,5 +295,5 @@ Data loading is handled by `src/db/refresh.py`, not by `init.sql`.
 
 **Cron example:**
 ```
-0 6 * * * cd /path/to/DineSafeViz && python3 src/db/refresh.py
+0 6 * * * cd /path/to/DineSafeViz && python3 src/dsv-db/refresh.py
 ```

@@ -13,12 +13,12 @@ docker compose up -d
 
 Track successful data fetch and db load
 ```bash
-docker compose up -d && docker container logs -f dinesafeviz-dsv-init-db-1
-docker compose up -d && docker container logs -f dinesafeviz-dsv-db-1
+docker compose up -d && docker container logs -f dsv-dsv-init-db-1
+docker compose up -d && docker container logs -f dsv-dsv-db-1
 ```
 
 ```bash
-# wipes pgdata volume, clears the partial load
+# wipes dsv-db-data volume, clears the partial load
 docker compose down -v      
 
 # picks up changes    
@@ -32,18 +32,18 @@ docker compose up -d
 ### Follow app logs
 
 ```bash
-docker container logs -f dinesafeviz-dsv-app-1
+docker container logs -f dsv-dsv-app-1
 ```
 
 ### Follow PostgreSQL logs
 
 ```bash
-docker container logs -f dinesafeviz-dsv-db-1
+docker container logs -f dsv-dsv-db-1
 ```
 
 ### Follow analytics logs
 ```bash
-docker container logs -f dinesafeviz-dsv-analytics-1
+docker container logs -f dsv-dsv-analytics-1
 ```
 
 
@@ -51,8 +51,8 @@ docker container logs -f dinesafeviz-dsv-analytics-1
 
 ```bash
 docker compose down
-docker volume rm dinesafeviz_grafana_data
-docker volume rm dinesafeviz_pgdata
+docker volume rm dsv_dsv-analytics-data
+docker volume rm dsv_dsv-db-data
 ```
 
 
@@ -85,7 +85,7 @@ docker compose up --build -d
    1 docker compose up -d --build dsv-app
 
   To Rebuild the Database (Ingestion Logic)
-  In your configuration, the `dsv-db` service uses a standard Postgres image, but the logic in `src/db/Dockerfile` (which
+  In your configuration, the `dsv-db` service uses a standard Postgres image, but the logic in `src/dsv-db/Dockerfile` (which
   handles data seeding and refreshes) is tied to the `dsv-init-db` service.
 
   To rebuild that logic:
@@ -102,5 +102,5 @@ docker compose up --build -d
   └────────────────────────┴──────────────────────────────────┘
 
   Note: Since `dsv-db` uses a pre-built image (postgres:17.9), it doesn't "rebuild" in the Docker sense. If you change
-  src/db/init.sql, you usually need to wipe the volume (docker compose down -v) for those changes to apply, as
+  src/dsv-db/init.sql, you usually need to wipe the volume (docker compose down -v) for those changes to apply, as
   Postgres only runs init scripts on the very first boot.

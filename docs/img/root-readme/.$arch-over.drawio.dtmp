@@ -4,11 +4,20 @@
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="he6pA-l9n7X3yqYaU9Au-2" value="db&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="swimlane;whiteSpace=wrap;html=1;" vertex="1" parent="1">
-          <mxGeometry x="310" y="520" width="200" height="200" as="geometry" />
+        <mxCell id="he6pA-l9n7X3yqYaU9Au-2" value="&lt;div&gt;dsv-db&lt;br&gt;container&lt;/div&gt;" style="swimlane;whiteSpace=wrap;html=1;startSize=30;" vertex="1" parent="1">
+          <mxGeometry x="130" y="440" width="200" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="he6pA-l9n7X3yqYaU9Au-9" value="postgres:17.9" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="he6pA-l9n7X3yqYaU9Au-2">
+          <mxGeometry x="30" y="60" width="120" height="60" as="geometry" />
         </mxCell>
         <mxCell id="he6pA-l9n7X3yqYaU9Au-3" value="vm" style="swimlane;whiteSpace=wrap;html=1;" vertex="1" parent="1">
           <mxGeometry x="10" y="150" width="200" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="he6pA-l9n7X3yqYaU9Au-6" value="dsv-db-data&lt;br&gt;volume" style="swimlane;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="700" width="200" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="he6pA-l9n7X3yqYaU9Au-8" value="postgres&lt;div&gt;17.9&lt;/div&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" vertex="1" parent="he6pA-l9n7X3yqYaU9Au-6">
+          <mxGeometry x="60" y="70" width="60" height="80" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>

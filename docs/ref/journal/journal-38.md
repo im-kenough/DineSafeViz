@@ -9,12 +9,12 @@ Completed Task 1: Updated existing mock database rows in test_routes.py and adde
 
 1. **Updated test_route_shows_inspection_data mock row**
    - Added "Fast Food" at position 6 (after "1 Main St")
-   - File: /home/sam/SCM/github/DineSafeViz/src/web/tests/test_routes.py
+   - File: /home/sam/SCM/github/DineSafeViz/src/dsv-app/tests/test_routes.py
    - Lines 46-63
 
 2. **Updated test_severity_class_on_row mock row**
    - Added "Fast Food" at position 6 (after "1 Main St")
-   - File: /home/sam/SCM/github/DineSafeViz/src/web/tests/test_routes.py
+   - File: /home/sam/SCM/github/DineSafeViz/src/dsv-app/tests/test_routes.py
    - Lines 78-93
 
 3. **Added three new test functions**
@@ -24,7 +24,7 @@ Completed Task 1: Updated existing mock database rows in test_routes.py and adde
 
 ### Test Results
 
-Ran: `python3 -m pytest src/web/tests/test_routes.py -v`
+Ran: `python3 -m pytest src/dsv-app/tests/test_routes.py -v`
 
 Results:
 - 24 tests PASSED
