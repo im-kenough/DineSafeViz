@@ -220,3 +220,6 @@ __marimo__/
 # Data files
 src/dsv-db/**/*.csv
 src/dsv-db/**/*.zip
+
+# draw.io tempfiles
+*.bkp

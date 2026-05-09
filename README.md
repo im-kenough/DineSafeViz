@@ -20,6 +20,8 @@ dashboard. Specify your own date range. Over 26 years of data!
 
 # Architectual Overview
 
+![alt text](docs/img/root-readme/arch-over.drawio.png)
+
 ## Install Guide
 
 [Instructions](docs/how-to/install-guide.md) for first time setup of the application
