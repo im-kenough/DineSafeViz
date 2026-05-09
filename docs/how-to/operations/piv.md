@@ -7,7 +7,7 @@ docker compose up --build -d
 curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 
  
 ### Verify proxy works (expect: 200) 
-curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/grafana/api/health
+curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/analytics/api/health
  
 ### Verify dashboard page (expect: 200)
 curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/dashboard 

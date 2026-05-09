@@ -31,11 +31,11 @@ HISTORICAL_ZIP_URL = (
     "Dinesafe%20Historical%20Data.zip"
 )
 
-DB_HOST = os.environ.get("DB_HOST", "dsv-db")
-DB_PORT = os.environ.get("DB_PORT", "5432")
-DB_NAME = os.environ.get("DB_NAME", "dinesafe")
-DB_USER = os.environ.get("DB_USER", "dinesafe")
-DB_PASSWORD = os.environ.get("DB_PASSWORD", "dinesafe")
+DSV_DB_HOST = os.environ.get("DSV_DB_HOST", "dsv-db")
+DSV_DB_PORT = os.environ.get("DSV_DB_PORT", "5432")
+DSV_DB_NAME = os.environ.get("DSV_DB_NAME", "dinesafe")
+DSV_DB_USER = os.environ.get("DSV_DB_USER", "dinesafe")
+DSV_DB_PASSWORD = os.environ.get("DSV_DB_PASSWORD", "dinesafe")
 
 # Column order for COPY into the inspections table (excludes serial `id`)
 INSPECTIONS_COLUMNS = [
@@ -134,11 +134,11 @@ def map_row(row, column_map):
 def get_connection():
     """Return a psycopg2 connection using the module-level config."""
     return psycopg2.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
+        host=DSV_DB_HOST,
+        port=DSV_DB_PORT,
+        dbname=DSV_DB_NAME,
+        user=DSV_DB_USER,
+        password=DSV_DB_PASSWORD,
     )
 
 

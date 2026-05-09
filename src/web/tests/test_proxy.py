@@ -1,7 +1,7 @@
 from unittest.mock import patch, MagicMock
 
 
-def _mock_grafana_response(status_code=200, content=b"grafana html", headers=None):
+def _mock_analytics_response(status_code=200, content=b"analytics html", headers=None):
     resp = MagicMock()
     resp.status_code = status_code
     resp.content = content
@@ -9,43 +9,43 @@ def _mock_grafana_response(status_code=200, content=b"grafana html", headers=Non
     return resp
 
 
-def test_grafana_proxy_forwards_get(client):
-    mock_resp = _mock_grafana_response()
-    with patch("app._grafana_session.request", return_value=mock_resp) as mock_req:
-        resp = client.get("/grafana/d/dinesafe/dinesafe-inspections")
+def test_analytics_proxy_forwards_get(client):
+    mock_resp = _mock_analytics_response()
+    with patch("app._analytics_session.request", return_value=mock_resp) as mock_req:
+        resp = client.get("/analytics/d/dinesafe/dinesafe-inspections")
     mock_req.assert_called_once()
     kwargs = mock_req.call_args.kwargs
     assert kwargs["method"] == "GET"
-    assert "dsv-analytics:3000/grafana/d/dinesafe/dinesafe-inspections" in kwargs["url"]
+    assert "dsv-analytics:3000/analytics/d/dinesafe/dinesafe-inspections" in kwargs["url"]
     assert resp.status_code == 200
-    assert resp.data == b"grafana html"
+    assert resp.data == b"analytics html"
 
 
-def test_grafana_proxy_passes_query_string(client):
-    mock_resp = _mock_grafana_response()
-    with patch("app._grafana_session.request", return_value=mock_resp) as mock_req:
-        resp = client.get("/grafana/d/dinesafe/x?kiosk&orgId=1")
+def test_analytics_proxy_passes_query_string(client):
+    mock_resp = _mock_analytics_response()
+    with patch("app._analytics_session.request", return_value=mock_resp) as mock_req:
+        resp = client.get("/analytics/d/dinesafe/x?kiosk&orgId=1")
     url = mock_req.call_args.kwargs["url"]
     assert "kiosk" in url
     assert "orgId=1" in url
 
 
-def test_grafana_proxy_returns_grafana_status_code(client):
-    mock_resp = _mock_grafana_response(status_code=404, content=b"not found")
-    with patch("app._grafana_session.request", return_value=mock_resp):
-        resp = client.get("/grafana/nonexistent")
+def test_analytics_proxy_returns_analytics_status_code(client):
+    mock_resp = _mock_analytics_response(status_code=404, content=b"not found")
+    with patch("app._analytics_session.request", return_value=mock_resp):
+        resp = client.get("/analytics/nonexistent")
     assert resp.status_code == 404
 
 
-def test_grafana_proxy_forwards_post(client):
-    mock_resp = _mock_grafana_response(
+def test_analytics_proxy_forwards_post(client):
+    mock_resp = _mock_analytics_response(
         content=b'{"results":{}}',
         headers={"Content-Type": "application/json"},
     )
     payload = b'{"queries":[]}'
-    with patch("app._grafana_session.request", return_value=mock_resp) as mock_req:
+    with patch("app._analytics_session.request", return_value=mock_resp) as mock_req:
         resp = client.post(
-            "/grafana/api/ds/query",
+            "/analytics/api/ds/query",
             data=payload,
             headers={"Content-Type": "application/json"},
         )

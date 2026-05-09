@@ -9,8 +9,8 @@ site has embedded it." Chrome commonly shows a refused-to-connect message in
 the frame.
 
 Grafana sends `X-Frame-Options: deny` unless embedding is enabled. This project
-renders Grafana inside an iframe on `/dashboard`, so Grafana must allow
-embedding.
+renders the analytics dashboard inside an iframe on `/dashboard`, so Grafana
+must allow embedding.
 
 ### Fix
 

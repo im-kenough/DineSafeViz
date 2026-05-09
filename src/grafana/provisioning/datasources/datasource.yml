@@ -5,12 +5,12 @@ datasources:
     uid: dinesafe-postgres
     type: postgres
     access: proxy
-    url: ${DB_HOST}:${DB_PORT}
-    user: ${DB_USER}
+    url: ${DSV_DB_HOST}:${DSV_DB_PORT}
+    user: ${DSV_DB_USER}
     secureJsonData:
-      password: ${DB_PASSWORD}
+      password: ${DSV_DB_PASSWORD}
     jsonData:
-      database: ${DB_NAME}
+      database: ${DSV_DB_NAME}
       sslmode: disable
       postgresVersion: 1700
     isDefault: true

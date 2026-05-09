@@ -57,8 +57,13 @@ DineSafeViz/
 
 ## Configuration
 
-- Postgres credentials passed via environment variables in `docker-compose.yml`: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`.
-- Flask reads the same credentials from environment to build its connection string.
+- Database settings are passed through service-scoped environment variables:
+  `DSV_DB_HOST`, `DSV_DB_PORT`, `DSV_DB_NAME`, `DSV_DB_USER`, and
+  `DSV_DB_PASSWORD`.
+- The Postgres container maps `DSV_DB_USER`, `DSV_DB_PASSWORD`, and
+  `DSV_DB_NAME` to `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`.
+- The Flask app and analytics datasource read the same `DSV_DB_*` values for
+  connectivity.
 - Default values: user=`dinesafe`, password=`dinesafe`, db=`dinesafe`.
 
 ## Out of Scope
