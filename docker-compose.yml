@@ -1,24 +1,6 @@
 name: dsv
 
 services:
-  # DSV-DB: PostgreSQL database service
-  # Stores City of Toronto DineSafe dataset
-  dsv-db:
-    image: postgres:17.9
-    environment:
-      POSTGRES_USER: ${DSV_DB_USER}
-      POSTGRES_PASSWORD: ${DSV_DB_PASSWORD}
-      POSTGRES_DB: ${DSV_DB_NAME}
-    volumes:
-      - dsv-db-data:/var/lib/postgresql/data
-      - ./src/dsv-db/init.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dinesafe"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  
   # DSV-App: Flask web application service
   # Serves the website frontend and API, proxies analytics dashboard at /analytics/
   dsv-app:
@@ -36,6 +18,39 @@ services:
         condition: service_healthy
       dsv-analytics:
         condition: service_started
+
+  # DSV-DB: PostgreSQL database service
+  # Stores City of Toronto DineSafe dataset
+  dsv-db:
+    image: postgres:17.9
+    environment:
+      POSTGRES_USER: ${DSV_DB_USER}
+      POSTGRES_PASSWORD: ${DSV_DB_PASSWORD}
+      POSTGRES_DB: ${DSV_DB_NAME}
+    volumes:
+      - dsv-db-data:/var/lib/postgresql/data
+      - ./src/dsv-db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DSV_DB_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # One-shot service: seeds the DB on first run, refreshes recent data on subsequent runs.
+  # Mirrors the init-grafana pattern — exits after completion, never restarts.
+  dsv-init-db:
+    build: ./src/dsv-db
+    environment:
+      DSV_DB_HOST: dsv-db
+      DSV_DB_PORT: 5432
+      DSV_DB_NAME: ${DSV_DB_NAME}
+      DSV_DB_USER: ${DSV_DB_USER}
+      DSV_DB_PASSWORD: ${DSV_DB_PASSWORD}
+    depends_on:
+      dsv-db:
+        condition: service_healthy
+    restart: "no"
+
 
   # DSV-Analytics: a Grafana dashboard
   # Shows a dashboard of stats and metrics based on the DSV-DB dataset, embedded in the Flask app at /analytics/ (also accessible directly at localhost:3000/analytics/)
@@ -72,21 +87,6 @@ services:
     depends_on:
       dsv-db:
         condition: service_healthy
-
-  # One-shot service: seeds the DB on first run, refreshes recent data on subsequent runs.
-  # Mirrors the init-grafana pattern — exits after completion, never restarts.
-  dsv-init-db:
-    build: ./src/dsv-db
-    environment:
-      DSV_DB_HOST: dsv-db
-      DSV_DB_PORT: 5432
-      DSV_DB_NAME: ${DSV_DB_NAME}
-      DSV_DB_USER: ${DSV_DB_USER}
-      DSV_DB_PASSWORD: ${DSV_DB_PASSWORD}
-    depends_on:
-      dsv-db:
-        condition: service_healthy
-    restart: "no"
 
   # Grafana 11 RBAC requires explicit dashboard permissions even for anonymous Viewer role.
   # This service runs once on startup to grant Viewer access to the provisioned dashboard.
