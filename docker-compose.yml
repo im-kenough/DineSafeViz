@@ -9,7 +9,7 @@ services:
       - "5000:5000"
     environment:
       DSV_DB_HOST: dsv-db
-      DSV_DB_PORT: 5432
+      DSV_DB_PORT: ${DSV_DB_PORT}
       DSV_DB_NAME: ${DSV_DB_NAME}
       DSV_DB_USER: ${DSV_DB_USER}
       DSV_DB_PASSWORD: ${DSV_DB_PASSWORD}
@@ -42,7 +42,7 @@ services:
     build: ./src/dsv-db
     environment:
       DSV_DB_HOST: dsv-db
-      DSV_DB_PORT: 5432
+      DSV_DB_PORT: ${DSV_DB_PORT}
       DSV_DB_NAME: ${DSV_DB_NAME}
       DSV_DB_USER: ${DSV_DB_USER}
       DSV_DB_PASSWORD: ${DSV_DB_PASSWORD}
@@ -77,7 +77,7 @@ services:
 
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/dinesafe.json
       DSV_DB_HOST: dsv-db
-      DSV_DB_PORT: 5432
+      DSV_DB_PORT: ${DSV_DB_PORT}
       DSV_DB_NAME: ${DSV_DB_NAME}
       DSV_DB_USER: ${DSV_DB_USER}
       DSV_DB_PASSWORD: ${DSV_DB_PASSWORD}
