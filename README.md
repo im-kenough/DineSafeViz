@@ -18,3 +18,11 @@ View a stats breakdown of the inspection results in a Grafana dashboard. Specify
 ![alt text](docs/img/root-readme/dsv-dash-1.png)
 
 # Architectual Overview
+
+## Install Guide
+
+[Instructions](docs/how-to/install-guide.md) for first time setup of the application
+
+## Deployment Guide
+
+Instructions to deploy / redeploy the app after a change
