@@ -31,7 +31,7 @@ HISTORICAL_ZIP_URL = (
     "Dinesafe%20Historical%20Data.zip"
 )
 
-DB_HOST = os.environ.get("DB_HOST", "db")
+DB_HOST = os.environ.get("DB_HOST", "dsv-db")
 DB_PORT = os.environ.get("DB_PORT", "5432")
 DB_NAME = os.environ.get("DB_NAME", "dinesafe")
 DB_USER = os.environ.get("DB_USER", "dinesafe")

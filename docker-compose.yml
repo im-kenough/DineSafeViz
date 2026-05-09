@@ -1,5 +1,5 @@
 services:
-  db:
+  dsv-db:
     image: postgres:17.9
     environment:
       POSTGRES_USER: ${DB_USER}
@@ -14,23 +14,23 @@ services:
       timeout: 5s
       retries: 5
 
-  web:
+  dsv-app:
     build: ./src/web
     ports:
       - "5000:5000"
     environment:
-      DB_HOST: db
+      DB_HOST: dsv-db
       DB_PORT: 5432
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
     depends_on:
-      db:
+      dsv-db:
         condition: service_healthy
-      grafana:
+      dsv-analytics:
         condition: service_started
 
-  grafana:
+  dsv-analytics:
     image: grafana/grafana:11.6.0
     ports:
       # Exposed for direct admin access. Navigate to localhost:3000/grafana/ to log in.
@@ -52,7 +52,7 @@ services:
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
 
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/dinesafe.json
-      DB_HOST: db
+      DB_HOST: dsv-db
       DB_PORT: 5432
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
@@ -61,30 +61,30 @@ services:
       - ./src/grafana/provisioning:/etc/grafana/provisioning
       - grafana_data:/var/lib/grafana
     depends_on:
-      db:
+      dsv-db:
         condition: service_healthy
 
   # One-shot service: seeds the DB on first run, refreshes recent data on subsequent runs.
   # Mirrors the init-grafana pattern — exits after completion, never restarts.
-  init-db:
+  dsv-init-db:
     build: ./src/db
     environment:
-      DB_HOST: db
+      DB_HOST: dsv-db
       DB_PORT: 5432
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
     depends_on:
-      db:
+      dsv-db:
         condition: service_healthy
     restart: "no"
 
   # Grafana 11 RBAC requires explicit dashboard permissions even for anonymous Viewer role.
   # This service runs once on startup to grant Viewer access to the provisioned dashboard.
-  init-grafana:
+  dsv-init-analytics:
     image: curlimages/curl:latest
     depends_on:
-      grafana:
+      dsv-analytics:
         condition: service_started
     environment:
       GF_ADMIN_USER: ${GF_ADMIN_USER}
@@ -93,10 +93,10 @@ services:
       - sh
       - -c
       - |
-        i=0; until curl -s http://grafana:3000/grafana/api/health | grep -q '"database": "ok"'; do sleep 2; i=$$(($$i+1)); [ $$i -ge 30 ] && echo "Grafana did not start in time" && exit 1; done
-        DASH_ID=$$(curl -s "http://$$GF_ADMIN_USER:$$GF_ADMIN_PASSWORD@grafana:3000/grafana/api/dashboards/uid/dinesafe" | grep -oE '"id":[0-9]+' | head -1 | grep -oE '[0-9]+')
+        i=0; until curl -s http://dsv-analytics:3000/grafana/api/health | grep -q '"database": "ok"'; do sleep 2; i=$$(($$i+1)); [ $$i -ge 30 ] && echo "Analytics dashboard did not start in time" && exit 1; done
+        DASH_ID=$$(curl -s "http://$$GF_ADMIN_USER:$$GF_ADMIN_PASSWORD@dsv-analytics:3000/grafana/api/dashboards/uid/dinesafe" | grep -oE '"id":[0-9]+' | head -1 | grep -oE '[0-9]+')
         [ -z "$$DASH_ID" ] && echo "Dashboard not found, skipping permissions grant" && exit 0
-        curl -sf -X POST "http://$$GF_ADMIN_USER:$$GF_ADMIN_PASSWORD@grafana:3000/grafana/api/dashboards/id/$$DASH_ID/permissions" -H "Content-Type: application/json" -d '{"items":[{"role":"Viewer","permission":1}]}'
+        curl -sf -X POST "http://$$GF_ADMIN_USER:$$GF_ADMIN_PASSWORD@dsv-analytics:3000/grafana/api/dashboards/id/$$DASH_ID/permissions" -H "Content-Type: application/json" -d '{"items":[{"role":"Viewer","permission":1}]}'
     restart: "no"
 
 volumes:

@@ -13,8 +13,8 @@ docker compose up -d
 
 Track successful data fetch and db load
 ```bash
-docker compose up -d && docker container logs -f dinesafeviz-init-db
-docker compose up -d && docker container logs -f dinesafeviz-db-1
+docker compose up -d && docker container logs -f dinesafeviz-dsv-init-db-1
+docker compose up -d && docker container logs -f dinesafeviz-dsv-db-1
 ```
 
 ```bash
@@ -22,28 +22,28 @@ docker compose up -d && docker container logs -f dinesafeviz-db-1
 docker compose down -v      
 
 # picks up changes    
-docker compose build init-db
+docker compose build dsv-init-db
 docker compose up -d
 
 ```
 
 ## Follow logs
 
-### Follow webapp logs
+### Follow app logs
 
 ```bash
-docker container logs -f dinesafeviz-web-1
+docker container logs -f dinesafeviz-dsv-app-1
 ```
 
-### Follow poastgres logs
+### Follow PostgreSQL logs
 
 ```bash
-docker container logs -f dinesafeviz-db-1
+docker container logs -f dinesafeviz-dsv-db-1
 ```
 
-### Follow ds-dashboard logs
+### Follow analytics logs
 ```bash
-docker container logs -f dinesafeviz-grafana-1
+docker container logs -f dinesafeviz-dsv-analytics-1
 ```
 
 
@@ -76,31 +76,31 @@ docker compose up --build -d
   docker-compose.yml.
 
   To Rebuild the Web App
-  The web application is defined as the web service. Use the following command to rebuild it without affecting other
+  The web application is defined as the `dsv-app` service. Use the following command to rebuild it without affecting other
   services:
 
-   1 docker compose build web
+   1 docker compose build dsv-app
 
   To rebuild and immediately restart it:
-   1 docker compose up -d --build web
+   1 docker compose up -d --build dsv-app
 
   To Rebuild the Database (Ingestion Logic)
-  In your configuration, the db service uses a standard Postgres image, but the logic in src/db/Dockerfile (which
-  handles data seeding and refreshes) is tied to the init-db service.
+  In your configuration, the `dsv-db` service uses a standard Postgres image, but the logic in `src/db/Dockerfile` (which
+  handles data seeding and refreshes) is tied to the `dsv-init-db` service.
 
   To rebuild that logic:
-   1 docker compose build init-db
+   1 docker compose build dsv-init-db
 
   Summary Table
   ┌────────────────────────┬──────────────────────────────────┐
   │ Goal                   │ Command                          │
   ├────────────────────────┼──────────────────────────────────┤
-  │ Rebuild Web only       │ docker compose build web         │
-  │ Rebuild Ingestion only │ docker compose build init-db     │
-  │ Rebuild & Restart Web  │ docker compose up -d --build web │
+  │ Rebuild Web only       │ docker compose build dsv-app         │
+  │ Rebuild Ingestion only │ docker compose build dsv-init-db     │
+  │ Rebuild & Restart Web  │ docker compose up -d --build dsv-app │
   │ Rebuild everything     │ docker compose build             │
   └────────────────────────┴──────────────────────────────────┘
 
-  Note: Since db uses a pre-built image (postgres:17.9), it doesn't "rebuild" in the Docker sense. If you change
+  Note: Since `dsv-db` uses a pre-built image (postgres:17.9), it doesn't "rebuild" in the Docker sense. If you change
   src/db/init.sql, you usually need to wipe the volume (docker compose down -v) for those changes to apply, as
   Postgres only runs init scripts on the very first boot.

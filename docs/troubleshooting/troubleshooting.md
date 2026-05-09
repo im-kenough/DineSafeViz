@@ -14,7 +14,7 @@ embedding.
 
 ### Fix
 
-Set `GF_SECURITY_ALLOW_EMBEDDING: "true"` in the `grafana` service in
+Set `GF_SECURITY_ALLOW_EMBEDDING: "true"` in the `dsv-analytics` service in
 `docker-compose.yml`, then recreate the containers so Grafana picks up the new
 setting.
 

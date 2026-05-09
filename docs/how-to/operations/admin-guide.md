@@ -1,7 +1,8 @@
 
-# How to login to DineSafeViz Dashboard - grafana
+# How to log in to the DineSafeViz analytics dashboard
 
-The dashboard crunches data from the postgresql db and presents it via Grafana dashboards
+The analytics dashboard reads data from the PostgreSQL database and presents
+it through the embedded dashboard stack.
 
-- Go to login page: http://localhost:3000/grafana/
-- Login with admin creds in the .env file
+- Open `http://localhost:3000/grafana/`.
+- Log in with the admin credentials from `.env`.

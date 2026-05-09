@@ -16,7 +16,7 @@ def test_grafana_proxy_forwards_get(client):
     mock_req.assert_called_once()
     kwargs = mock_req.call_args.kwargs
     assert kwargs["method"] == "GET"
-    assert "grafana:3000/grafana/d/dinesafe/dinesafe-inspections" in kwargs["url"]
+    assert "dsv-analytics:3000/grafana/d/dinesafe/dinesafe-inspections" in kwargs["url"]
     assert resp.status_code == 200
     assert resp.data == b"grafana html"
 

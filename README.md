@@ -13,7 +13,8 @@ See a full list of Inspection results.
 
 ## Dashboard
 
-View a stats breakdown of the inspection results in a Grafana dashboard. Specify your own date range. Over 26 years of data!
+View a stats breakdown of the inspection results in the DSV Analytics
+dashboard. Specify your own date range. Over 26 years of data!
 
 ![alt text](docs/img/root-readme/dsv-dash-1.png)
 

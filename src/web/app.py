@@ -194,7 +194,7 @@ def build_days(rows: List[Dict], start: date, end: date) -> List[Tuple[date, Lis
 
 
 DB_CONFIG = {
-    "host": os.environ.get("DB_HOST", "db"),
+    "host": os.environ.get("DB_HOST", "dsv-db"),
     "port": os.environ.get("DB_PORT", "5432"),
     "dbname": os.environ.get("DB_NAME", "dinesafe"),
     "user": os.environ.get("DB_USER", "dinesafe"),
@@ -302,7 +302,7 @@ def info():
     return render_template("info.html")
 
 
-GRAFANA_URL = os.environ.get("GRAFANA_URL", "http://grafana:3000")
+GRAFANA_URL = os.environ.get("GRAFANA_URL", "http://dsv-analytics:3000")
 _grafana_session = http_requests.Session()
 _HOP_BY_HOP = {"content-encoding", "content-length", "transfer-encoding", "connection"}
 
