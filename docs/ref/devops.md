@@ -4,10 +4,10 @@ Phases of the [DevOps lifecycle](https://www.ibm.com/think/topics/devops-lifecyc
 
 # Plan
 
- In this stage, teams identify the business requirement and collect end-user feedback. They create a project roadmap to maximize the business value and deliver the desired product during this stage.
+Define requirements, create roadmaps, and organize tasks
 
- - Project roadmap: github projects
- - requirements gathering: github issues
+- [Github Issues](https://github.com/im-kenough/DineSafeViz/issues): identify issues, gathering feedback
+- [Github Projects](https://github.com/users/im-kenough/projects/6): Backlog management, sprint planning, user story creation.
 
 # Code
 
@@ -15,7 +15,7 @@ Create working source code
 
 - IDE: VSCode
 - Software versioning: git
-- Source COde Management: github
+- Source COde Management: [github](https://github.com/im-kenough/DineSafeViz). Develop using [giflow](docs/ref/deploy/ci-cd.md).
 
 # Build
 Compile, validate and package source code into deployable artifacts.

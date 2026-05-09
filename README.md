@@ -9,13 +9,9 @@ Modern, well documented and supports a full [devops](docs/ref/devops.md) toolcha
 
 # Features
 
-## Inspections
-
 See a full list of Inspection results.
 
 ![alt text](docs/img/root-readme/inspec-1.png)
-
-## Dashboard
 
 View a stats breakdown of the inspection results in the DSV Analytics
 dashboard. Specify your own date range. Over 26 years of data!
