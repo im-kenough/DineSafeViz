@@ -1,6 +1,8 @@
 name: dsv
 
 services:
+  # DSV-DB: PostgreSQL database service
+  # Stores City of Toronto DineSafe dataset
   dsv-db:
     image: postgres:17.9
     environment:
@@ -16,6 +18,9 @@ services:
       timeout: 5s
       retries: 5
 
+  
+  # DSV-App: Flask web application service
+  # Serves the website frontend and API, proxies analytics dashboard at /analytics/
   dsv-app:
     build: ./src/dsv-app
     ports:
@@ -32,6 +37,8 @@ services:
       dsv-analytics:
         condition: service_started
 
+  # DSV-Analytics: a Grafana dashboard
+  # Shows a dashboard of stats and metrics based on the DSV-DB dataset, embedded in the Flask app at /analytics/ (also accessible directly at localhost:3000/analytics/)
   dsv-analytics:
     image: grafana/grafana:11.6.0
     ports:
