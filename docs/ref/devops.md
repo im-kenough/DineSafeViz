@@ -15,7 +15,7 @@ Create working source code
 
 - IDE: VSCode
 - Software versioning: git
-- Source COde Management: [github](https://github.com/im-kenough/DineSafeViz). Develop using [giflow](docs/ref/deploy/ci-cd.md).
+- Source COde Management: [github](https://github.com/im-kenough/DineSafeViz). Develop using [giflow](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow).
 
 # Build
 Compile, validate and package source code into deployable artifacts.
