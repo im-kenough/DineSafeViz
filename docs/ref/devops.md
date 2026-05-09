@@ -14,8 +14,10 @@ Define requirements, create roadmaps, and organize tasks
 Create working source code
 
 - IDE: VSCode
+  - insert list of useful extensions & linting tools
+  - Developed with assistance of Agentic coding: Claude Code, Codex, Gemini CLI
 - Software versioning: git
-- Source COde Management: [github](https://github.com/im-kenough/DineSafeViz). Develop using [giflow](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow).
+- Source COde Management: [github](https://github.com/im-kenough/DineSafeViz). Talk about branching strategy.
 
 # Build
 Compile, validate and package source code into deployable artifacts.
