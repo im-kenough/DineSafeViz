@@ -36,6 +36,13 @@ Implementing features:
    - merge stg into main
    - create tag
 
+## Release & tagging process
+
+[Release](docs/how-to/5-release.md) process. 
+
+> [!NOTE]
+> Ensure at least one PR in the release has a `feature` or `enhancement` label so version resolver picks a minor bump automatically.
+
 ## Antipatterns
 
 - Don't check in secrets (sensitive data like API keys, password or secrets)
