@@ -1,0 +1,65 @@
+# infra/ansible/roles/dsv-app/tasks/main.yml
+---
+# --- VM Identity ---
+
+- name: Set hostname
+  hostname:
+    name: "{{ vm_name }}"
+
+- name: Add hostname to /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1'
+    line: "127.0.1.1 {{ vm_name }}"
+
+- name: Configure static IP via netplan
+  copy:
+    dest: /etc/netplan/99-static.yaml
+    content: |
+      network:
+        version: 2
+        ethernets:
+          eth0:
+            addresses:
+              - {{ vm_ip }}{{ network_cidr }}
+            routes:
+              - to: default
+                via: {{ network_gateway }}
+            nameservers:
+              addresses:
+                - {{ network_dns }}
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Apply netplan
+  command: netplan apply
+  changed_when: true
+
+# --- GitHub App Key ---
+
+- name: Install GitHub App private key
+  copy:
+    content: "{{ vault_github_app_key }}"
+    dest: "/home/{{ service_account }}/.ssh/github-app-key"
+    owner: "{{ service_account }}"
+    group: "{{ service_account }}"
+    mode: "0600"
+
+- name: Deploy SSH config for GitHub
+  template:
+    src: ssh_config.j2
+    dest: "/home/{{ service_account }}/.ssh/config"
+    owner: "{{ service_account }}"
+    group: "{{ service_account }}"
+    mode: "0644"
+
+# --- App Directory ---
+
+- name: Create app parent directory
+  file:
+    path: "/home/{{ service_account }}/app"
+    state: directory
+    owner: "{{ service_account }}"
+    group: "{{ service_account }}"
+    mode: "0755"

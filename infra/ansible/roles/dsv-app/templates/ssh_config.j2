@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+# GitHub App deploy key configuration
+Host github.com
+  HostName github.com
+  User git
+  IdentityFile /home/{{ service_account }}/.ssh/github-app-key
+  IdentitiesOnly yes
+  StrictHostKeyChecking accept-new
