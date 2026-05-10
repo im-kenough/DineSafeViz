@@ -1,0 +1,10 @@
+# infra/packer/variables.pkrvars.hcl.example
+#
+# Copy to variables.pkrvars.hcl and fill in values.
+# This file is gitignored — never commit it with real values.
+# In practice, the Makefile renders this from Ansible Vault automatically.
+
+proxmox_api_url          = "https://10.0.20.21:8006"
+proxmox_api_token_id     = "svc-packer@pve!packer"
+proxmox_api_token_secret = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+proxmox_node             = "pve"
