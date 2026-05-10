@@ -1,6 +1,16 @@
-# Overview
+# Data Mapping
 
-The DineSafe dataset looks like this.
+# Data Sources
+
+The DineSafe dataset comes in two parts, there's "current" data and historical
+data.
+
+They can be downloaded from the City of Toronto Open Data portal as csv files. There's also an API.
+
+## Current Data
+
+The "[current data](https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/b6b4f3fb-2e2c-47e7-931d-b87d22806948/resource/eda39233-4791-464e-98e6-094f51a01916/download/Dinesafe.csv)" dataset is updated daily by the City of Toronto and contains about 3 years of data.
+
 
 <details>
 <summary>Sample data (8 rows)</summary>
@@ -15,10 +25,11 @@ The DineSafe dataset looks like this.
 | 6 | 10817088 | None | 000 TD LOUNGE | Food Take Out | 1 BLUE JAYS WAY None M5V 1J4 | None | No infractions were observed under the Food Premises Regulation during an inspection. | 2024-07-04 | None | None | None |  |  | 43.64168 | -79.39012 | 699cf64aa42c1ee0e6fe5b767703ce81 |
 | 7 | 001Vo000013QnGiIAK | None | 000 THE WAREHOUSE (docks) | Commissary | 1 Blue Jays Way None M5V 1J4 | None | No infractions were observed under the Food Premises Regulation during an inspection. | 2024-08-09 | None | None | None |  |  | 43.64168 | -79.39012 | e605e36388c6fbe5176dd514ac5e5949 |
 | 8 | 001Vo000013QnGcIAK | None | 000F BLUEPRINT CLUB KITCHEN | Banquet Facility | 1 Blue Jays Way None M5V 1J4 | FAIL TO ENSURE EQUIPMENT SURFACE SANITIZED AS NECESSARY - SEC. 22 | One or more minor infractions were observed under the Food Premises Regulation during an inspection. | 2025-03-27 | M - Minor | Notice to Comply | None |  |  | 43.64168 | -79.39012 | 8bd58999ca6747cebd449e81a9198ac0 |
-
 </details>
 
-# Data Dictionary
+### Data Dictionary
+
+The columns are defined as follows:
 
 | Column | Description |
 | --- | --- |
@@ -40,7 +51,12 @@ The DineSafe dataset looks like this.
 | Longitude | Longitude of establishment |
 | unique_id | Unique composite key |
 
-# Historical data (2001-2015)
+
+## Historical Data
+
+The [historical dataset](https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/b6b4f3fb-2e2c-47e7-931d-b87d22806948/resource/c0a5f6b0-534a-47c3-867d-d4b5cc84a656/download/Dinesafe%20Historical%20Data.zip) contains data going back to 2001.
+
+## Historical data (2001-2015)
 
 The historical dataset lives in
 `src/dsv-db/2023-04-11 - Dinesafe Historical data/`. It contains one CSV
@@ -241,7 +257,9 @@ When importing historical data into the current DB schema:
   proper CSV parser (not naive comma-splitting) because
   `Infraction Details` often contains commas.
 
-# Unified schema (inspections table)
+# Database Schema
+
+## Unified schema (inspections table)
 
 The Postgres `inspections` table merges both historical (2001–2022)
 and recent (2023–present) data into a single schema. Two columns from
