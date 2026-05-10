@@ -30,4 +30,4 @@ dashboard. Specify your own date range. Over 26 years of data!
 
 ## Deployment Guide
 
-Instructions to deploy / redeploy the app after a change
+Instructions to [deploy / redeploy](docs/how-to/deploy-guide.md) the application the app after a change

@@ -1,9 +1,10 @@
 # Overview
 
-The DineSafe dataset looks like this
+The DineSafe dataset looks like this.
 
+<details>
+<summary>Sample data (8 rows)</summary>
 
-```markdown
 | _id | Establishment ID | Inspection ID | Establishment Name | Establishment Type | Establishment Address | Infraction Details | Inspection Observation | Inspection Date | Severity | Action | Outcome | Outcome Date | Amount Fined | Latitude | Longitude | unique_id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | 10752656 | None | # HASHTAG INDIA RESTAURANT | Food Take Out | 1871 O'CONNOR DR None M4A 1X1 | FAIL TO ENSURE EQUIPMENT SURFACE SANITIZED AS NECESSARY - SEC. 22 | One or more minor infractions were observed under the Food Premises Regulation during an inspection. | 2024-03-06 | M - Minor | Notice to Comply | None |  |  | 43.72199 | -79.30349 | 168f86274045194142c0e7c381ccb75d |
@@ -14,30 +15,30 @@ The DineSafe dataset looks like this
 | 6 | 10817088 | None | 000 TD LOUNGE | Food Take Out | 1 BLUE JAYS WAY None M5V 1J4 | None | No infractions were observed under the Food Premises Regulation during an inspection. | 2024-07-04 | None | None | None |  |  | 43.64168 | -79.39012 | 699cf64aa42c1ee0e6fe5b767703ce81 |
 | 7 | 001Vo000013QnGiIAK | None | 000 THE WAREHOUSE (docks) | Commissary | 1 Blue Jays Way None M5V 1J4 | None | No infractions were observed under the Food Premises Regulation during an inspection. | 2024-08-09 | None | None | None |  |  | 43.64168 | -79.39012 | e605e36388c6fbe5176dd514ac5e5949 |
 | 8 | 001Vo000013QnGcIAK | None | 000F BLUEPRINT CLUB KITCHEN | Banquet Facility | 1 Blue Jays Way None M5V 1J4 | FAIL TO ENSURE EQUIPMENT SURFACE SANITIZED AS NECESSARY - SEC. 22 | One or more minor infractions were observed under the Food Premises Regulation during an inspection. | 2025-03-27 | M - Minor | Notice to Comply | None |  |  | 43.64168 | -79.39012 | 8bd58999ca6747cebd449e81a9198ac0 |
-```
+
+</details>
 
 # Data Dictionary
 
-Column	Description
-_id	
-
-Unique row identifier for Open Data database
-Establishment ID	Unique identifier for an establishment
-Inspection ID	Unique ID for an inspection
-Establishment Name	Business name of the establishment
-Establishment Type	Establishment type ie restaurant, mobile cart
-Establishment Address	Municipal address of the establishment
-Infraction Details	Description of the Infraction
-Inspection Observation	Details observed associated with the Infraction
-Inspection Date	Calendar date the inspection was conducted
-Severity	Level of the infraction, i.e. S - Significant, M - Minor, C - Crucial
-Action	Enforcement activity based on the infractions noted during a food safety inspection
-Outcome	The registered court decision resulting from the issuance of a ticket or summons for outstanding infractions to the Health Protection and Promotion Act
-Outcome Date	The date of the court outcome
-Amount Fined	Fine determined in the court outcome
-Latitude	Latitude of establishment
-Longitude	Longitude of establishment
-unique_id	Unique composite key
+| Column | Description |
+| --- | --- |
+| _id | Unique row identifier for Open Data database |
+| Establishment ID | Unique identifier for an establishment |
+| Inspection ID | Unique ID for an inspection |
+| Establishment Name | Business name of the establishment |
+| Establishment Type | Establishment type (for example, restaurant, mobile cart) |
+| Establishment Address | Municipal address of the establishment |
+| Infraction Details | Description of the infraction |
+| Inspection Observation | Details observed associated with the infraction |
+| Inspection Date | Calendar date the inspection was conducted |
+| Severity | Level of the infraction (S - Significant, M - Minor, C - Crucial) |
+| Action | Enforcement activity based on the infractions noted during a food safety inspection |
+| Outcome | The registered court decision resulting from the issuance of a ticket or summons for outstanding infractions to the Health Protection and Promotion Act |
+| Outcome Date | The date of the court outcome |
+| Amount Fined | Fine determined in the court outcome |
+| Latitude | Latitude of establishment |
+| Longitude | Longitude of establishment |
+| unique_id | Unique composite key |
 
 # Historical data (2001-2015)
 
