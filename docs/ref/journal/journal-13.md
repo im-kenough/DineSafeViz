@@ -13,10 +13,10 @@
 - Dashboard permissions were empty (`[]`).
 
 ### Root cause
-Grafana 11 RBAC: anonymous Viewer org role no longer implicitly grants access to dashboards. Explicit dashboard-level permissions are required. Additionally, there was no persistent `grafana_data` volume, so any API-set permissions were lost on container restart.
+Grafana 11 RBAC: anonymous Viewer org role no longer implicitly grants access to dashboards. Explicit dashboard-level permissions are required. Additionally, there was no persistent `dsv-analytics-data` volume, so any API-set permissions were lost on container restart.
 
 ### Fix
-1. Added `grafana_data:/var/lib/grafana` volume to the grafana service in docker-compose.yml — persists Grafana's internal SQLite database across restarts.
+1. Added `dsv-analytics-data:/var/lib/grafana` volume to the grafana service in docker-compose.yml — persists Grafana's internal SQLite database across restarts.
 2. Added `init-grafana` service that waits for Grafana to be ready, then grants Viewer role access to the dashboard via API. Runs once and exits.
 
 ### Files changed

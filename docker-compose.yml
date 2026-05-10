@@ -1,32 +1,91 @@
+name: dsv
+
 services:
-  db:
+  # DSV-App: Flask web application service
+  # Serves the website frontend and API, proxies analytics dashboard at /analytics/
+  dsv-app:
+    build: ./src/dsv-app
+    ports:
+      - "5000:5000"
+    environment:
+      DSV_DB_HOST: dsv-db
+      DSV_DB_PORT: ${DSV_DB_PORT}
+      DSV_DB_NAME: ${DSV_DB_NAME}
+      DSV_DB_USER: ${DSV_DB_USER}
+      DSV_DB_PASSWORD: ${DSV_DB_PASSWORD}
+    depends_on:
+      dsv-db:
+        condition: service_healthy
+      dsv-analytics:
+        condition: service_started
+
+  # DSV-DB: PostgreSQL database service
+  # Stores City of Toronto DineSafe dataset
+  dsv-db:
     image: postgres:17.9
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DSV_DB_USER}
+      POSTGRES_PASSWORD: ${DSV_DB_PASSWORD}
+      POSTGRES_DB: ${DSV_DB_NAME}
     volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./src/db/init.sql:/docker-entrypoint-initdb.d/init.sql
-      - ./src/db/Dinesafe.csv:/data/Dinesafe.csv
+      - dsv-db-data:/var/lib/postgresql/data
+      - ./src/dsv-db/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dinesafe"]
+      test: ["CMD-SHELL", "pg_isready -U ${DSV_DB_USER}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  web:
-    build: ./src/web
-    ports:
-      - "5000:5000"
+  # One-shot service: seeds the DB on first run, refreshes recent data on subsequent runs.
+  # Mirrors the init-grafana pattern — exits after completion, never restarts.
+  dsv-init-db:
+    build: ./src/dsv-db
     environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
+      DSV_DB_HOST: dsv-db
+      DSV_DB_PORT: ${DSV_DB_PORT}
+      DSV_DB_NAME: ${DSV_DB_NAME}
+      DSV_DB_USER: ${DSV_DB_USER}
+      DSV_DB_PASSWORD: ${DSV_DB_PASSWORD}
     depends_on:
-      db:
+      dsv-db:
+        condition: service_healthy
+    restart: "no"
+
+
+  # DSV-Analytics: a Grafana dashboard
+  # Shows a dashboard of stats and metrics based on the DSV-DB dataset, embedded in the Flask app at /analytics/ (also accessible directly at localhost:3000/analytics/)
+  dsv-analytics:
+    image: grafana/grafana:11.6.0
+    ports:
+      # Exposed for direct admin access. Navigate to localhost:3000/analytics/ to log in.
+      # The public-facing embed still runs through the Flask proxy (anonymous, no port needed).
+      - "3000:3000"
+    environment:
+      # Sub-path config — required for the Flask proxy at /analytics/ to work correctly.
+      GF_SERVER_ROOT_URL: ${DSV_ANALYTICS_ROOT_URL:-http://localhost:5000/analytics/}
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+
+      # Admin credentials — set these in your .env file (see .env.example).
+      # Only applied on first boot; changing them after requires wiping Grafana's internal DB.
+      GF_SECURITY_ADMIN_USER: ${DSV_ANALYTICS_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${DSV_ANALYTICS_ADMIN_PASSWORD}
+
+      # Anonymous viewer access — keeps the embedded dashboard working without login.
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/dinesafe.json
+      DSV_DB_HOST: dsv-db
+      DSV_DB_PORT: ${DSV_DB_PORT}
+      DSV_DB_NAME: ${DSV_DB_NAME}
+      DSV_DB_USER: ${DSV_DB_USER}
+      DSV_DB_PASSWORD: ${DSV_DB_PASSWORD}
+    volumes:
+      - ./src/dsv-analytics/provisioning:/etc/grafana/provisioning
+      - dsv-analytics-data:/var/lib/grafana
+    depends_on:
+      dsv-db:
         condition: service_healthy
       grafana:
         condition: service_started
@@ -85,6 +144,26 @@ services:
         curl -sf -X POST "http://$$GF_ADMIN_USER:$$GF_ADMIN_PASSWORD@grafana:3000/grafana/api/dashboards/id/$$DASH_ID/permissions" -H "Content-Type: application/json" -d '{"items":[{"role":"Viewer","permission":1}]}'
     restart: "no"
 
+  # Grafana 11 RBAC requires explicit dashboard permissions even for anonymous Viewer role.
+  # This service runs once on startup to grant Viewer access to the provisioned dashboard.
+  dsv-init-analytics:
+    image: curlimages/curl:latest
+    depends_on:
+      dsv-analytics:
+        condition: service_started
+    environment:
+      DSV_ANALYTICS_ADMIN_USER: ${DSV_ANALYTICS_ADMIN_USER}
+      DSV_ANALYTICS_ADMIN_PASSWORD: ${DSV_ANALYTICS_ADMIN_PASSWORD}
+    entrypoint:
+      - sh
+      - -c
+      - |
+        i=0; until curl -s http://dsv-analytics:3000/analytics/api/health | grep -q '"database": "ok"'; do sleep 2; i=$$(($$i+1)); [ $$i -ge 30 ] && echo "Analytics dashboard did not start in time" && exit 1; done
+        DASH_ID=$$(curl -s "http://$$DSV_ANALYTICS_ADMIN_USER:$$DSV_ANALYTICS_ADMIN_PASSWORD@dsv-analytics:3000/analytics/api/dashboards/uid/dinesafe" | grep -oE '"id":[0-9]+' | head -1 | grep -oE '[0-9]+')
+        [ -z "$$DASH_ID" ] && echo "Dashboard not found, skipping permissions grant" && exit 0
+        curl -sf -X POST "http://$$DSV_ANALYTICS_ADMIN_USER:$$DSV_ANALYTICS_ADMIN_PASSWORD@dsv-analytics:3000/analytics/api/dashboards/id/$$DASH_ID/permissions" -H "Content-Type: application/json" -d '{"items":[{"role":"Viewer","permission":1}]}'
+    restart: "no"
+
 volumes:
-  pgdata:
-  grafana_data:
+  dsv-db-data:
+  dsv-analytics-data:

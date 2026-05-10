@@ -2,7 +2,7 @@
 
 ## 2026-04-28 — /simplify review of task-header branch changes
 
-Running `/simplify` on `src/web/` to review changes on the `task-header` branch vs `main`.
+Running `/simplify` on `src/dsv-app/` to review changes on the `task-header` branch vs `main`.
 
 ### Changes in scope (main...HEAD diff)
 - `app.py`: Added `get_version()`, `inject_globals()` context processor, `/dashboard`, `/info` routes, Grafana reverse-proxy
