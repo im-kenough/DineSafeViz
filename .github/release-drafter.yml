@@ -1,5 +1,10 @@
+# **Not a workflow** — this is the configuration file consumed by the `release-drafter` github action.
+
+# Sets the draft's title and tag to `v$RESOLVED_VERSION`
 name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
+
+# Maps PR labels → section headings in the release body
 categories:
   - title: '🔒 Security'
     labels:
@@ -40,8 +45,14 @@ categories:
       - 'refactor'
       - 'chore'
 
+# Format for each changelog entry
 change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
 change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.      
+
+# Maps labels to semver bump priority (major > minor > patch)
+# Per semantic versioning, major increments 1.x.x, minor increments x.1.x, patch increments x.x.1
+# So make sure a PR has t least a label of type minor (feature, enhancement) to increment x.1.x
+# and at least a label of type patch (bug, fix, infosec) to increment x.x.1
 version-resolver:
   major:
     labels:
@@ -56,6 +67,8 @@ version-resolver:
       - 'bug'
       - 'fix'
       - 'infosec'
+
+# The full Markdown body template including deployment notes, PIV, and rollback sections
 template: |
   ## What's Changed
 

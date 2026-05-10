@@ -1,3 +1,8 @@
+# Triggers: push to `main`, pull request opened/reopened/synchronized.
+# What it does: Runs the https://github.com/release-drafter/release-drafter action.
+# On each trigger it rebuilds a single draft release containing categorized notes for all PRs merged since the 
+# last published tag. The draft's version, title, body, and tag are all regenerated from the template on every run.
+
 name: Release Drafter
 
 on:
