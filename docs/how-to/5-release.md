@@ -4,41 +4,49 @@ This document covers how to version, tag, and publish releases of DineSafeViz.
 
 ## How the release pipeline works
 
-Releases are fully automated once you push a version tag. The pipeline has
-two parts:
+The pipeline has two phases:
 
-1. **Tag push** — pushing a tag matching `v*` to `main` triggers the
-   `release.yml` workflow.
-2. **Release creation** — the workflow calls `softprops/action-gh-release`,
-   which creates a published GitHub Release and auto-generates release notes
-   using GitHub's built-in generator (`generate_release_notes: true`).
+1. **Draft phase** — every push to `main` triggers the `release-drafter.yml`
+   workflow. It creates or updates a draft GitHub Release, grouped by PR label,
+   using the template in `.github/release-drafter.yml`. The suggested version
+   is resolved automatically from your PR labels (see
+   [Versioning](#versioning)).
 
-GitHub's built-in generator groups PRs into categories based on labels. The
-categories are configured in `.github/release.yml` (see
-[Configuring release notes categories](#configuring-release-notes-categories)
-below). The file `.github/release-drafter.yml` is **not currently wired to
-any workflow** and has no effect on releases.
+2. **Publish phase** — pushing a tag matching `v*` triggers the `release.yml`
+   workflow, which publishes the matching draft release.
 
 ## Versioning
 
-This project follows [Semantic Versioning](https://semver.org/):
+This project follows [Semantic Versioning](https://semver.org/). Release
+drafter infers the next version from the highest-priority label on merged PRs
+since the last tag:
 
-- **Major** (`x.0.0`) — breaking changes.
-- **Minor** (`0.x.0`) — new features, backward compatible.
-- **Patch** (`0.0.x`) — bug fixes, backward compatible.
+| Label | Bump |
+|---|---|
+| `major`, `breaking` | Major (`x.0.0`) |
+| `feature`, `enhancement` | Minor (`0.x.0`) |
+| `bug`, `fix`, `infosec` | Patch (`0.0.x`) |
+
+If the inferred version is wrong (e.g. you want `v0.2.0` but the draft says
+`v0.1.1`), edit the draft release on GitHub before pushing the tag — see step
+3 below.
 
 ## PR labels
 
-GitHub's release notes generator uses PR labels to group entries under the
-correct heading. Apply exactly one type label to every PR you open:
+Apply exactly one type label to every PR before merging. Release drafter uses
+these to categorize entries in the release notes.
 
 | Label | Category in release notes |
 |---|---|
-| `enhancement` | Features |
-| `bug` | Bug fixes |
-| `ci-cd` | CI/CD |
-| `build` | Build & dependencies |
+| `infosec` | Security |
+| `feature`, `enhancement` | Features |
+| `ui` | UI |
+| `bug`, `fix` | Bug Fixes |
+| `infra`, `iac`, `ops`, `dr`, `db` | Infrastructure |
+| `ci-cd`, `github_actions` | CI/CD |
+| `build`, `dependencies`, `python`, `docker` | Build & Dependencies |
 | `documentation` | Documentation |
+| `refactor`, `chore` | Maintenance |
 
 Dependabot PRs are labeled automatically via `.github/dependabot.yml`.
 
@@ -49,8 +57,6 @@ Dependabot PRs are labeled automatically via `.github/dependabot.yml`.
 
 ## Cutting a release
 
-Follow these steps to publish a new release.
-
 1. **Confirm `main` is ready.** Verify all intended PRs are merged and CI
    passes.
 
@@ -60,60 +66,26 @@ Follow these steps to publish a new release.
    git tag --sort=-version:refname | head -5
    ```
 
-3. **Create an annotated tag.** Replace `v0.2.0` with the next version:
+3. **Review the draft release.** Open the
+   [Releases page](https://github.com/im-kenough/DineSafeViz/releases) and
+   open the draft. Verify:
+   - The release notes look correct.
+   - The suggested tag (top of the page) matches the version you intend to
+     publish. If not, edit the tag field directly on the draft page.
+
+4. **Create an annotated tag.** Use the same version shown on the draft:
 
    ```bash
    git tag -a v0.2.0 -m "Release v0.2.0"
    ```
 
-4. **Push the tag.**
+5. **Push the tag.**
 
    ```bash
    git push origin v0.2.0
    ```
 
-5. **Verify the release.** Open the
-   [Releases page](https://github.com/im-kenough/DineSafeViz/releases) and
-   confirm the new release was created with the correct notes.
-
-## Configuring release notes categories
-
-GitHub's built-in generator reads `.github/release.yml` for category
-definitions. This file does **not** exist yet — without it, GitHub lists all
-PRs in a single uncategorized block.
-
-To enable grouping, create `.github/release.yml` with the following content:
-
-```yaml
-changelog:
-  categories:
-    - title: "🚀 Features"
-      labels:
-        - enhancement
-        - feature
-    - title: "🐛 Bug Fixes"
-      labels:
-        - bug
-        - fix
-    - title: "⚙️ CI/CD"
-      labels:
-        - ci-cd
-    - title: "🔨 Build & Dependencies"
-      labels:
-        - build
-        - dependencies
-    - title: "📚 Documentation"
-      labels:
-        - documentation
-    - title: "🔖 Other"
-      labels:
-        - "*"
-```
-
-<!-- prettier-ignore -->
-> [!IMPORTANT]
-> `.github/release.yml` (GitHub native) and `.github/release-drafter.yml`
-> (release-drafter action) are separate tools with different config formats.
-> The current workflow uses GitHub native generation. The
-> `release-drafter.yml` file is inert until a workflow that invokes the
-> `release-drafter/release-drafter` action is added.
+6. **Verify the release.** The `release.yml` workflow will publish the draft.
+   Confirm the release appears on the
+   [Releases page](https://github.com/im-kenough/DineSafeViz/releases) with
+   the correct notes.
