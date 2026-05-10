@@ -223,3 +223,13 @@ src/dsv-db/**/*.zip
 
 # draw.io tempfiles
 *.bkp
+
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/*.tfstate*
+infra/terraform/.terraform.lock.hcl
+infra/terraform/terraform.tfvars
+
+# Packer
+infra/packer/variables.pkrvars.hcl
+infra/packer/.packer/
