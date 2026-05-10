@@ -5,7 +5,7 @@ Is a dockerized web app that vizualizes data from Toronto Public Health's food s
 
 # Tech Stack
 
-Well documented and built with a decent [devops](docs/ref/devops.md) toolchain
+[Well documented](docs/ref/arch.md) and built with a decent [devops](docs/ref/devops.md) toolchain
 
 # Features
 
