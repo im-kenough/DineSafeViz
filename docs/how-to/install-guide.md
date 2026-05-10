@@ -15,16 +15,16 @@ DineSafeViz is a dockerized application, so you'll need Docker and Docker Compos
 - Ubuntu 20.04 LTS or later
 - Other Linux distributions with Docker support are compatible
 
-## Prerequisites
+## Step 1: Install required packages
 
-Install required apps
+Install system utilities needed for the setup process:
 
 ```bash
 sudo apt update && sudo apt full-upgrade -y
 sudo apt install -y git nano curl
 ```
 
-Install Docker
+## Step 2: Install Docker and Docker Compose
 ```bash
 # Add Docker's official GPG key:
 sudo apt install -y ca-certificates curl
@@ -55,9 +55,9 @@ newgrp docker
 docker run hello-world
 ```
 
+## Step 3: Generate and add SSH key to GitHub
 
-
-Generate an SSH key:
+To access the repository, you'll need to set up an SSH key and add it to GitHub.
 
 ```bash
 ssh-keygen -t ed25519 -C "yyz-app01-test"
@@ -76,7 +76,7 @@ Copy the entire output. We'll paste the public key into the repo as a deploy key
 - **GitHub:** Go to [https://github.com/im-kenough/DineSafeViz/settings/keys/new](https://github.com/im-kenough/DineSafeViz/settings/keys/new), click "Add new SSH key,"
 - Title: "yyz-app01-test"
 - Key: the value of your public key
-Click add key
+- Click add key
 
 Test your SSH connection:
 
@@ -88,7 +88,7 @@ You should see a message confirming successful authentication.
 
 ## Step 4: Clone the repository
 
-Create a directory for the application and clone the repository:
+Create a working directory and clone the DineSafeViz repository:
 
 ```bash
 mkdir -p ~/app
@@ -105,21 +105,30 @@ git status
 
 You should see output showing the current branch and that your working directory is clean.
 
+> [!NOTE]
+> You'll be on the default branch. If you want to access a different branch use:
+> 
+> ```git fetch --all```
+> 
+> ```git switch some-other-branch```
+
 ## Step 5: Configure environment variables
 
-The application reads configuration from a `.env` file. Create copy `.env.example` to `.env`:
+The application reads configuration from a `.env` file. Copy the example configuration:
 
 ```bash
 cp .env.example .env
 ```
 
-Edit the `.env` file with `nano` and replace with actual values:
+Edit the `.env` file with `nano`:
 
 ```bash
 nano .env
 ```
 
-## Step 7: Build and start the application
+Update the variables based on your deployment environment. For a local test installation, most defaults are suitable. If you need to customize database credentials, API keys, or ports, make those changes now. Save and exit (`Ctrl+O`, `Enter`, `Ctrl+X`).
+
+## Step 6: Build and start the application
 
 Start all services using Docker Compose:
 
@@ -136,11 +145,17 @@ This command will:
 4. Initialize the database and load the CSV data
 5. Configure the Grafana analytics dashboard
 
-The initial startup takes 1-2 minutes. Monitor the startup process by checking logs:
+The initial startup takes 1–2 minutes. Monitor the startup process by checking container logs:
 
+```bash
+docker compose logs -f
+```
 
+Press `Ctrl+C` to exit the logs once all services have started.
 
-Access the web app in your browser:
-- web page: 10.0.20.242:5000
-- analytics dashboard: 10.0.20.242:3000
-  - only if interactive admin access is needed for grafana
+## Step 7: Verify the installation and access the application
+
+Once all containers are running, access the application in your browser:
+
+- **Web application:** `http://vm-ip-goes-here:5000` — The main DineSafeViz application
+- **Analytics dashboard:** `http://vm-ip-goes-here:3000` — Grafana dashboard for inspections and compliance data
