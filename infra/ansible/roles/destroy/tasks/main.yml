@@ -1,0 +1,36 @@
+# infra/ansible/roles/destroy/tasks/main.yml
+---
+- name: Check if app directory exists
+  stat:
+    path: "{{ app_dir }}/docker-compose.yml"
+  register: compose_check
+
+- name: Stop and remove containers (keep volumes)
+  command: docker compose down
+  args:
+    chdir: "{{ app_dir }}"
+  become: false
+  when:
+    - compose_check.stat.exists
+    - keep_data | default(false) | bool
+  changed_when: true
+
+- name: Stop and remove containers and volumes (full wipe)
+  command: docker compose down -v
+  args:
+    chdir: "{{ app_dir }}"
+  become: false
+  when:
+    - compose_check.stat.exists
+    - not (keep_data | default(false) | bool)
+  changed_when: true
+
+- name: Remove app directory
+  file:
+    path: "{{ app_dir }}"
+    state: absent
+
+- name: Prune unused Docker images
+  command: docker image prune -af
+  become: false
+  changed_when: true

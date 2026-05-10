@@ -28,3 +28,10 @@ Make 2 separate commits, one per task.
 - `infra/ansible/playbooks/deploy-dsv.yml` — playbook targeting dsv hosts, loads vault secrets, applies deploy role
 
 ### 2026-05-10 — Committed Task 9
+Commit: `feat(infra): add Ansible deploy role — clone repo, template .env, compose up` → 753bd7a
+
+### 2026-05-10 — Created destroy role files
+- `infra/ansible/roles/destroy/tasks/main.yml` — checks compose file exists, conditionally down vs down -v (keep_data), removes app_dir, prunes images
+- `infra/ansible/playbooks/destroy-dsv.yml` — playbook targeting dsv hosts, applies destroy role
+
+### 2026-05-10 — Committed Task 10
