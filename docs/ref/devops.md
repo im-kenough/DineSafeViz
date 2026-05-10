@@ -16,6 +16,7 @@ Create working source code
 - IDE: VSCode
   - insert list of useful extensions & linting tools
   - Developed with assistance of Agentic coding: Claude Code, Codex, Gemini CLI
+    - Spend limits are enforced
 - Software versioning: git
 - Source COde Management: [github](https://github.com/im-kenough/DineSafeViz). Talk about branching strategy.
 
@@ -34,6 +35,7 @@ Validate code behaves as expected
 Final quality and security checks. Coordianting how to move into staging and production environments
 
 - Github actions
+    - [SBOM generation](https://docs.aws.amazon.com/wellarchitected/latest/devops-guidance/dl.scm.10-generate-a-comprehensive-software-inventory-for-each-build.html) for releases: Comming Soon(™️)
 
 
 # Deploy
