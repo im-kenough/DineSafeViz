@@ -1,0 +1,9 @@
+# infra/ansible/playbooks/deploy-dsv.yml
+---
+- name: Deploy DineSafeViz application
+  hosts: dsv
+  become: true
+  vars_files:
+    - ../vault/secrets.yml
+  roles:
+    - deploy
