@@ -15,6 +15,6 @@ Two tasks:
 
 ### 2026-04-26 — Task 1, Step 1: Append failing test
 
-File modified: `src/web/tests/test_routes.py`
+File modified: `src/dsv-app/tests/test_routes.py`
 
 Added `test_severity_class_on_row` which asserts `class="sev-crucial"` appears in the rendered HTML. Current template has no class on `<tr>`, so test should fail.

@@ -10,4 +10,4 @@
 - Outcome values: Pending, Cancelled, Charges Withdrawn, Conviction - Fined, Conviction: Fined, Corrected During Inspection, Notice to Comply, Not in Compliance, None
 - Establishment types: many (Restaurant, Food Take Out, Bakery, Supermarket, etc.) — CSV has messy data with some types parsed from names
 - Current app: Flask + Postgres, served on port 5000, shows inspections grouped by date within year/quarter selectors
-- Docker: postgres:17.9 + Flask web container, docker-compose with pgdata volume
+- Docker: postgres:17.9 + Flask web container, docker-compose with dsv-db-data volume

@@ -27,14 +27,14 @@ Task: ensure website fonts are consistent, have good contrast, and are legible.
 
 ### Changes made
 
-`src/web/static/fonts/` (new):
+`src/dsv-app/static/fonts/` (new):
 - IBMPlexSans-Regular.woff2, Medium.woff2, SemiBold.woff2, Bold.woff2
 - Sourced from npm `@ibm/plex@6.4.0`, no runtime external dependency
 
-`src/web/templates/base.html`:
+`src/dsv-app/templates/base.html`:
 - No changes (Google Fonts links were added then removed; external preconnects removed)
 
-`src/web/static/style.css`:
+`src/dsv-app/static/style.css`:
 - `--text-muted`: `#5e6478` → `#7a8094` (contrast ~5.4:1 on bg; was 3.62:1)
 - `body`: `font-family` → `'IBM Plex Sans', sans-serif`; added `line-height: 1.6`
 - Active/hover nav btn: bg `var(--accent)` → `#2952d9` (contrast ~6.3:1 with white; was 3.49:1)

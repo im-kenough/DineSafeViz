@@ -1,0 +1,21 @@
+CREATE TABLE inspections (
+    id                          SERIAL PRIMARY KEY,
+    establishment_id            TEXT,
+    inspection_id               TEXT,
+    establishment_name          TEXT,
+    establishment_type          TEXT,
+    establishment_address       TEXT,
+    infraction_details          TEXT,
+    inspection_observation      TEXT,
+    inspection_date             DATE,
+    severity                    TEXT,
+    action                      TEXT,
+    outcome                     TEXT,
+    outcome_date                TEXT,
+    amount_fined                TEXT,
+    latitude                    DOUBLE PRECISION,
+    longitude                   DOUBLE PRECISION,
+    unique_id                   TEXT,
+    establishment_status        TEXT,
+    min_inspections_per_year    TEXT
+);

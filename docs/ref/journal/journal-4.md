@@ -5,7 +5,7 @@
 ### Context
 - Branch: `4-setup-a-db`
 - PoC is complete: Flask + Postgres in docker-compose, env-var credentials
-- Existing: `src/web/Dockerfile`, `docker-compose.yml`, `src/db/init.sql`
+- Existing: `src/dsv-app/Dockerfile`, `docker-compose.yml`, `src/dsv-db/init.sql`
 - User wants to plan how to expand the project, asking about Dockerfile vs docker-compose and local dev workflow
 
 ### Session goal

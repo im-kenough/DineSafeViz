@@ -1,0 +1,17 @@
+apiVersion: 1
+
+datasources:
+  - name: PostgreSQL
+    uid: dinesafe-postgres
+    type: postgres
+    access: proxy
+    url: ${DSV_DB_HOST}:${DSV_DB_PORT}
+    user: ${DSV_DB_USER}
+    secureJsonData:
+      password: ${DSV_DB_PASSWORD}
+    jsonData:
+      database: ${DSV_DB_NAME}
+      sslmode: disable
+      postgresVersion: 1700
+    isDefault: true
+    editable: true

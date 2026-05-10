@@ -22,7 +22,7 @@
 - Created `docker-compose.yml` with `db` and `web` services
 - `db` mounts `init.sql` into `/docker-entrypoint-initdb.d/` (auto-runs on first start) and `Dinesafe.csv` into `/data/`
 - `web` depends on `db` being healthy via `pg_isready` healthcheck (5s interval, 5 retries)
-- Named volume `pgdata` persists DB data across container restarts
+- Named volume `dsv-db-data` persists DB data across container restarts
 
 ### 2026-04-26 — Task 3: Flask web app
 

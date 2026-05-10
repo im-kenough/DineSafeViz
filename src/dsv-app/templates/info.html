@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}DineSafeViz - Info{% endblock %}
+{% block head %}
+    <style>
+        .info-content {
+            max-width: 900px;
+            line-height: 1.6;
+        }
+        .info-content h2 {
+            margin-top: 2rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.5rem;
+        }
+        .info-content ul {
+            padding-left: 1.5rem;
+        }
+        .info-content .meta {
+            color: var(--accent);
+            font-weight: bold;
+            margin-bottom: 1.5rem;
+        }
+        .info-content .section-title {
+            font-weight: bold;
+            margin-top: 1rem;
+            color: var(--accent);
+        }
+        .data-dictionary table {
+            margin-top: 1rem;
+        }
+    </style>
+{% endblock %}
+{% block content %}
+    <h2 class="page-heading">DineSafeViz Info</h2>
+    <div class="info-content">
+        <p>
+            DineSafe is Toronto Public Health's food safety program that inspects all establishments serving and
+            preparing food. Each inspection results in a pass, a conditional pass or a closed notice.
+        </p>
+        <p>
+            The Inspection List on this site contains 25 years of data.
+        </p>
+        <p class="meta">
+            Note: inspection records from January through October 2023 are absent from this site because neither the City's historical archive nor its current dataset covers that period.
+        </p>
+
+        <h2>Types of Notices</h2>
+        <p>
+            <a href="https://www.toronto.ca/community-people/health-wellness-care/health-programs-advice/food-safety/dinesafe/about-dinesafe/" target="_blank">About DineSafe Notices</a>
+        </p>
+
+        <h3>Pass</h3>
+        <p>A Pass notice will be issued when only minor or no infractions are observed during an inspection.</p>
+        <p>If minor infractions are repeated at the next inspection, the Public Health Inspector may issue a ticket to obtain compliance. Fines range from $55 to $465 depending on the severity of the infraction.</p>
+        <div class="section-title">Minor infraction type:</div>
+        <ul>
+            <li>Infractions that present a minimal health risk</li>
+            <li>These items must be corrected by the next inspection</li>
+        </ul>
+        <div class="section-title">Examples:</div>
+        <ul>
+            <li>Walls, floors or other non-food contact surfaces or equipment need cleaning or repair (e.g., cracked or missing floor tiles, cracked or peeling paint not directly over food preparation area)</li>
+            <li>Inadequate ventilation and lighting systems</li>
+            <li>Hair constraints not worn</li>
+        </ul>
+
+        <h3>Conditional Pass</h3>
+        <p>A conditional pass notice will be issued when one or more significant infractions are observed during an inspection.</p>
+        <p>When issued, a Public Health Inspector will re-inspect an establishment within 24-48 hours of the initial inspection. If the infractions are corrected and no other infractions or only Minor Infractions are found, a Pass Notice will be issued.</p>
+        <div class="section-title">Significant infraction types:</div>
+        <ul>
+            <li>Infractions that present a potential health hazard</li>
+            <li>These items must be corrected within 24-48 hours or legal action may be taken</li>
+            <li>These items indirectly involve food, through handling, preparation, storage and/or service</li>
+        </ul>
+        <div class="section-title">Examples:</div>
+        <ul>
+            <li>Food contact surfaces or equipment require cleaning or repair</li>
+            <li>Repair of refrigeration and mechanical dish washing equipment require</li>
+            <li>Accurate indicating thermometers not provided</li>
+            <li>Lack of hand wash basin with the necessary supplies</li>
+            <li>Garbage not stored in a sanitary manner</li>
+            <li>Improper cleaning and sanitizing of equipment and utensils</li>
+            <li>Washroom cleanliness not maintained, supplies not provided</li>
+        </ul>
+
+        <h3>Closed</h3>
+        <p>A closed notice will be issued when one or more crucial infractions observed during an inspection are not corrected immediately. A food establishment can only be closed when a health hazard is present.</p>
+        <p>An Order to Close the establishment and/or remove the health hazard will be issued. When all of the infractions listed in the Order and all other significant or crucial infractions are corrected, the establishment will receive a Pass Notice and may be re-opened.</p>
+        <div class="section-title">Crucial infraction type:</div>
+        <ul>
+            <li>Infractions that present an immediate health hazard</li>
+            <li>These items directly involve food, such as contamination, time-temperature abuse or lack of safe (potable) water or any other condition that is a health hazard</li>
+            <li>These items must be corrected immediately or an Order to Close the premises can be issued and/or immediate action must be taken to remove or eliminate the health hazard</li>
+            <li>Enforcement action will be taken</li>
+        </ul>
+        <div class="section-title">Examples:</div>
+        <ul>
+            <li>No hot and cold running water under pressure in food preparation area or where utensils are washed</li>
+            <li>Rodent or insect infestation without effective method of pest control</li>
+            <li>Inadequate refrigeration</li>
+            <li>Sewage back-up</li>
+            <li>Lack of safe potable water</li>
+            <li>Food contaminated or adulterated</li>
+        </ul>
+
+        <h2>Types of Infractions</h2>
+        <p>
+            <a href="https://www.toronto.ca/community-people/health-wellness-care/health-programs-advice/food-safety/dinesafe/dinesafe-infractions/" target="_blank">DineSafe Infractions</a>
+        </p>
+
+        <h3>Crucial Infractions - Immediate Health Hazard</h3>
+        <p>These infractions must be corrected immediately. An order to close the premises may be issued and/or immediate action must be taken to remove or eliminate the health hazard. A Closed Notice will be issued and must be posted, and other enforcement action will be taken.</p>
+
+        <h3>Significant Infractions - Potential Health Hazard</h3>
+        <p>These infractions must be corrected immediately and a re-inspection to check for compliance will be conducted within 24 to 48 hours. Legal action may be taken should these infractions remain outstanding.</p>
+
+        <h3>Minor Infractions - Minimal Health Hazard</h3>
+        <p>These infractions must be corrected immediately. A follow-up compliance check will be conducted at the next scheduled inspection.</p>
+
+        <h2>Data Dictionary</h2>
+        <p>Column definitions for the DineSafe dataset</p>
+        <div class="data-dictionary">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Column</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>_id</td><td>Unique row identifier for Open Data database</td></tr>
+                    <tr><td>Establishment ID</td><td>Unique identifier for an establishment</td></tr>
+                    <tr><td>Inspection ID</td><td>Unique ID for an inspection</td></tr>
+                    <tr><td>Establishment Name</td><td>Business name of the establishment</td></tr>
+                    <tr><td>Establishment Type</td><td>Establishment type i.e. restaurant, mobile cart</td></tr>
+                    <tr><td>Establishment Address</td><td>Municipal address of the establishment</td></tr>
+                    <tr><td>Infraction Details</td><td>Description of the Infraction</td></tr>
+                    <tr><td>Inspection Observation</td><td>Details observed associated with the Infraction</td></tr>
+                    <tr><td>Inspection Date</td><td>Calendar date the inspection was conducted</td></tr>
+                    <tr><td>Severity</td><td>Level of the infraction, i.e. S - Significant, M - Minor, C - Crucial</td></tr>
+                    <tr><td>Action</td><td>Enforcement activity based on the infractions noted during a food safety inspection</td></tr>
+                    <tr><td>Outcome</td><td>The registered court decision resulting from the issuance of a ticket or summons for outstanding infractions to the Health Protection and Promotion Act</td></tr>
+                    <tr><td>Outcome Date</td><td>The date of the court outcome</td></tr>
+                    <tr><td>Amount Fined</td><td>Fine determined in the court outcome</td></tr>
+                    <tr><td>Latitude</td><td>Latitude of establishment</td></tr>
+                    <tr><td>Longitude</td><td>Longitude of establishment</td></tr>
+                    <tr><td>unique_id</td><td>Unique composite key</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}
