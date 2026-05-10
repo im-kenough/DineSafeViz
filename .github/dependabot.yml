@@ -7,20 +7,20 @@ version: 2
 
 updates:
   - package-ecosystem: "pip"
-    directory: "/src/web"
+    directory: "/src/dsv-app"
     target-branch: "dev"
     schedule:
       interval: "weekly"
 
   # docker webapp
   - package-ecosystem: "docker"
-    directory: "/src/web"
+    directory: "/src/dsv-app"
     target-branch: "dev"
     schedule:
       interval: "weekly"
   # docker db
   - package-ecosystem: "docker"
-    directory: "/src/db"
+    directory: "/src/dsv-db"
     target-branch: "dev"
     schedule:
       interval: "weekly"

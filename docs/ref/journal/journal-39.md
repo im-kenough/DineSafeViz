@@ -11,7 +11,7 @@ The original test passed `_mock_db([])` (empty rows) to the endpoint. The templa
 ### Solution
 Replaced the test to provide a properly formatted mock row (10 fields matching the database schema):
 
-**File changed:** `/home/sam/SCM/github/DineSafeViz/src/web/tests/test_routes.py` (lines 185-213)
+**File changed:** `/home/sam/SCM/github/DineSafeViz/src/dsv-app/tests/test_routes.py` (lines 185-213)
 
 **Change made:** Replace empty `_mock_db([])` call with actual row data:
 ```python
@@ -33,7 +33,7 @@ rows = [(
 
 **Step 3: Run specific test**
 ```
-python3 -m pytest src/web/tests/test_routes.py::test_column_headers_in_order -v
+python3 -m pytest src/dsv-app/tests/test_routes.py::test_column_headers_in_order -v
 ```
 
 Result: FAILED (as expected)
@@ -45,7 +45,7 @@ The table now renders (we see headers), but "Establishment Type" is not yet in t
 
 **Step 4: Run full test suite**
 ```
-python3 -m pytest src/web/tests/test_routes.py -v 2>&1 | tail -10
+python3 -m pytest src/dsv-app/tests/test_routes.py -v 2>&1 | tail -10
 ```
 
 Results: **24 passed, 1 failed** ✓
@@ -60,7 +60,7 @@ Task 1 fix complete. Test is now functional and will pass after Tasks 2 and 3 (S
 
 ### Changes Made
 
-**1. File: `/home/sam/SCM/github/DineSafeViz/src/web/templates/index.html`**
+**1. File: `/home/sam/SCM/github/DineSafeViz/src/dsv-app/templates/index.html`**
 
 - **Lines 19-29** (`<thead>`): Replaced header row
   - Old order: Severity, Action, Infraction Details, Establishment Name, Address, Outcome, Outcome Date, Amount Fined
@@ -73,7 +73,7 @@ Task 1 fix complete. Test is now functional and will pass after Tasks 2 and 3 (S
 
 ### Test Results
 
-**Command:** `python3 -m pytest src/web/tests/ -v`
+**Command:** `python3 -m pytest src/dsv-app/tests/ -v`
 **Result:** ✓ **54 PASSED** (51 original + 3 new task tests)
 - `test_column_headers_in_order` ✓ PASSED
 - `test_establishment_type_rendered` ✓ PASSED
@@ -85,9 +85,9 @@ Task 1 fix complete. Test is now functional and will pass after Tasks 2 and 3 (S
 **Commit SHA:** 2ddf7796eaa305359c4f0f2a025c61879eda0793
 
 **Files committed:**
-- src/web/app.py (pre-existing changes from Task 2)
-- src/web/templates/index.html (this task)
-- src/web/tests/test_routes.py (pre-existing changes from Task 1)
+- src/dsv-app/app.py (pre-existing changes from Task 2)
+- src/dsv-app/templates/index.html (this task)
+- src/dsv-app/tests/test_routes.py (pre-existing changes from Task 1)
 
 **Commit message:** `feat(ui): reorder inspection columns and add establishment type (#73)`
 

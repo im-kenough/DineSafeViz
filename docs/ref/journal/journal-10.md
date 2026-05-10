@@ -10,7 +10,7 @@ Stack: Grafana 11.6.0 as internal Docker service, Flask proxy at `/grafana/*`, i
 
 ## 2026-04-26 — Task 1: Grafana Provisioning Files
 
-Creating `src/grafana/provisioning/datasources/datasource.yml` and `src/grafana/provisioning/dashboards/dashboard.yml`.
+Creating `src/dsv-analytics/provisioning/datasources/datasource.yml` and `src/dsv-analytics/provisioning/dashboards/dashboard.yml`.
 
 Files to create: datasource config pointing at PostgreSQL via env vars; dashboard provider config pointing at provisioning directory.
 
@@ -20,7 +20,7 @@ Committed: `feat(grafana): add datasource and dashboard provider configs`
 
 ## 2026-04-26 — Task 2: Grafana Dashboard JSON
 
-Created `src/grafana/provisioning/dashboards/dinesafe.json` with 11 panels (3 stat, 2 time series, 2 pie, 4 bar). UID: `dinesafe`.
+Created `src/dsv-analytics/provisioning/dashboards/dinesafe.json` with 11 panels (3 stat, 2 time series, 2 pie, 4 bar). UID: `dinesafe`.
 
 Committed: `feat(grafana): add 11-panel dashboard definition`
 
@@ -36,7 +36,7 @@ Committed: `feat(docker): add internal-only Grafana service`
 
 ## 2026-04-26 — Task 4: requests dependency
 
-Added `requests==2.32.3` to `src/web/requirements.txt`.
+Added `requests==2.32.3` to `src/dsv-app/requirements.txt`.
 
 Committed: `build: add requests dependency for Grafana proxy`
 
@@ -54,7 +54,7 @@ All 31 tests pass. Committed: `feat: add Flask reverse proxy for internal Grafan
 
 ## 2026-04-26 — Task 6: Dashboard Route and Template
 
-Created `src/web/templates/dashboard.html` with iframe pointing at `/grafana/d/dinesafe/dinesafe-inspections?kiosk`. Added `/dashboard` route to `app.py`.
+Created `src/dsv-app/templates/dashboard.html` with iframe pointing at `/grafana/d/dinesafe/dinesafe-inspections?kiosk`. Added `/dashboard` route to `app.py`.
 
 All 31 tests pass. Committed: `feat: add /dashboard route with Grafana iframe`
 
@@ -62,7 +62,7 @@ All 31 tests pass. Committed: `feat: add /dashboard route with Grafana iframe`
 
 ## 2026-04-26 — Task 7: Home Page Nav Link
 
-Added Dashboard nav link div to `src/web/templates/index.html`. Added `test_home_has_dashboard_link` to `test_routes.py`.
+Added Dashboard nav link div to `src/dsv-app/templates/index.html`. Added `test_home_has_dashboard_link` to `test_routes.py`.
 
 All 31 tests pass. Committed: `feat: add Dashboard nav link to home page`
 

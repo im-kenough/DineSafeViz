@@ -246,4 +246,4 @@ def test_establishment_cell_contains_name_and_address(client):
     )]
     with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
         resp = client.get("/inspections?year=2024&q=1")
-    assert b"Pasta Palace<br>99 King St W" in resp.data
+    assert b"Pasta Palace<br>----------<br>99 King St W" in resp.data

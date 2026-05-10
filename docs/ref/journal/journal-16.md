@@ -7,8 +7,8 @@ Branch: `task-ui-btn-uniform`
 Task: Make all buttons look like the GitHub/LinkedIn social buttons, then scale up 25%.
 
 ### Files reviewed
-- `src/web/static/style.css` — tab, social-links, flyout, dropdown styles
-- `src/web/templates/index.html`, `dashboard.html`, `info.html` — button markup
+- `src/dsv-app/static/style.css` — tab, social-links, flyout, dropdown styles
+- `src/dsv-app/templates/index.html`, `dashboard.html`, `info.html` — button markup
 
 ### Analysis
 Two distinct button styles existed:
@@ -27,7 +27,7 @@ Final values after 25% increase:
 - Active/hover: filled `var(--accent)` background
 
 ### Changes made
-- `src/web/static/style.css`: unified all button CSS rules, removed fixed `flex: 0 0 9rem`
-- `src/web/templates/index.html`: SVG 16→20 on LinkedIn and GitHub icons
-- `src/web/templates/dashboard.html`: same SVG update
-- `src/web/templates/info.html`: same SVG update
+- `src/dsv-app/static/style.css`: unified all button CSS rules, removed fixed `flex: 0 0 9rem`
+- `src/dsv-app/templates/index.html`: SVG 16→20 on LinkedIn and GitHub icons
+- `src/dsv-app/templates/dashboard.html`: same SVG update
+- `src/dsv-app/templates/info.html`: same SVG update

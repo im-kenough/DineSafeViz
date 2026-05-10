@@ -6,7 +6,7 @@ def test_dashboard_returns_200(client):
 def test_dashboard_contains_iframe(client):
     resp = client.get("/dashboard")
     assert b"<iframe" in resp.data
-    assert b"/grafana/d/dinesafe" in resp.data
+    assert b"/analytics/d/dinesafe" in resp.data
     assert b"kiosk" in resp.data
 
 

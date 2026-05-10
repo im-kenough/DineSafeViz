@@ -2,7 +2,10 @@
 
 ## Secrets
 
-These secrets are stored in a .env file. Rename [.env.example](.env.example) and populate with actual values
+These secrets are stored in a `.env` file. Rename [.env.example](.env.example)
+and populate it with actual values.
 
-- Postgresql: db username & password. Used to admin the database.
-- Grafana: grafana admin credentials. Used for administering the DineSafe analytics dashboard
+- PostgreSQL: `DSV_DB_USER`, `DSV_DB_PASSWORD`, and `DSV_DB_NAME`. Used to
+  configure and administer `dsv-db`.
+- Analytics dashboard: `DSV_ANALYTICS_ADMIN_USER` and
+  `DSV_ANALYTICS_ADMIN_PASSWORD`. Used to administer `dsv-analytics`.

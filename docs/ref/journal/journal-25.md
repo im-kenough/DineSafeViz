@@ -5,10 +5,10 @@
 **Goal:** Plan data ingestion refactor so the app has 10 years of historical data + daily refresh from Toronto Open Data.
 
 **Current state discovered:**
-- `src/db/init.sql`: creates `inspections` table + `_csv_staging` table, loads `Dinesafe.csv` via COPY, transforms into `inspections`, drops staging
-- `docker-compose.yml`: mounts `src/db/Dinesafe.csv` to `/data/Dinesafe.csv`, `init.sql` into `docker-entrypoint-initdb.d/`
+- `src/dsv-db/init.sql`: creates `inspections` table + `_csv_staging` table, loads `Dinesafe.csv` via COPY, transforms into `inspections`, drops staging
+- `docker-compose.yml`: mounts `src/dsv-db/Dinesafe.csv` to `/data/Dinesafe.csv`, `init.sql` into `docker-entrypoint-initdb.d/`
 - Current `Dinesafe.csv` spans 2023-11-10 to 2026-04-27 (~19,400 rows)
-- Historical CSVs in `src/db/2023-04-11 - Dinesafe Historical data/` cover 2001–2022 (22 files)
+- Historical CSVs in `src/dsv-db/2023-04-11 - Dinesafe Historical data/` cover 2001–2022 (22 files)
 - Historical schema differs from current: 16 cols, double-quoted, has `Rec #`/`Establishment Status`/`Min. Inspections Per Year`, lacks `Inspection Observation`/`Outcome Date`/`unique_id`/`_id`
 - `app.py` hardcodes `DATA_START = date(2023, 11, 9)` and `get_valid_years()` returns `range(2023, ...)`
 - No existing cron or refresh mechanism — data is static from initial Docker build
@@ -30,7 +30,7 @@ User decisions via Q&A:
 - Load ALL historical data (2001–2022), not just 10 years
 - Add `establishment_status` and `min_inspections_per_year` to inspections table (NULL for recent rows)
 - Daily refresh = full replace of recent data (delete rows >= 2023-11-01, re-insert from fresh CSV)
-- Python script (`src/db/refresh.py`) for both seed and refresh
+- Python script (`src/dsv-db/refresh.py`) for both seed and refresh
 - `init.sql` becomes schema-only; `refresh.py` handles all data loading
 - All config values centralized as constants for future config file extraction
 

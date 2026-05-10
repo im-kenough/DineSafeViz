@@ -194,11 +194,11 @@ def build_days(rows: List[Dict], start: date, end: date) -> List[Tuple[date, Lis
 
 
 DB_CONFIG = {
-    "host": os.environ.get("DB_HOST", "db"),
-    "port": os.environ.get("DB_PORT", "5432"),
-    "dbname": os.environ.get("DB_NAME", "dinesafe"),
-    "user": os.environ.get("DB_USER", "dinesafe"),
-    "password": os.environ.get("DB_PASSWORD", "dinesafe"),
+    "host": os.environ.get("DSV_DB_HOST", "dsv-db"),
+    "port": os.environ.get("DSV_DB_PORT", "5432"),
+    "dbname": os.environ.get("DSV_DB_NAME", "dinesafe"),
+    "user": os.environ.get("DSV_DB_USER", "dinesafe"),
+    "password": os.environ.get("DSV_DB_PASSWORD", "dinesafe"),
 }
 
 
@@ -302,19 +302,19 @@ def info():
     return render_template("info.html")
 
 
-GRAFANA_URL = os.environ.get("GRAFANA_URL", "http://grafana:3000")
-_grafana_session = http_requests.Session()
+DSV_ANALYTICS_URL = os.environ.get("DSV_ANALYTICS_URL", "http://dsv-analytics:3000")
+_analytics_session = http_requests.Session()
 _HOP_BY_HOP = {"content-encoding", "content-length", "transfer-encoding", "connection"}
 
 
-@app.route("/grafana/", defaults={"path": ""}, methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
-@app.route("/grafana/<path:path>", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
-def grafana_proxy(path):
-    """Reverse-proxy requests to the internal Grafana container."""
-    url = f"{GRAFANA_URL}/grafana/{path}"
+@app.route("/analytics/", defaults={"path": ""}, methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+@app.route("/analytics/<path:path>", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+def analytics_proxy(path):
+    """Reverse-proxy requests to the internal analytics container."""
+    url = f"{DSV_ANALYTICS_URL}/analytics/{path}"
     if request.query_string:
         url = f"{url}?{request.query_string.decode()}"
-    resp = _grafana_session.request(
+    resp = _analytics_session.request(
         method=request.method,
         url=url,
         headers={k: v for k, v in request.headers if k.lower() != "host"},
