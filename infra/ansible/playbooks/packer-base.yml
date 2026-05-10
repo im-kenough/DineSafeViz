@@ -1,0 +1,7 @@
+# infra/ansible/playbooks/packer-base.yml
+---
+- name: Build ubuntu-base image (Layer 1)
+  hosts: all
+  become: true
+  roles:
+    - base

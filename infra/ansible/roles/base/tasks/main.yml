@@ -1,0 +1,198 @@
+# infra/ansible/roles/base/tasks/main.yml
+---
+# --- Service Account ---
+
+- name: Create service account
+  user:
+    name: "{{ service_account }}"
+    shell: /bin/bash
+    groups: sudo
+    append: true
+    create_home: true
+
+- name: Allow service account passwordless sudo
+  copy:
+    dest: "/etc/sudoers.d/{{ service_account }}"
+    content: "{{ service_account }} ALL=(ALL) NOPASSWD:ALL\n"
+    mode: "0440"
+    validate: "visudo -cf %s"
+
+- name: Create .ssh directory for service account
+  file:
+    path: "/home/{{ service_account }}/.ssh"
+    state: directory
+    owner: "{{ service_account }}"
+    group: "{{ service_account }}"
+    mode: "0700"
+
+- name: Copy SSH authorized keys from build user to service account
+  copy:
+    src: /home/ubuntu/.ssh/authorized_keys
+    dest: "/home/{{ service_account }}/.ssh/authorized_keys"
+    remote_src: true
+    owner: "{{ service_account }}"
+    group: "{{ service_account }}"
+    mode: "0600"
+
+# --- System Updates ---
+
+- name: Update apt cache and upgrade all packages
+  apt:
+    update_cache: true
+    upgrade: dist
+    autoremove: true
+
+# --- Common Packages ---
+
+- name: Install common packages
+  apt:
+    name:
+      - curl
+      - wget
+      - git
+      - jq
+      - htop
+      - vim
+      - ca-certificates
+      - gnupg
+      - ufw
+      - fail2ban
+      - unattended-upgrades
+      - apt-listchanges
+    state: present
+
+# --- SSH Hardening ---
+
+- name: Deploy hardened sshd_config
+  template:
+    src: sshd_config.j2
+    dest: /etc/ssh/sshd_config
+    owner: root
+    group: root
+    mode: "0644"
+    validate: "sshd -t -f %s"
+  notify: Restart sshd
+
+# --- Firewall (UFW) ---
+
+- name: Set UFW default deny incoming
+  ufw:
+    direction: incoming
+    policy: deny
+
+- name: Set UFW default allow outgoing
+  ufw:
+    direction: outgoing
+    policy: allow
+
+- name: Allow SSH through UFW
+  ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+
+# --- fail2ban ---
+
+- name: Deploy fail2ban SSH jail config
+  copy:
+    src: jail.local
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart fail2ban
+
+- name: Enable and start fail2ban
+  systemd:
+    name: fail2ban
+    enabled: true
+    state: started
+
+# --- Unattended Upgrades ---
+
+- name: Enable unattended-upgrades for security patches
+  copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      APT::Periodic::AutocleanInterval "7";
+    owner: root
+    group: root
+    mode: "0644"
+
+# --- System Config ---
+
+- name: Set timezone
+  timezone:
+    name: "{{ vm_timezone }}"
+
+- name: Configure systemd-timesyncd NTP
+  copy:
+    dest: /etc/systemd/timesyncd.conf
+    content: |
+      [Time]
+      NTP=ntp.ubuntu.com
+      FallbackNTP=pool.ntp.org
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Enable and start systemd-timesyncd
+  systemd:
+    name: systemd-timesyncd
+    enabled: true
+    state: started
+
+- name: Create resolved.conf.d directory
+  file:
+    path: /etc/systemd/resolved.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Set DNS resolver
+  copy:
+    dest: /etc/systemd/resolved.conf.d/dns.conf
+    content: |
+      [Resolve]
+      DNS={{ network_dns }}
+      FallbackDNS=1.1.1.1
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Restart systemd-resolved
+  systemd:
+    name: systemd-resolved
+    state: restarted
+
+# --- Cleanup (smaller template) ---
+
+- name: Truncate machine-id for template cloning
+  copy:
+    content: ""
+    dest: /etc/machine-id
+
+- name: Clean apt cache
+  apt:
+    autoclean: true
+
+- name: Remove apt lists
+  file:
+    path: /var/lib/apt/lists
+    state: absent
+
+- name: Recreate apt lists directory
+  file:
+    path: /var/lib/apt/lists/partial
+    state: directory
+
+- name: Truncate all log files
+  shell: find /var/log -type f -exec truncate -s 0 {} \;
+  changed_when: true

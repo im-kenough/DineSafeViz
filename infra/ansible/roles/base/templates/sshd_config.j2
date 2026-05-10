@@ -1,0 +1,24 @@
+# {{ ansible_managed }}
+# Hardened SSH configuration — key-only auth, no root login
+
+Port 22
+Protocol 2
+
+PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+
+ChallengeResponseAuthentication no
+UsePAM yes
+
+X11Forwarding no
+PrintMotd no
+
+AcceptEnv LANG LC_*
+
+Subsystem sftp /usr/lib/openssh/sftp-server
+
+MaxAuthTries 3
+ClientAliveInterval 300
+ClientAliveCountMax 2
