@@ -8,25 +8,25 @@ version: 2
 updates:
   - package-ecosystem: "pip"
     directory: "/src/dsv-app"
-    target-branch: "dev"
+    target-branch: "main"
     schedule:
       interval: "weekly"
 
   # docker webapp
   - package-ecosystem: "docker"
     directory: "/src/dsv-app"
-    target-branch: "dev"
+    target-branch: "main"
     schedule:
       interval: "weekly"
   # docker db
   - package-ecosystem: "docker"
     directory: "/src/dsv-db"
-    target-branch: "dev"
+    target-branch: "main"
     schedule:
       interval: "weekly"
 
   - package-ecosystem: "github-actions"
     directory: "/"
-    target-branch: "dev"
+    target-branch: "main"
     schedule:
       interval: "weekly"
