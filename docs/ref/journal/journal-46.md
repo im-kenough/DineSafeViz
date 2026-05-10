@@ -41,3 +41,15 @@ for a single Docker Compose VM on Proxmox.
 ## 2026-05-10 14:30
 
 Writing design spec to `docs/superpowers/specs/2026-05-10-iac-design.md`.
+
+## 2026-05-10 15:00
+
+Wrote implementation plan to `docs/superpowers/plans/2026-05-10-iac.md`.
+19 tasks covering: directory scaffold, Ansible config/inventory/group_vars,
+3 Ansible roles (base, docker, dsv-app), 3 Packer templates, deploy/destroy
+roles and playbooks, Terraform config, render-tfvars/pkrvars scripts,
+Makefile, Ansible Vault setup, and 4 documentation files.
+
+Self-review found one bug: DNS resolver directory creation was ordered after
+the file copy that writes into it (base role). Fixed by swapping the task
+order.
