@@ -53,3 +53,39 @@ Makefile, Ansible Vault setup, and 4 documentation files.
 Self-review found one bug: DNS resolver directory creation was ordered after
 the file copy that writes into it (base role). Fixed by swapping the task
 order.
+
+## 2026-05-10 16:00
+
+Executed all 19 tasks of the implementation plan via Subagent-Driven Development.
+
+### Commits on `feat/iac-v0.3.0` (18 commits, 32 files):
+
+| Commit | Task | Description |
+|--------|------|-------------|
+| `4d0b3f0` | 1 | Scaffold directory structure + .gitignore |
+| `a7f270e` | 2 | Ansible config, inventory, group_vars |
+| `5e1a744` | 3 | Base role — OS hardening, SSH, UFW, fail2ban |
+| `2b169f8` | 4 | Docker role — Docker CE via official apt repo |
+| `0c6eb61` | 5 | dsv-app role — VM identity + GitHub App key |
+| `ed5b710` | 6 | Packer template — ubuntu-base (Layer 1) |
+| `c3a632d` | 7 | Packer template — ubuntu-docker (Layer 2) |
+| `775798b` | 8 | Packer template — dsv-app (Layer 3) + vars example |
+| `753bd7a` | 9 | Deploy role — clone repo, template .env, compose up |
+| `f28667e` | 10 | Destroy role — tear down with keep-data option |
+| `790a997` | 11 | Terraform config for Proxmox VM provisioning |
+| `6f9e387` | 12 | render-tfvars.py — bridges Vault to Terraform |
+| `e892948` | 13 | Makefile + render-pkrvars.py — orchestrate all ops |
+| `11e2861` | 15 | IaC strategy document |
+| `a23c794` | 16 | Install guide — first-time setup |
+| `210c85d` | 17 | Deploy guide — day-to-day operations |
+| `46c5457` | 18 | Secrets management — Ansible Vault strategy |
+
+Task 14 (Ansible Vault setup) skipped — requires interactive `ansible-vault create`.
+
+### Final validation results:
+
+- All 32 infra files present and accounted for
+- Both render scripts produce correct HCL output from YAML input
+- .gitignore covers terraform.tfvars, .terraform/, variables.pkrvars.hcl
+- Makefile `help` target lists all 14 targets correctly
+- Ansible and Terraform not installed on this machine — syntax checks skipped
