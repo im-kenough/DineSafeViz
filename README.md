@@ -24,8 +24,8 @@ across over 26 years of data.
 ## Tech stack
 
 DineSafeViz runs as a Docker Compose stack. See the
-[architecture reference](docs/ref/arch.md) and
-[DevOps reference](docs/ref/devops.md) for details.
+[architecture reference](docs/ref/arch/arch-app.md) and
+[DevOps reference](docs/ref/arch/README.MD) for details.
 
 ## Architecture
 
@@ -34,6 +34,14 @@ database initializer that seeds data from the Toronto Open Data API, and a
 Grafana analytics dashboard.
 
 ![Architecture overview diagram](docs/img/root-readme/arch-over.drawio.png)
+
+## Evolution
+
+Watch how DineSafeViz evolved over time:
+
+v x.y.z - Dockerized app on self hosted VM. Orchestrated with IAC.
+
+
 
 ## Documentation
 

@@ -4,8 +4,6 @@ This document discusses the IT security architecture of DinsSafeViz
 
 ## Secrets Management
 
-# Secrets Management
-
 Make a draw.io diagram outlining the security flow
 
 ## Principles
@@ -65,38 +63,9 @@ The vault file (`infra/ansible/vault/secrets.yml`) contains:
 | `.env` (on VM at deploy time) | Templated from vault | No (never in repo) |
 | `.env.example` (in repo root) | Placeholder values | Yes (no real secrets) |
 
-## Vault Operations
+## Service Accounts
 
-### View secrets
-
-```bash
-cd infra/ansible
-ansible-vault view vault/secrets.yml --ask-vault-pass
-```
-
-### Edit secrets
-
-```bash
-cd infra/ansible
-ansible-vault edit vault/secrets.yml --ask-vault-pass
-```
-
-### Change vault password
-
-```bash
-cd infra/ansible
-ansible-vault rekey vault/secrets.yml --ask-vault-pass
-```
-
-## Rules
-
-- **Never** commit unencrypted secrets to the repository
-- **Never** hardcode passwords in `docker-compose.yml`, `.tf` files, or
-  playbooks
-- **Never** store `.tfvars` or `.pkrvars.hcl` files with real values in git
-- **Always** use `--ask-vault-pass` (or a vault password file) when running
-  Ansible or Make targets
-- `.env` files exist only on the target VM, templated at deploy time
+Provide a list of service accounts used in the application group by function
 
 
 ## Repository Security
