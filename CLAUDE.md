@@ -1,4 +1,32 @@
-DineSafeViz is a dockerized app that vizualizes data from Toronto Public Health's food safety and inspection program, DineSafe.
+## Project context
+
+DineSafeViz is a dockerized app that visualizes data from Toronto Public
+Health's food safety and inspection program, DineSafe. It's a personal homelab
+project serving as a portfolio showcase for prospective employers in sysadmin
+and DevOps roles.
+
+The goal is to demonstrate operational excellence: supporting an application
+using modern enterprise patterns, with well-structured documentation covering
+architecture and operating procedures. Security and privacy are first-class
+concerns throughout.
+
+## About me
+
+I'm a sysadmin and DevOps analyst, not a software developer. Frame suggestions
+from an operations perspective — infrastructure, reliability, observability,
+and process — rather than from a developer's perspective.
+
+## Cost constraints
+
+This is a personal project with a personal budget. Follow this order of
+preference when recommending tooling:
+
+1. Free and open-source
+2. Free tier of a managed service
+3. Low-cost paid option (flag the cost explicitly)
+
+Don't recommend paid tooling without noting the cost and whether a free
+alternative exists.
 
 ## 1. Think Before Coding
 

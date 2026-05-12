@@ -1,4 +1,12 @@
+# IT Security architecture
+
+This document discusses the IT security architecture of DinsSafeViz
+
+## Secrets Management
+
 # Secrets Management
+
+Make a draw.io diagram outlining the security flow
 
 ## Principles
 
@@ -89,3 +97,18 @@ ansible-vault rekey vault/secrets.yml --ask-vault-pass
 - **Always** use `--ask-vault-pass` (or a vault password file) when running
   Ansible or Make targets
 - `.env` files exist only on the target VM, templated at deploy time
+
+
+## Repository Security
+
+Security measures implemented in the repo
+
+Dependabot enabled to scan for outdated software
+
+
+## Shift left
+
+IDE configurations:
+- a
+- b
+- c

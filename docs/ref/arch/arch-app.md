@@ -1,10 +1,33 @@
-# Architecture
+# Application Architecture 
+
+This document describes the architecture of the DineSaveViz application
 
 DineSafeViz runs as five Docker Compose services on a shared network. Four
 services are long-running; two are one-shot helpers that exit after
 completing their startup tasks.
 
 ![Architecture overview](../img/root-readme/arch-over.drawio.png)
+
+
+## Web app
+
+Flask serves web pages where users can view a list of health and safety inspections.
+
+They can also access an analytics dashboard breaking down the stats.
+
+
+## DineSafeViz Analytics Dashboard
+
+The DineSafeViz Analytics Dashboard breaks down the dataset and visualises them in a grafana dashboard
+
+### Database
+
+The webapp and analytics services pulls data from a postgresql db.
+
+A bulk dataload is performed when the app is first created. Periodic updates will 
+
+------------
+
 
 ## Services
 

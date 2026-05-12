@@ -1,4 +1,4 @@
-# Infrastructure as Code Strategy
+# Infrastructure as Code Architecture
 
 ## Purpose
 

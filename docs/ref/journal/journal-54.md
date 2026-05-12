@@ -19,3 +19,8 @@ Create 4 files in `infra/terraform/`:
 - `infra/terraform/main.tf` — bpg/proxmox provider >=0.66.0, proxmox_virtual_environment_vm resource cloning template 9102
 - `infra/terraform/outputs.tf` — 3 outputs: vm_name, vm_id, vm_ip
 - `infra/terraform/terraform.tfvars.example` — example file for secrets (gitignored)
+
+### 2026-05-10 — Validation skipped (terraform not installed on dev machine)
+
+### 2026-05-10 — Committed Task 11
+Commit: `feat(infra): add Terraform config for Proxmox VM provisioning` → 790a997
