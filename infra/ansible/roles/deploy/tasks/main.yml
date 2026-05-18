@@ -4,28 +4,14 @@
   wait_for_connection:
     timeout: 120
 
-- name: Check if repo exists
-  stat:
-    path: "{{ app_dir }}/.git"
-  register: repo_check
-
-- name: Clone repo (fresh deploy)
-  git:
-    repo: "{{ app_repo }}"
-    dest: "{{ app_dir }}"
-    version: "{{ app_branch }}"
-    accept_hostkey: true
-  become: false
-  when: not repo_check.stat.exists
-
-- name: Pull latest code (existing deploy)
+- name: Clone or update repo
   git:
     repo: "{{ app_repo }}"
     dest: "{{ app_dir }}"
     version: "{{ app_branch }}"
     update: true
+    accept_hostkey: true
   become: false
-  when: repo_check.stat.exists
 
 - name: Template .env file from vault secrets
   template:

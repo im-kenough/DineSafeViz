@@ -16,49 +16,53 @@ VAULT_FILE := $(ANSIBLE_DIR)/vault/secrets.yml
 
 # --- Image Pipeline ---
 
-.PHONY: bake-base
-bake-base: ## Build ubuntu-base template (Layer 1)
+define bake
 	cd $(PACKER_DIR) && \
 	ansible-vault view ../$(VAULT_FILE) --ask-vault-pass \
-		| python3 ../scripts/render-pkrvars.py > variables.pkrvars.hcl && \
-	packer init ubuntu-base.pkr.hcl && \
-	packer build -var-file=variables.pkrvars.hcl ubuntu-base.pkr.hcl; \
+		| python3 ../scripts/render-vars.py packer > variables.pkrvars.hcl && \
+	packer init $(1) && \
+	packer build -var-file=variables.pkrvars.hcl $(1); \
 	rm -f variables.pkrvars.hcl
+endef
+
+.PHONY: bake-base
+bake-base: ## Build ubuntu-base template (Layer 1)
+	$(call bake,ubuntu-base.pkr.hcl)
 
 .PHONY: bake-docker
 bake-docker: ## Build ubuntu-docker template (Layer 2, requires Layer 1)
-	cd $(PACKER_DIR) && \
-	ansible-vault view ../$(VAULT_FILE) --ask-vault-pass \
-		| python3 ../scripts/render-pkrvars.py > variables.pkrvars.hcl && \
-	packer init ubuntu-docker.pkr.hcl && \
-	packer build -var-file=variables.pkrvars.hcl ubuntu-docker.pkr.hcl; \
-	rm -f variables.pkrvars.hcl
+	$(call bake,ubuntu-docker.pkr.hcl)
 
 .PHONY: bake-dsv-app
 bake-dsv-app: ## Build dsv-app template (Layer 3, requires Layer 2)
+	$(call bake,dsv-app.pkr.hcl)
+
+.PHONY: bake-all
+bake-all: ## Build all image layers in order (single vault prompt)
 	cd $(PACKER_DIR) && \
 	ansible-vault view ../$(VAULT_FILE) --ask-vault-pass \
-		| python3 ../scripts/render-pkrvars.py > variables.pkrvars.hcl && \
+		| python3 ../scripts/render-vars.py packer > variables.pkrvars.hcl && \
+	packer init ubuntu-base.pkr.hcl && \
+	packer build -var-file=variables.pkrvars.hcl ubuntu-base.pkr.hcl && \
+	packer init ubuntu-docker.pkr.hcl && \
+	packer build -var-file=variables.pkrvars.hcl ubuntu-docker.pkr.hcl && \
 	packer init dsv-app.pkr.hcl && \
 	packer build -var-file=variables.pkrvars.hcl dsv-app.pkr.hcl; \
 	rm -f variables.pkrvars.hcl
-
-.PHONY: bake-all
-bake-all: bake-base bake-docker bake-dsv-app ## Build all image layers in order
 
 # --- VM Provisioning ---
 
 .PHONY: provision-vm
 provision-vm: ## Provision VM from dsv-app template via Terraform
 	ansible-vault view $(VAULT_FILE) --ask-vault-pass \
-		| python3 scripts/render-tfvars.py > $(TERRAFORM_DIR)/terraform.tfvars
+		| python3 scripts/render-vars.py terraform > $(TERRAFORM_DIR)/terraform.tfvars
 	cd $(TERRAFORM_DIR) && terraform init && terraform apply
 	@rm -f $(TERRAFORM_DIR)/terraform.tfvars
 
 .PHONY: destroy-vm
 destroy-vm: ## Destroy the VM via Terraform
 	ansible-vault view $(VAULT_FILE) --ask-vault-pass \
-		| python3 scripts/render-tfvars.py > $(TERRAFORM_DIR)/terraform.tfvars
+		| python3 scripts/render-vars.py terraform > $(TERRAFORM_DIR)/terraform.tfvars
 	cd $(TERRAFORM_DIR) && terraform destroy
 	@rm -f $(TERRAFORM_DIR)/terraform.tfvars
 
