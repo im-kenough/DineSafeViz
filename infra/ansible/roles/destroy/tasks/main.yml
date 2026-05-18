@@ -5,24 +5,12 @@
     path: "{{ app_dir }}/docker-compose.yml"
   register: compose_check
 
-- name: Stop and remove containers (keep volumes)
-  command: docker compose down
+- name: Stop and remove containers
+  command: "docker compose down{{ '' if (keep_data | default(false) | bool) else ' -v' }}"
   args:
     chdir: "{{ app_dir }}"
   become: false
-  when:
-    - compose_check.stat.exists
-    - keep_data | default(false) | bool
-  changed_when: true
-
-- name: Stop and remove containers and volumes (full wipe)
-  command: docker compose down -v
-  args:
-    chdir: "{{ app_dir }}"
-  become: false
-  when:
-    - compose_check.stat.exists
-    - not (keep_data | default(false) | bool)
+  when: compose_check.stat.exists
   changed_when: true
 
 - name: Remove app directory

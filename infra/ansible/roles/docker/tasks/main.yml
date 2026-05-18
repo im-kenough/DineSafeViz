@@ -3,14 +3,6 @@
 # --- Docker CE Installation (official apt repository method) ---
 # Ref: https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository
 
-- name: Install prerequisites for Docker apt repository
-  apt:
-    name:
-      - ca-certificates
-      - curl
-    state: present
-    update_cache: true
-
 - name: Create keyrings directory
   file:
     path: /etc/apt/keyrings
