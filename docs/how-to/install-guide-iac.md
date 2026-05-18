@@ -4,56 +4,75 @@ Step-by-step instructions for setting up the IaC toolchain from scratch. After
 completing this guide you will have three Proxmox VM templates ready for
 deployment.
 
-## Prerequisites
+# Setting up IAC in Proxmox
 
-### Workstation Software
+Instructions for setting up tool chain to create VMs and provision them
 
-Install the following on your workstation (the machine you run IaC commands
-from):
+## Setup Workstation
 
-1. **Packer** (>= 1.9)
-   ```bash
-   # Ubuntu/Debian
-   curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-   echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-   sudo apt update && sudo apt install packer
-   ```
-   Verify: `packer version`
+On the workstation that will be issuing IAC commands, install the following software:
 
-2. **Terraform** (>= 1.5)
-   ```bash
-   sudo apt install terraform
-   ```
-   Verify: `terraform version`
+- packer, terraform, ansible, python 3 w/ pyYAML
 
-3. **Ansible** (>= 2.15)
-   ```bash
-   sudo apt install ansible
-   ```
-   Verify: `ansible --version`
+```bash
+# Install packer
+curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
 
-4. **Python 3 with PyYAML** (for render scripts)
-   ```bash
-   pip3 install pyyaml
-   ```
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
 
-5. **SSH key pair** (Ed25519 recommended)
-   ```bash
-   ssh-keygen -t ed25519 -C "iac" -f ~/.ssh/iac
-   ```
-   This key will be used by Packer and Ansible to SSH into VMs during builds
-   and deploys.
+sudo apt update
+sudo apt install -y packer
+packer version
 
-### Proxmox Access
+```
 
-You need shell access (SSH or console) to the Proxmox host at `10.0.20.21`
-for the initial setup steps.
+```bash
+sudo apt-get update && sudo apt-get install -y gnupg software-properties-common
 
-## Step 1: Create Proxmox Service Accounts
+wget -O- https://apt.releases.hashicorp.com/gpg | \
+gpg --dearmor | \
+sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null
 
-SSH into the Proxmox host and create two service accounts with API tokens.
+gpg --no-default-keyring \
+--keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg \
+--fingerprint
 
-### svc-packer (for image builds)
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+
+sudo apt update
+sudo apt-get install -y terraform
+
+terraform -v
+```
+
+```bash
+sudo apt install -y ansible
+ansible --version
+```
+
+
+```bash
+pip3 install pyyaml
+```
+
+### Create SSH key
+
+Create ssh key on your workstation that will be used for all IAC operations.
+
+```bash
+ssh-keygen -t ed25519 -C "iac" -f ~/.ssh/iac
+```
+
+## Setup Proxmox
+
+### Create Proxmox service accounts
+
+- SSH into proxmox with root credentials
+
+#### Create `svc-packer`
+
+Create a paker service account `svc-packer` for image builds
+
 
 ```bash
 # Create user
@@ -69,10 +88,11 @@ pveum aclmod / -user svc-packer@pve -role Packer
 pveum user token add svc-packer@pve packer --privsep 0
 ```
 
-**Save the token value** — it is only shown once. You will add it to the
-Ansible Vault in Step 4.
+**Save the token value** — it is only shown once.
 
-### svc-terraform (for VM provisioning)
+#### Create `svc-terraform`
+
+Create a terraform service account `svc-terraform` for vm provisioning
 
 ```bash
 # Create user
@@ -88,13 +108,12 @@ pveum aclmod / -user svc-terraform@pve -role Terraform
 pveum user token add svc-terraform@pve terraform --privsep 0
 ```
 
-**Save the token value.**
+Save the token you'll only see it once.
 
-## Step 2: Import the Seed Cloud Image
+### Create the proxmox template
 
-On the Proxmox host, download and import the Ubuntu 24.04 cloud image as
-template 9000:
-
+Import the proxmox image.
+Create a VM config, convert to a template
 ```bash
 # Download cloud image
 wget https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img \
@@ -119,42 +138,43 @@ qm set 9000 --serial0 socket --vga serial0
 qm set 9000 --agent enabled=1
 
 # Set cloud-init defaults (SSH key for Packer to connect)
-# copies the existing proxmos authorized keys into the VM config since it'll contain the IAC public key
-# can be more surgical and just add your iac public key
 qm set 9000 --ciuser ubuntu
-qm set 9000 --sshkeys ~/.ssh/authorized_keys  # or paste your public key
-
-# Convert to template
-# Freezes the cloudinit image
-qm template 9000
 ```
-A more precise alternative
 
-On your workstation load the IAC public key into Proxmox's tmp dir. Have the VM config reference it
+On your workstation, upload your IAC public key into Proxmox's temp dir.
+Then tell the VM to import the key from that dir.
+Once converted to a template, the image is frozen and persists the authorized public key
+
 ```bash
 cat ~/.ssh/iac.pub | ssh root@10.0.20.21 "cat > /tmp/iac.pub && qm set 9000 --sshkeys /tmp/iac.pub"
 ```
+## Setup Github repo
 
+### Create deploy keys
 
-Verify: template 9000 should appear in the Proxmox UI under the node.
+We'll create a pair of ssh keys for the deployment VM to clone down the repo
 
-## Step 3: Configure SSH Access
-
-Ensure your workstation's SSH public key is in the cloud-init config of
-template 9000 (done in Step 2 with `--sshkeys`). Packer and Ansible use this
-key to SSH into VMs during builds.
-
-Add your `iac` public key to the template:
 ```bash
-qm set 9000 --sshkeys ~/.ssh/iac.pub
+ssh-keygen -t ed25519 -f ~/.ssh/dsv-deploy-key-RO -C "DineSafeViz deploy key Read Only" -N ''
 ```
 
-Test that you can resolve the Proxmox host:
+Cat out the public key, you'll paste this in to the Deploy Keys section later.
 ```bash
-ssh root@10.0.20.21 "echo 'Proxmox SSH OK'"
+cat ~/.ssh/dsv-deploy-key-RO.pub
 ```
 
-## Step 4: Create the Ansible Vault
+### Setup deploy keys
+
+In the repo, 
+
+- click on Settings > Deploy Keys > Add deploy key
+- title = dsv-deploy-key-RO
+- key = the public key
+- allow write access = unchecked
+
+Click Add Key
+
+### Create the Ansible vault
 
 From the repo root:
 
@@ -181,15 +201,12 @@ vault_db_name: "dinesafe"
 vault_analytics_admin_user: "admin"
 vault_analytics_admin_password: "<choose a strong password>"
 
-# GitHub App private key
-vault_github_app_key: |
+# GitHub deploy key private key
+vault_github_deploy_keys: |
   -----BEGIN RSA PRIVATE KEY-----
   <paste your GitHub App private key here>
   -----END RSA PRIVATE KEY-----
 ```
-
-Save and close. Remember your vault password — you will need it for every
-`make` command.
 
 ## Step 5: Build Image Layers
 
