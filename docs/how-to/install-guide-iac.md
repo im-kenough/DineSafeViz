@@ -39,7 +39,7 @@ from):
 
 5. **SSH key pair** (Ed25519 recommended)
    ```bash
-   ssh-keygen -t ed25519 -C "iac@homelab"
+   ssh-keygen -t ed25519 -C "iac" -f ~/.ssh/iac
    ```
    This key will be used by Packer and Ansible to SSH into VMs during builds
    and deploys.
@@ -60,10 +60,10 @@ SSH into the Proxmox host and create two service accounts with API tokens.
 pveum user add svc-packer@pve --comment "Packer image build service account"
 
 # Create role with required permissions
-pveum role add PVE_Packer -privs "VM.Allocate VM.Clone VM.Config.Disk VM.Config.CPU VM.Config.Memory VM.Config.Network VM.Config.Options VM.Config.Cloudinit VM.Audit VM.Console VM.Monitor VM.PowerMgmt Datastore.AllocateSpace Datastore.Audit Sys.Modify SDN.Use"
+pveum role add Packer -privs "VM.Allocate VM.Clone VM.Config.Disk VM.Config.CPU VM.Config.Memory VM.Config.Network VM.Config.Options VM.Config.Cloudinit VM.Audit VM.Console VM.PowerMgmt Datastore.AllocateSpace Datastore.Audit Sys.Modify SDN.Use"
 
 # Assign role to user on root path
-pveum aclmod / -user svc-packer@pve -role PVE_Packer
+pveum aclmod / -user svc-packer@pve -role Packer
 
 # Create API token (save the output!)
 pveum user token add svc-packer@pve packer --privsep 0
@@ -79,10 +79,10 @@ Ansible Vault in Step 4.
 pveum user add svc-terraform@pve --comment "Terraform provisioning service account"
 
 # Create role with required permissions
-pveum role add PVE_Terraform -privs "VM.Allocate VM.Clone VM.Config.Disk VM.Config.CPU VM.Config.Memory VM.Config.Network VM.Config.Options VM.Config.Cloudinit VM.Audit VM.PowerMgmt Datastore.AllocateSpace Datastore.Audit SDN.Use"
+pveum role add Terraform -privs "VM.Allocate VM.Clone VM.Config.Disk VM.Config.CPU VM.Config.Memory VM.Config.Network VM.Config.Options VM.Config.Cloudinit VM.Audit VM.PowerMgmt Datastore.AllocateSpace Datastore.Audit SDN.Use"
 
 # Assign role to user on root path
-pveum aclmod / -user svc-terraform@pve -role PVE_Terraform
+pveum aclmod / -user svc-terraform@pve -role Terraform
 
 # Create API token (save the output!)
 pveum user token add svc-terraform@pve terraform --privsep 0
@@ -101,7 +101,7 @@ wget https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.i
   -O /var/lib/vz/template/iso/ubuntu-24.04-cloud.img
 
 # Create VM shell
-qm create 9000 --name ubuntu-2404-cloud --memory 2048 --cores 2 \
+qm create 9000 --name ubuntu-2404-cloud --memory 4096 --cores 4 \
   --net0 virtio,bridge=vmbr0
 
 # Import disk
@@ -119,12 +119,22 @@ qm set 9000 --serial0 socket --vga serial0
 qm set 9000 --agent enabled=1
 
 # Set cloud-init defaults (SSH key for Packer to connect)
+# copies the existing proxmos authorized keys into the VM config since it'll contain the IAC public key
+# can be more surgical and just add your iac public key
 qm set 9000 --ciuser ubuntu
 qm set 9000 --sshkeys ~/.ssh/authorized_keys  # or paste your public key
 
 # Convert to template
+# Freezes the cloudinit image
 qm template 9000
 ```
+A more precise alternative
+
+On your workstation load the IAC public key into Proxmox's tmp dir. Have the VM config reference it
+```bash
+cat ~/.ssh/iac.pub | ssh root@10.0.20.21 "cat > /tmp/iac.pub && qm set 9000 --sshkeys /tmp/iac.pub"
+```
+
 
 Verify: template 9000 should appear in the Proxmox UI under the node.
 
@@ -133,6 +143,11 @@ Verify: template 9000 should appear in the Proxmox UI under the node.
 Ensure your workstation's SSH public key is in the cloud-init config of
 template 9000 (done in Step 2 with `--sshkeys`). Packer and Ansible use this
 key to SSH into VMs during builds.
+
+Add your `iac` public key to the template:
+```bash
+qm set 9000 --sshkeys ~/.ssh/iac.pub
+```
 
 Test that you can resolve the Proxmox host:
 ```bash
