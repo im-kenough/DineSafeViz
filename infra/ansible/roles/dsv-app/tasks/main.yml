@@ -36,12 +36,12 @@
   command: netplan apply
   changed_when: true
 
-# --- GitHub App Key ---
+# --- GitHub Deploy Key ---
 
-- name: Install GitHub App private key
+- name: Install GitHub deploy key
   copy:
-    content: "{{ vault_github_app_key }}"
-    dest: "/home/{{ service_account }}/.ssh/github-app-key"
+    content: "{{ vault_github_deploy_keys }}"
+    dest: "/home/{{ service_account }}/.ssh/deploy-key"
     owner: "{{ service_account }}"
     group: "{{ service_account }}"
     mode: "0600"

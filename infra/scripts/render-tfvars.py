@@ -13,6 +13,7 @@ import yaml
 VAULT_TO_TF = {
     "vault_proxmox_api_token_id": "proxmox_api_token_id",
     "vault_proxmox_api_token_secret": "proxmox_api_token_secret",
+    "vault_proxmox_node": "proxmox_node",
 }
 
 

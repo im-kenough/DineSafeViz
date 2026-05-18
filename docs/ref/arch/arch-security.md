@@ -61,7 +61,7 @@ The vault file (`infra/ansible/vault/secrets.yml`) contains:
 | `vault_db_name` | PostgreSQL database name | Ansible deploy (.env) |
 | `vault_analytics_admin_user` | Grafana admin username | Ansible deploy (.env) |
 | `vault_analytics_admin_password` | Grafana admin password | Ansible deploy (.env) |
-| `vault_github_app_key` | GitHub App private key (RSA) | Packer dsv-app build |
+| `vault_github_deploy_keys` | GitHub deploy key (private key) | Packer dsv-app build |
 
 ### What lives where
 
@@ -140,23 +140,40 @@ Packer image creation.
 
 ### Proxmox API
 
-| Token | Purpose | Used by |
-|-------|---------|---------|
-| `vault_proxmox_api_token_id/secret` | VM provisioning and management | Terraform |
-| `vault_packer_api_token_id/secret` | Template image creation | Packer |
+Two dedicated Proxmox service accounts with separate API tokens,
+following the principle of least privilege:
 
-Terraform and Packer use separate API tokens to follow the principle
-of least privilege. Each token is scoped to only the operations its
-tool needs.
+| Account | Role | Token (vault key) | Used by |
+|---------|------|--------------------|---------|
+| `svc-packer@pve` | `Packer` | `vault_packer_api_token_id/secret` | Packer |
+| `svc-terraform@pve` | `Terraform` | `vault_proxmox_api_token_id/secret` | Terraform |
+
+Each account uses an API token (`--privsep 0`) rather than a
+password. The Proxmox roles are custom-created with minimal
+permissions:
+
+- **Packer role:** VM.Allocate, VM.Clone, VM.Config.*, VM.Audit,
+  VM.Console, VM.Monitor, VM.PowerMgmt, Datastore.AllocateSpace,
+  Datastore.Audit, Sys.Modify, SDN.Use
+- **Terraform role:** VM.Allocate, VM.Clone, VM.Config.*, VM.Audit,
+  VM.PowerMgmt, Datastore.AllocateSpace, Datastore.Audit, SDN.Use
+
+Neither account has full administrator access. If a token is
+compromised, the blast radius is limited to VM operations — no access
+to storage content, networking configuration, or other Proxmox
+nodes.
 
 ### GitHub access
 
 | Credential | Purpose | Used by |
 |------------|---------|---------|
-| `vault_github_app_key` | Clone the repo to the VM via SSH | Packer dsv-app build, Ansible deploy |
+| `vault_github_deploy_keys` | Clone the repo to the VM via SSH | Packer dsv-app build, Ansible deploy |
 
-A GitHub App private key is used instead of a personal access token.
-The SSH config on the VM
+A read-only GitHub deploy key (ed25519) is used instead of a personal
+access token. Deploy keys are scoped to a single repository and cannot
+push, manage settings, or access other repos. The private key is
+installed to `/home/adm-ubuntu/.ssh/deploy-key` (mode `0600`) during
+the Packer dsv-app build. The SSH config on the VM
 (`infra/ansible/roles/dsv-app/templates/ssh_config.j2`) pins the
 identity file and sets `IdentitiesOnly yes` to prevent key leakage.
 

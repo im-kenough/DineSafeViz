@@ -138,14 +138,14 @@ Inherits from ubuntu-base (9100). Ansible `docker` role adds:
 Inherits from ubuntu-docker (9101). Ansible `dsv-app` role adds:
 
 - **VM identity:** Hostname set to `yyz-app-dsv01`, static IP 10.0.20.80
-- **GitHub App private key:** Installed to `/home/adm-ubuntu/.ssh/github-app-key`
+- **GitHub deploy key:** Installed to `/home/adm-ubuntu/.ssh/deploy-key`
   (permissions 0600)
-- **SSH config:** `~/.ssh/config` entry for github.com using the App key
+- **SSH config:** `~/.ssh/config` entry for github.com using the deploy key
 - **App directory:** `/home/adm-ubuntu/app/` created, owned by `adm-ubuntu`
 
 No repo clone, no `.env`, no Docker Compose. Those happen at deploy time.
 
-**Rebuild cadence:** When base layers change or GitHub App key is rotated.
+**Rebuild cadence:** When base layers change or GitHub deploy key is rotated.
 
 ## Terraform — VM Provisioning
 
@@ -254,11 +254,11 @@ vault_db_name: dinesafe
 vault_analytics_admin_user: admin
 vault_analytics_admin_password: <password>
 
-# GitHub App private key
-vault_github_app_key: |
-  -----BEGIN RSA PRIVATE KEY-----
+# GitHub deploy key (private key)
+vault_github_deploy_keys: |
+  -----BEGIN OPENSSH PRIVATE KEY-----
   ...
-  -----END RSA PRIVATE KEY-----
+  -----END OPENSSH PRIVATE KEY-----
 ```
 
 ### What Lives Where

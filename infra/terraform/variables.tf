@@ -24,7 +24,6 @@ variable "proxmox_api_token_secret" {
 variable "proxmox_node" {
   description = "Proxmox node name as shown in the UI"
   type        = string
-  default     = "pve"
 }
 
 variable "proxmox_storage" {
@@ -64,7 +63,7 @@ variable "vm_memory" {
 variable "vm_disk_size" {
   description = "Disk size in GB"
   type        = number
-  default     = 20
+  default     = 60
 }
 
 # --- Network ---

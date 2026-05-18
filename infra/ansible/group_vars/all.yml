@@ -5,7 +5,7 @@
 
 # --- Proxmox ---
 proxmox_api_url: "https://10.0.20.21:8006"
-proxmox_node: "pve"              # Proxmox node name as shown in UI
+proxmox_node: "{{ vault_proxmox_node }}"  # from vault/secrets.yml
 proxmox_storage: "local-lvm"
 proxmox_bridge: "vmbr0"
 
@@ -25,7 +25,7 @@ vm_name: "yyz-app-dsv01"
 vm_ip: "10.0.20.80"
 vm_cpu: 2
 vm_memory: 4096
-vm_disk_size: 20
+vm_disk_size: 60
 vm_timezone: "America/Toronto"
 
 # --- Service Account ---

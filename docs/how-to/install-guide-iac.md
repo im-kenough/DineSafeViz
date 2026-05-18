@@ -79,7 +79,7 @@ Create a paker service account `svc-packer` for image builds
 pveum user add svc-packer@pve --comment "Packer image build service account"
 
 # Create role with required permissions
-pveum role add Packer -privs "VM.Allocate VM.Clone VM.Config.Disk VM.Config.CPU VM.Config.Memory VM.Config.Network VM.Config.Options VM.Config.Cloudinit VM.Audit VM.Console VM.PowerMgmt Datastore.AllocateSpace Datastore.Audit Sys.Modify SDN.Use"
+pveum role add Packer -privs "VM.Allocate VM.Clone VM.Config.CDROM VM.Config.Disk VM.Config.CPU VM.Config.Memory VM.Config.Network VM.Config.Options VM.Config.Cloudinit VM.Config.HWType VM.Audit VM.Console VM.PowerMgmt Datastore.AllocateSpace Datastore.Audit Sys.Modify SDN.Use"
 
 # Assign role to user on root path
 pveum aclmod / -user svc-packer@pve -role Packer
@@ -99,7 +99,7 @@ Create a terraform service account `svc-terraform` for vm provisioning
 pveum user add svc-terraform@pve --comment "Terraform provisioning service account"
 
 # Create role with required permissions
-pveum role add Terraform -privs "VM.Allocate VM.Clone VM.Config.Disk VM.Config.CPU VM.Config.Memory VM.Config.Network VM.Config.Options VM.Config.Cloudinit VM.Audit VM.PowerMgmt Datastore.AllocateSpace Datastore.Audit SDN.Use"
+pveum role add Terraform -privs "VM.Allocate VM.Clone VM.Config.Disk VM.Config.CPU VM.Config.Memory VM.Config.Network VM.Config.Options VM.Config.Cloudinit VM.Config.HWType VM.Audit VM.PowerMgmt Datastore.AllocateSpace Datastore.Audit SDN.Use"
 
 # Assign role to user on root path
 pveum aclmod / -user svc-terraform@pve -role Terraform
@@ -112,42 +112,60 @@ Save the token you'll only see it once.
 
 ### Create the proxmox template
 
-Import the proxmox image.
-Create a VM config, convert to a template
+Download the Ubuntu cloud image and import it as-is. The cloud image
+does not ship with `qemu-guest-agent`, but the Ansible base role
+installs it during the Layer 1 build on a running system. The Layer 1
+Packer config uses a temporary static IP (`ssh_host`) instead of agent
+IP discovery, so the seed template needs no modification.
+
 ```bash
 # Download cloud image
 wget https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img \
   -O /var/lib/vz/template/iso/ubuntu-24.04-cloud.img
 
-# Create VM shell
+# Create VM with virtio-scsi controller (required for Ubuntu cloud images)
 qm create 9000 --name ubuntu-2404-cloud --memory 4096 --cores 4 \
-  --net0 virtio,bridge=vmbr0
+  --net0 virtio,bridge=vmbr0 --scsihw virtio-scsi-pci
 
 # Import disk
 qm importdisk 9000 /var/lib/vz/template/iso/ubuntu-24.04-cloud.img local-lvm
 
-# Configure disk and boot
-qm set 9000 --scsihw virtio-scsi-pci --scsi0 local-lvm:vm-9000-disk-0
-qm set 9000 --boot c --bootdisk scsi0
+# Attach disk and set boot order
+qm set 9000 --scsi0 local-lvm:vm-9000-disk-0
+qm set 9000 --boot order=scsi0
+
+# Resize disk to 60G (cloud image ships with 2G — all VMs use 60G)
+qm resize 9000 scsi0 60G
 
 # Add cloud-init drive and serial console
 qm set 9000 --ide2 local-lvm:cloudinit
 qm set 9000 --serial0 socket --vga serial0
 
-# Enable QEMU guest agent
+# Enable QEMU guest agent (used after base role installs it)
 qm set 9000 --agent enabled=1
 
-# Set cloud-init defaults (SSH key for Packer to connect)
+# Set cloud-init defaults
 qm set 9000 --ciuser ubuntu
+qm set 9000 --ipconfig0 ip=dhcp
 ```
 
 On your workstation, upload your IAC public key into Proxmox's temp dir.
 Then tell the VM to import the key from that dir.
-Once converted to a template, the image is frozen and persists the authorized public key
+Once converted to a template, the image is frozen and persists the
+authorized public key.
 
 ```bash
-cat ~/.ssh/iac.pub | ssh root@10.0.20.21 "cat > /tmp/iac.pub && qm set 9000 --sshkeys /tmp/iac.pub"
+cat ~/.ssh/iac.pub | ssh root@10.0.20.21 \
+  "cat > /tmp/iac.pub && qm set 9000 --sshkeys /tmp/iac.pub"
 ```
+
+On the Proxmox server, convert to template.
+
+```bash
+qm template 9000
+```
+
+
 ## Setup Github repo
 
 ### Create deploy keys
@@ -186,25 +204,28 @@ ansible-vault create vault/secrets.yml
 When the editor opens, enter all secrets (use the real values from Steps 1-2):
 
 ```yaml
-# Proxmox API tokens
+# Proxmox Configuration
+vault_proxmox_node: "yyz-hyp01"
+
+## Proxmox API tokens
 vault_proxmox_api_token_id: "svc-terraform@pve!terraform"
-vault_proxmox_api_token_secret: "<token from Step 1>"
+vault_proxmox_api_token_secret: "aaaaaaaaaaaaaaaaaaaaaaa"
 vault_packer_api_token_id: "svc-packer@pve!packer"
-vault_packer_api_token_secret: "<token from Step 1>"
+vault_packer_api_token_secret: "bbbbbbbbbbbbbbbbbbbb"
 
 # PostgreSQL credentials
 vault_db_user: "dinesafe"
-vault_db_password: "<choose a strong password>"
+vault_db_password: "ccccccccccccc"
 vault_db_name: "dinesafe"
 
 # Grafana credentials
 vault_analytics_admin_user: "admin"
-vault_analytics_admin_password: "<choose a strong password>"
+vault_analytics_admin_password: "ddddddddddd"
 
-# GitHub deploy key private key
+# github deploy key
 vault_github_deploy_keys: |
   -----BEGIN RSA PRIVATE KEY-----
-  <paste your GitHub App private key here>
+  eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
   -----END RSA PRIVATE KEY-----
 ```
 

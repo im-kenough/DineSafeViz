@@ -19,7 +19,8 @@ packer {
 # --- Variables ---
 
 variable "proxmox_api_url" {
-  type = string
+  type    = string
+  default = "https://10.0.20.21:8006/api2/json"
 }
 
 variable "proxmox_api_token_id" {
@@ -32,8 +33,7 @@ variable "proxmox_api_token_secret" {
 }
 
 variable "proxmox_node" {
-  type    = string
-  default = "pve"
+  type = string
 }
 
 variable "clone_vm_id" {
@@ -69,12 +69,27 @@ source "proxmox-clone" "ubuntu-docker" {
   vm_id       = var.template_vm_id
   vm_name     = var.template_name
 
-  cores  = 2
-  memory = 2048
+  cores           = 4
+  memory          = 6144
+  scsi_controller = "virtio-scsi-pci"
+
+  disks {
+    type         = "scsi"
+    storage_pool = "local-lvm"
+    disk_size    = "60G"
+    discard      = true
+  }
 
   network_adapters {
+    model  = "virtio"
     bridge = "vmbr0"
   }
+
+  ipconfig {
+    ip = "dhcp"
+  }
+
+  qemu_agent = true
 
   ssh_username = var.ssh_username
   ssh_timeout  = "15m"
@@ -92,7 +107,8 @@ build {
     playbook_file = "../ansible/playbooks/packer-docker.yml"
     user          = var.ssh_username
     ansible_env_vars = [
-      "ANSIBLE_HOST_KEY_CHECKING=False"
+      "ANSIBLE_HOST_KEY_CHECKING=False",
+      "ANSIBLE_ROLES_PATH=../ansible/roles"
     ]
   }
 }

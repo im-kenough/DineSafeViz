@@ -19,7 +19,8 @@ packer {
 # --- Variables ---
 
 variable "proxmox_api_url" {
-  type = string
+  type    = string
+  default = "https://10.0.20.21:8006/api2/json"
 }
 
 variable "proxmox_api_token_id" {
@@ -32,8 +33,7 @@ variable "proxmox_api_token_secret" {
 }
 
 variable "proxmox_node" {
-  type    = string
-  default = "pve"
+  type = string
 }
 
 variable "clone_vm_id" {
@@ -56,7 +56,23 @@ variable "ssh_username" {
   default = "ubuntu"
 }
 
+variable "build_ip" {
+  type        = string
+  default     = "10.0.20.200"
+  description = "Temporary static IP for the Layer 1 build VM. Must be outside the DHCP range."
+}
+
+variable "network_gateway" {
+  type    = string
+  default = "10.0.20.1"
+}
+
 # --- Source ---
+
+# Layer 1 uses a static IP instead of DHCP because the seed cloud image
+# (9000) has no qemu-guest-agent — Packer can't discover a DHCP address
+# without the agent. The Ansible base role installs the agent, so Layers
+# 2+ can use qemu_agent = true with DHCP.
 
 source "proxmox-clone" "ubuntu-base" {
   proxmox_url              = var.proxmox_api_url
@@ -69,13 +85,30 @@ source "proxmox-clone" "ubuntu-base" {
   vm_id       = var.template_vm_id
   vm_name     = var.template_name
 
-  cores  = 2
-  memory = 2048
+  cores           = 4
+  memory          = 6144
+  scsi_controller = "virtio-scsi-pci"
+
+  disks {
+    type         = "scsi"
+    storage_pool = "local-lvm"
+    disk_size    = "60G"
+    discard      = true
+  }
 
   network_adapters {
+    model  = "virtio"
     bridge = "vmbr0"
   }
 
+  ipconfig {
+    ip      = "${var.build_ip}/24"
+    gateway = var.network_gateway
+  }
+
+  nameserver = var.network_gateway
+
+  ssh_host     = var.build_ip
   ssh_username = var.ssh_username
   ssh_timeout  = "15m"
 
@@ -91,8 +124,10 @@ build {
   provisioner "ansible" {
     playbook_file = "../ansible/playbooks/packer-base.yml"
     user          = var.ssh_username
+    use_proxy     = false
     ansible_env_vars = [
-      "ANSIBLE_HOST_KEY_CHECKING=False"
+      "ANSIBLE_HOST_KEY_CHECKING=False",
+      "ANSIBLE_ROLES_PATH=../ansible/roles"
     ]
   }
 }

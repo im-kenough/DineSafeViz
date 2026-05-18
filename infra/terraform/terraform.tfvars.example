@@ -8,7 +8,7 @@ proxmox_api_token_id     = "svc-terraform@pve!terraform"
 proxmox_api_token_secret = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 
 # Override defaults if needed:
-# proxmox_node = "pve"
+# proxmox_node = "yyz-hyp01"
 # vm_name      = "yyz-app-dsv01"
 # vm_cpu       = 2
 # vm_memory    = 4096

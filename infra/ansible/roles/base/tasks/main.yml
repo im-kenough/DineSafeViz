@@ -34,6 +34,16 @@
     group: "{{ service_account }}"
     mode: "0600"
 
+# --- Wait for cloud-init ---
+
+- name: Wait for cloud-init to finish
+  command: cloud-init status --wait
+  changed_when: false
+  # cloud-init frequently exits 1 on the final stage (package upgrade conflicts
+  # from the cloud image) but the dpkg lock is released and the system is ready.
+  # We only need it to be done, not to have succeeded.
+  failed_when: false
+
 # --- System Updates ---
 
 - name: Update apt cache and upgrade all packages
@@ -59,9 +69,16 @@
       - fail2ban
       - unattended-upgrades
       - apt-listchanges
+      - qemu-guest-agent
     state: present
 
 # --- SSH Hardening ---
+
+- name: Create sshd privilege separation directory
+  file:
+    path: /run/sshd
+    state: directory
+    mode: "0755"
 
 - name: Deploy hardened sshd_config
   template:
