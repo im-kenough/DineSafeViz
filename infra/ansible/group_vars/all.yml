@@ -31,7 +31,7 @@ packer_app_build_ip: "10.0.20.202"
 packer_ssh_username: "ubuntu"
 packer_cpu: 4
 packer_memory: 6144
-packer_disk_size: 60
+packer_disk_size: 40
 
 # --- Target app VM ---
 app_vm_name: "yyz-app-dsv01"
