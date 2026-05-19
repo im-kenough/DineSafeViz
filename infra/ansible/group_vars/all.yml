@@ -28,7 +28,7 @@ template_dsv_app: 9102
 build_ip_base: "10.0.20.200"
 build_ip_docker: "10.0.20.201"
 build_ip_app: "10.0.20.202"
-packer_ssh_username: "ubuntu"
+packer_ssh_username: "adm-ubuntu"
 packer_cpu: 4
 packer_memory: 6144
 packer_disk_size: 40

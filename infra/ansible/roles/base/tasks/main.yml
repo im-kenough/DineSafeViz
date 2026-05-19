@@ -25,14 +25,11 @@
     group: "{{ service_account }}"
     mode: "0700"
 
-- name: Copy SSH authorized keys from build user to service account
-  copy:
-    src: /home/ubuntu/.ssh/authorized_keys
-    dest: "/home/{{ service_account }}/.ssh/authorized_keys"
-    remote_src: true
-    owner: "{{ service_account }}"
-    group: "{{ service_account }}"
-    mode: "0600"
+- name: Add IAC public key to service account
+  authorized_key:
+    user: "{{ service_account }}"
+    state: present
+    key: "{{ template_iac_public_key }}"
 
 # --- Wait for cloud-init ---
 

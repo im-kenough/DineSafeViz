@@ -88,7 +88,7 @@ source "proxmox-iso" "ubuntu-seed" {
   }
 
   ssh_username = var.ssh_username
-  ssh_password = "ubuntu"
+  ssh_password = "adm-ubuntu"
   ssh_timeout  = "20m"
 
   # Cloud-Init configuration for the resulting template

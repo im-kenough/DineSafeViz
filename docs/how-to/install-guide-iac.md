@@ -99,7 +99,7 @@ Create a terraform service account `svc-terraform` for vm provisioning
 pveum user add svc-terraform@pve --comment "Terraform provisioning service account"
 
 # Create role with required permissions
-pveum role add Terraform -privs "VM.Allocate VM.Clone VM.Config.Disk VM.Config.CPU VM.Config.Memory VM.Config.Network VM.Config.Options VM.Config.Cloudinit VM.Config.HWType VM.Audit VM.PowerMgmt Datastore.AllocateSpace Datastore.Audit SDN.Use"
+pveum role add Terraform -privs "VM.Allocate VM.Clone VM.Config.Disk VM.Config.CPU VM.Config.Memory VM.Config.Network VM.Config.Options VM.Config.Cloudinit VM.Config.HWType VM.Audit VM.PowerMgmt VM.GuestAgent.Audit Datastore.AllocateSpace Datastore.Audit SDN.Use"
 
 # Assign role to user on root path
 pveum aclmod / -user svc-terraform@pve -role Terraform
@@ -145,7 +145,7 @@ qm set 9000 --serial0 socket --vga serial0
 qm set 9000 --agent enabled=1
 
 # Set cloud-init defaults
-qm set 9000 --ciuser ubuntu
+qm set 9000 --ciuser adm-ubuntu
 qm set 9000 --ipconfig0 ip=dhcp
 ```
 
