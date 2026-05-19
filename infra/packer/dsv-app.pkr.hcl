@@ -44,11 +44,6 @@ variable "vault_github_deploy_keys" {
   sensitive = true
 }
 
-variable "ansible_vault_password_file" {
-  type    = string
-  default = ""
-}
-
 # --- Source ---
 
 source "proxmox-clone" "dsv-app" {
@@ -109,11 +104,8 @@ build {
       "ANSIBLE_HOST_KEY_CHECKING=False",
       "ANSIBLE_ROLES_PATH=../ansible/roles"
     ]
-    extra_arguments = concat(
-      [
-        "-e", "vault_github_deploy_keys=${var.vault_github_deploy_keys}"
-      ],
-      var.ansible_vault_password_file != "" ? ["--vault-password-file", var.ansible_vault_password_file] : []
-    )
+    extra_arguments = [
+      "-e", "vault_github_deploy_keys=${var.vault_github_deploy_keys}"
+    ]
   }
 }

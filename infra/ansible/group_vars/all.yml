@@ -5,7 +5,7 @@
 
 # --- Proxmox ---
 proxmox_api_url: "https://10.0.20.21:8006"
-proxmox_node_name: "yyz-hyp01"
+proxmox_node: "yyz-hyp01"
 proxmox_storage: "local-lvm"
 proxmox_bridge: "vmbr0"
 proxmox_api_terraform_token_id: "svc-terraform@pve!terraform"
@@ -25,9 +25,9 @@ template_dsv_app: 9102
 
 # --- Packer Build ---
 # VM Configs used for building incremental images
-packer_build_ip: "10.0.20.200"
-packer_docker_build_ip: "10.0.20.201"
-packer_app_build_ip: "10.0.20.202"
+build_ip_base: "10.0.20.200"
+build_ip_docker: "10.0.20.201"
+build_ip_app: "10.0.20.202"
 packer_ssh_username: "ubuntu"
 packer_cpu: 4
 packer_memory: 6144

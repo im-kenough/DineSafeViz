@@ -66,7 +66,7 @@ variable "vm_ip" {
   type        = string
 }
 
-variable "network_bridge" {
+variable "proxmox_bridge" {
   description = "Proxmox network bridge"
   type        = string
 }
