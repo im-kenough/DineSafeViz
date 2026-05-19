@@ -47,6 +47,7 @@ MAPPINGS = {
         "proxmox_bridge": "proxmox_bridge",
         "template_dsv_app": "template_id",
         "app_vm_name": "vm_name",
+        "app_vm_id": "vm_id",
         "app_vm_cpu": "vm_cpu",
         "app_vm_memory": "vm_memory",
         "app_vm_disk_size": "vm_disk_size",

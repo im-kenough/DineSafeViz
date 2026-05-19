@@ -275,3 +275,18 @@ ssh root@10.0.20.21 "qm list" | grep -E "9[01][0-9]{2}"
 
 The image pipeline is complete. To provision a VM and deploy the app, see the
 [IaC Deploy Guide](deploy-guide-iac.md).
+
+
+# Appendix
+
+## Proxmox commands
+
+Delete all IaC templates in order
+```bash
+qm shutdown 8000
+qm destroy 8000
+qm destroy 9102 # dsv-app (Layer 3)
+qm destroy 9101 # ubuntu-docker (Layer 2)
+qm destroy 9100 # ubuntu-base (Layer 1)
+qm destroy 9000 # ubuntu-seed (Layer 0)
+```

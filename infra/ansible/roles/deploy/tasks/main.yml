@@ -38,14 +38,6 @@
     group: "{{ service_account }}"
     mode: "0600"
 
-- name: Deploy fixed docker-compose.yml
-  template:
-    src: docker-compose.yml.j2
-    dest: "{{ app_dir }}/docker-compose.yml"
-    owner: "{{ service_account }}"
-    group: "{{ service_account }}"
-    mode: "0644"
-
 - name: Start application with Docker Compose
   command: docker compose up -d --build
   args:

@@ -35,6 +35,7 @@ packer_disk_size: 40
 
 # --- Target app VM ---
 app_vm_name: "yyz-app-dsv01"
+app_vm_id: 8000
 app_vm_ip: "10.0.20.80"
 app_vm_cpu: 2
 app_vm_memory: 4096
@@ -47,7 +48,7 @@ service_account: "adm-ubuntu"
 # --- Application ---
 app_dir: "/home/adm-ubuntu/app/DineSafeViz"
 app_repo: "git@github.com:im-kenough/DineSafeViz.git"
-app_branch: "main"
+app_branch: "feat/iac-v0.3.0-deploy"
 
 # dinesafeviz analytics db configuration - postgresql db
 app_analytics_db_user: "dinesafe"
