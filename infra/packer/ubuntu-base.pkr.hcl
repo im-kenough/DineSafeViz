@@ -124,6 +124,14 @@ build {
   provisioner "ansible" {
     playbook_file = "../ansible/playbooks/packer-base.yml"
     user          = var.ssh_username
+    # Packer's ansible provisioner defaults to routing SSH through a local proxy
+    # it controls. That proxy only handles exec channels — not the SFTP
+    # subsystem. Ansible's Gathering Facts step uploads AnsiballZ_setup.py via
+    # SFTP, which fails silently through the proxy (empty error). Setting
+    # use_proxy = false passes the real VM IP and ephemeral key directly to
+    # ansible-playbook so it manages its own SSH connection (exec + SFTP).
+    # Requires direct network access from the Packer host to the build VM.
+    # See: docs/ref/infra/known-issues.md
     use_proxy     = false
     ansible_env_vars = [
       "ANSIBLE_HOST_KEY_CHECKING=False",

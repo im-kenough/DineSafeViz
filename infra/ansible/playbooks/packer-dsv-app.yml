@@ -7,3 +7,4 @@
     - ../vault/secrets.yml
   roles:
     - dsv-app
+    - cleanup

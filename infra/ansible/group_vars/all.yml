@@ -5,9 +5,11 @@
 
 # --- Proxmox ---
 proxmox_api_url: "https://10.0.20.21:8006"
-proxmox_node: "{{ vault_proxmox_node }}"  # from vault/secrets.yml
+proxmox_node_name: "yyz-hyp01"
 proxmox_storage: "local-lvm"
 proxmox_bridge: "vmbr0"
+proxmox_api_terraform_token_id: "svc-terraform@pve!terraform"
+proxmox_api_packer_token_id: "svc-packer@pve!packer"
 
 # --- Network ---
 network_gateway: "10.0.20.1"
@@ -15,6 +17,7 @@ network_dns: "10.0.20.1"
 network_cidr: "/24"
 
 # --- Template IDs ---
+template_iac_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFmyYybUB9XU0yUVaViMXy8VHpxLe+MhqTfldUJhpcC8 iac"
 template_cloud_image: 9000
 template_ubuntu_base: 9100
 template_ubuntu_docker: 9101
@@ -35,6 +38,15 @@ service_account: "adm-ubuntu"
 app_dir: "/home/adm-ubuntu/app/DineSafeViz"
 app_repo: "git@github.com:im-kenough/DineSafeViz.git"
 app_branch: "main"
+
+# dinesafeviz analytics db configuration - postgresql db
+app_analytics_db_user: "dinesafe"
+app_analytics_db_name: "dinesafe"
+app_analytics_db_host: "dsv-db"
+app_analytics_db_port: 5432
+
+# dinesafeviz analytics dashboard (grafana)
+app_analytics_admin_user: "admin"
 
 # --- Docker ---
 docker_log_max_size: "10m"

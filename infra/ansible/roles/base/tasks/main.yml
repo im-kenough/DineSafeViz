@@ -189,27 +189,4 @@
     name: systemd-resolved
     state: restarted
 
-# --- Cleanup (smaller template) ---
 
-- name: Truncate machine-id for template cloning
-  copy:
-    content: ""
-    dest: /etc/machine-id
-
-- name: Clean apt cache
-  apt:
-    autoclean: true
-
-- name: Remove apt lists
-  file:
-    path: /var/lib/apt/lists
-    state: absent
-
-- name: Recreate apt lists directory
-  file:
-    path: /var/lib/apt/lists/partial
-    state: directory
-
-- name: Truncate all log files
-  shell: find /var/log -type f -exec truncate -s 0 {} \;
-  changed_when: true
