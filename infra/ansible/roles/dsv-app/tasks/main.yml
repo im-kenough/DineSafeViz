@@ -72,3 +72,6 @@
     owner: "{{ service_account }}"
     group: "{{ service_account }}"
     mode: "0755"
+
+- name: Flush handlers to apply changes before cleanup
+  meta: flush_handlers

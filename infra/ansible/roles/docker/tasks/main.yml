@@ -115,3 +115,6 @@
 - name: Remove hello-world image
   command: docker rmi hello-world
   changed_when: true
+
+- name: Flush handlers to apply changes before cleanup
+  meta: flush_handlers

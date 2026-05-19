@@ -48,6 +48,7 @@ MAPPINGS = {
         "template_ubuntu_docker": "template_ubuntu_docker",
         "template_dsv_app": "template_dsv_app",
         "template_iac_public_key": "template_iac_public_key",
+        "vault_github_deploy_keys": "vault_github_deploy_keys",
     },
     "terraform": {
         "proxmox_api_url": "proxmox_api_url",
@@ -112,7 +113,7 @@ def main():
         elif isinstance(value, (int, float)):
             out = str(value)
         else:
-            escaped = str(value).replace("\\", "\\\\").replace('"', '\\"')
+            escaped = str(value).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
             out = f'"{escaped}"'
 
         print(f"{hcl_key} = {out}")

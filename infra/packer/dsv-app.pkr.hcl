@@ -39,6 +39,11 @@ variable "cpu" { type = number }
 variable "memory" { type = number }
 variable "disk_size" { type = number }
 
+variable "vault_github_deploy_keys" {
+  type      = string
+  sensitive = true
+}
+
 variable "ansible_vault_password_file" {
   type    = string
   default = ""
@@ -104,8 +109,11 @@ build {
       "ANSIBLE_HOST_KEY_CHECKING=False",
       "ANSIBLE_ROLES_PATH=../ansible/roles"
     ]
-    extra_arguments = var.ansible_vault_password_file != "" ? [
-      "--vault-password-file", var.ansible_vault_password_file
-    ] : []
+    extra_arguments = concat(
+      [
+        "-e", "vault_github_deploy_keys=${var.vault_github_deploy_keys}"
+      ],
+      var.ansible_vault_password_file != "" ? ["--vault-password-file", var.ansible_vault_password_file] : []
+    )
   }
 }
