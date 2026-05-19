@@ -53,17 +53,13 @@ bake-dsv-app: ## Build dsv-app template (Layer 3, requires Layer 2)
 	$(call bake,dsv-app.pkr.hcl)
 
 .PHONY: bake-all
-bake-all: ## Build all image layers in order (single vault prompt)
+bake-all: ## Build all image layers in order (single vault prompt, skips seed)
 	cd $(PACKER_DIR) && \
 	ansible-vault view ../$(VAULT_FILE) --ask-vault-pass \
 		| python3 ../scripts/render-vars.py packer > variables.pkrvars.hcl && \
-	packer init ubuntu-seed.pkr.hcl && \
-	packer build -var-file=variables.pkrvars.hcl ubuntu-seed.pkr.hcl && \
 	packer init ubuntu-base.pkr.hcl && \
 	packer build -var-file=variables.pkrvars.hcl ubuntu-base.pkr.hcl && \
-	packer init ubuntu-docker.pkr.hcl && \
 	packer build -var-file=variables.pkrvars.hcl ubuntu-docker.pkr.hcl && \
-	packer init dsv-app.pkr.hcl && \
 	packer build -var-file=variables.pkrvars.hcl dsv-app.pkr.hcl; \
 	rm -f variables.pkrvars.hcl
 
@@ -73,15 +69,15 @@ bake-all: ## Build all image layers in order (single vault prompt)
 provision-vm: ## Provision VM from dsv-app template via Terraform
 	ansible-vault view $(VAULT_FILE) --ask-vault-pass \
 		| python3 scripts/render-vars.py terraform > $(TERRAFORM_DIR)/terraform.tfvars
-	cd $(TERRAFORM_DIR) && terraform init && terraform apply
-	@rm -f $(TERRAFORM_DIR)/terraform.tfvars
+	cd $(TERRAFORM_DIR) && terraform init && terraform apply; \
+		ret=$$?; rm -f terraform.tfvars; exit $$ret
 
 .PHONY: destroy-vm
 destroy-vm: ## Destroy the VM via Terraform
 	ansible-vault view $(VAULT_FILE) --ask-vault-pass \
 		| python3 scripts/render-vars.py terraform > $(TERRAFORM_DIR)/terraform.tfvars
-	cd $(TERRAFORM_DIR) && terraform destroy
-	@rm -f $(TERRAFORM_DIR)/terraform.tfvars
+	cd $(TERRAFORM_DIR) && terraform destroy; \
+		ret=$$?; rm -f terraform.tfvars; exit $$ret
 
 # --- App Deployment ---
 

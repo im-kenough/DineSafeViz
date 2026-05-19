@@ -83,20 +83,6 @@
     mode: "0644"
   notify: Restart docker
 
-# --- Firewall rules ---
-
-- name: Allow app port 5000 through UFW
-  ufw:
-    rule: allow
-    port: "5000"
-    proto: tcp
-
-- name: Allow Grafana port 3000 through UFW
-  ufw:
-    rule: allow
-    port: "3000"
-    proto: tcp
-
 # --- Smoke test ---
 
 - name: Run Docker hello-world smoke test
@@ -115,3 +101,6 @@
 - name: Remove hello-world image
   command: docker rmi hello-world
   changed_when: true
+
+- name: Flush handlers to apply changes before cleanup
+  meta: flush_handlers

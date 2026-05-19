@@ -10,20 +10,8 @@ import sys
 import yaml
 import os
 
-# Paths relative to the script's location or execution context (infra/ root)
-def find_all_vars():
-    search_paths = [
-        "ansible/group_vars/all.yml",
-        "../ansible/group_vars/all.yml",
-        "../../ansible/group_vars/all.yml",
-    ]
-    for path in search_paths:
-        if os.path.exists(path):
-            return path
-    return "ansible/group_vars/all.yml"  # fallback to default
-
-
-ALL_VARS_PATH = find_all_vars()
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ALL_VARS_PATH = os.path.join(SCRIPT_DIR, "..", "ansible", "group_vars", "all.yml")
 
 # Mappings from (source_key) to (hcl_key)
 # Source key can be from all.yml or from secrets (vault_*)
@@ -32,13 +20,13 @@ MAPPINGS = {
         "proxmox_api_url": "proxmox_api_url",
         "proxmox_api_packer_token_id": "proxmox_api_token_id",
         "vault_packer_api_token_secret": "proxmox_api_token_secret",
-        "proxmox_node_name": "proxmox_node",
+        "proxmox_node": "proxmox_node",
         "proxmox_storage": "proxmox_storage",
         "proxmox_bridge": "proxmox_bridge",
         "network_gateway": "network_gateway",
-        "packer_build_ip": "build_ip_base",
-        "packer_docker_build_ip": "build_ip_docker",
-        "packer_app_build_ip": "build_ip_app",
+        "build_ip_base": "build_ip_base",
+        "build_ip_docker": "build_ip_docker",
+        "build_ip_app": "build_ip_app",
         "packer_ssh_username": "ssh_username",
         "packer_cpu": "cpu",
         "packer_memory": "memory",
@@ -48,20 +36,21 @@ MAPPINGS = {
         "template_ubuntu_docker": "template_ubuntu_docker",
         "template_dsv_app": "template_dsv_app",
         "template_iac_public_key": "template_iac_public_key",
+        "vault_github_deploy_keys": "vault_github_deploy_keys",
     },
     "terraform": {
         "proxmox_api_url": "proxmox_api_url",
         "proxmox_api_terraform_token_id": "proxmox_api_token_id",
         "vault_proxmox_api_token_secret": "proxmox_api_token_secret",
-        "proxmox_node_name": "proxmox_node",
+        "proxmox_node": "proxmox_node",
         "proxmox_storage": "proxmox_storage",
+        "proxmox_bridge": "proxmox_bridge",
         "template_dsv_app": "template_id",
         "app_vm_name": "vm_name",
         "app_vm_cpu": "vm_cpu",
         "app_vm_memory": "vm_memory",
         "app_vm_disk_size": "vm_disk_size",
         "app_vm_ip": "vm_ip",
-        "proxmox_bridge": "network_bridge",
     },
 }
 
@@ -112,7 +101,7 @@ def main():
         elif isinstance(value, (int, float)):
             out = str(value)
         else:
-            escaped = str(value).replace("\\", "\\\\").replace('"', '\\"')
+            escaped = str(value).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
             out = f'"{escaped}"'
 
         print(f"{hcl_key} = {out}")

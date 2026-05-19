@@ -43,7 +43,7 @@ resource "proxmox_virtual_environment_vm" "dsv_app" {
   }
 
   network_device {
-    bridge = var.network_bridge
+    bridge = var.proxmox_bridge
   }
 
   # IP, hostname, and SSH keys are baked into the template (Layer 3).
