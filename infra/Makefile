@@ -14,7 +14,18 @@ TERRAFORM_DIR := terraform
 PACKER_DIR := packer
 VAULT_FILE := $(ANSIBLE_DIR)/vault/secrets.yml
 
+# Cache ISOs on the workstation to avoid redundant downloads
+export PACKER_CACHE_DIR := $(CURDIR)/.packer_cache
+
 # --- Image Pipeline ---
+
+# Handle --force-download flag for bake targets
+ifeq ($(filter --force-download,$(MAKECMDGOALS)),--force-download)
+.PHONY: --force-download
+--force-download:
+	@:
+export PKR_VAR_force_download = true
+endif
 
 define bake
 	cd $(PACKER_DIR) && \
@@ -25,8 +36,12 @@ define bake
 	rm -f variables.pkrvars.hcl
 endef
 
+.PHONY: bake-seed
+bake-seed: ## Build ubuntu-seed template (Layer 0) from ISO
+	$(call bake,ubuntu-seed.pkr.hcl)
+
 .PHONY: bake-base
-bake-base: ## Build ubuntu-base template (Layer 1)
+bake-base: ## Build ubuntu-base template (Layer 1, requires Layer 0)
 	$(call bake,ubuntu-base.pkr.hcl)
 
 .PHONY: bake-docker
@@ -42,6 +57,8 @@ bake-all: ## Build all image layers in order (single vault prompt)
 	cd $(PACKER_DIR) && \
 	ansible-vault view ../$(VAULT_FILE) --ask-vault-pass \
 		| python3 ../scripts/render-vars.py packer > variables.pkrvars.hcl && \
+	packer init ubuntu-seed.pkr.hcl && \
+	packer build -var-file=variables.pkrvars.hcl ubuntu-seed.pkr.hcl && \
 	packer init ubuntu-base.pkr.hcl && \
 	packer build -var-file=variables.pkrvars.hcl ubuntu-base.pkr.hcl && \
 	packer init ubuntu-docker.pkr.hcl && \

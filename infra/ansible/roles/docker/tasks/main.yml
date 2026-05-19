@@ -1,5 +1,14 @@
 # infra/ansible/roles/docker/tasks/main.yml
 ---
+# --- System Settlement ---
+
+- name: Wait for cloud-init and background apt processes
+  shell: |
+    cloud-init status --wait
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done
+  changed_when: false
+  failed_when: false
+
 # --- Docker CE Installation (official apt repository method) ---
 # Ref: https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository
 

@@ -16,45 +16,28 @@ packer {
   }
 }
 
-# --- Variables ---
+# --- Variables (from variables.pkrvars.hcl) ---
 
-variable "proxmox_api_url" {
-  type    = string
-  default = "https://10.0.20.21:8006/api2/json"
-}
-
-variable "proxmox_api_token_id" {
-  type = string
-}
-
+variable "proxmox_api_url" { type = string }
+variable "proxmox_api_token_id" { type = string }
 variable "proxmox_api_token_secret" {
   type      = string
   sensitive = true
 }
+variable "proxmox_node" { type = string }
+variable "proxmox_storage" { type = string }
+variable "proxmox_bridge" { type = string }
 
-variable "proxmox_node" {
-  type = string
-}
+variable "template_ubuntu_docker" { type = number }
+variable "template_dsv_app" { type = number }
 
-variable "clone_vm_id" {
-  type    = number
-  default = 9101
-}
+variable "ssh_username" { type = string }
+variable "build_ip_app" { type = string }
+variable "network_gateway" { type = string }
 
-variable "template_vm_id" {
-  type    = number
-  default = 9102
-}
-
-variable "template_name" {
-  type    = string
-  default = "dsv-app"
-}
-
-variable "ssh_username" {
-  type    = string
-  default = "ubuntu"
-}
+variable "cpu" { type = number }
+variable "memory" { type = number }
+variable "disk_size" { type = number }
 
 variable "ansible_vault_password_file" {
   type    = string
@@ -70,36 +53,41 @@ source "proxmox-clone" "dsv-app" {
   insecure_skip_tls_verify = true
   node                     = var.proxmox_node
 
-  clone_vm_id = var.clone_vm_id
-  vm_id       = var.template_vm_id
-  vm_name     = var.template_name
+  clone_vm_id = var.template_ubuntu_docker
+  vm_id       = var.template_dsv_app
+  vm_name     = "dsv-app"
 
-  cores           = 2
-  memory          = 2048
+  cores           = var.cpu
+  memory          = var.memory
   scsi_controller = "virtio-scsi-pci"
 
   disks {
     type         = "scsi"
-    storage_pool = "local-lvm"
-    disk_size    = "60G"
+    storage_pool = var.proxmox_storage
+    disk_size    = "${var.disk_size}G"
     discard      = true
   }
 
   network_adapters {
     model  = "virtio"
-    bridge = "vmbr0"
+    bridge = var.proxmox_bridge
   }
 
   ipconfig {
-    ip = "dhcp"
+    ip      = "${var.build_ip_app}/24"
+    gateway = var.network_gateway
   }
 
-  qemu_agent = true
+  nameserver              = var.network_gateway
+  qemu_agent              = true
+  cloud_init              = true
+  cloud_init_storage_pool = var.proxmox_storage
 
+  ssh_host     = var.build_ip_app
   ssh_username = var.ssh_username
   ssh_timeout  = "15m"
 
-  template_name        = var.template_name
+  template_name        = "dsv-app"
   template_description = "DineSafeViz app VM — identity + GitHub deploy key, Layer 3. Built by Packer."
 }
 
@@ -111,6 +99,7 @@ build {
   provisioner "ansible" {
     playbook_file = "../ansible/playbooks/packer-dsv-app.yml"
     user          = var.ssh_username
+    use_proxy     = false
     ansible_env_vars = [
       "ANSIBLE_HOST_KEY_CHECKING=False",
       "ANSIBLE_ROLES_PATH=../ansible/roles"

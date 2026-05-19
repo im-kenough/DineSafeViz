@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read decrypted Ansible Vault YAML from stdin, write HCL variable assignments to stdout.
+"""Merge Ansible group_vars/all.yml and secrets from stdin, output HCL for Packer/Terraform.
 
 Usage:
     ansible-vault view vault/secrets.yml --ask-vault-pass | python3 scripts/render-vars.py packer
@@ -8,20 +8,71 @@ Usage:
 
 import sys
 import yaml
+import os
 
-# Separate vault keys per tool — Packer and Terraform use distinct API tokens.
+# Paths relative to the script's location or execution context (infra/ root)
+def find_all_vars():
+    search_paths = [
+        "ansible/group_vars/all.yml",
+        "../ansible/group_vars/all.yml",
+        "../../ansible/group_vars/all.yml",
+    ]
+    for path in search_paths:
+        if os.path.exists(path):
+            return path
+    return "ansible/group_vars/all.yml"  # fallback to default
+
+
+ALL_VARS_PATH = find_all_vars()
+
+# Mappings from (source_key) to (hcl_key)
+# Source key can be from all.yml or from secrets (vault_*)
 MAPPINGS = {
     "packer": {
-        "vault_packer_api_token_id": "proxmox_api_token_id",
+        "proxmox_api_url": "proxmox_api_url",
+        "proxmox_api_packer_token_id": "proxmox_api_token_id",
         "vault_packer_api_token_secret": "proxmox_api_token_secret",
-        "vault_proxmox_node": "proxmox_node",
+        "proxmox_node_name": "proxmox_node",
+        "proxmox_storage": "proxmox_storage",
+        "proxmox_bridge": "proxmox_bridge",
+        "network_gateway": "network_gateway",
+        "packer_build_ip": "build_ip_base",
+        "packer_docker_build_ip": "build_ip_docker",
+        "packer_app_build_ip": "build_ip_app",
+        "packer_ssh_username": "ssh_username",
+        "packer_cpu": "cpu",
+        "packer_memory": "memory",
+        "packer_disk_size": "disk_size",
+        "template_cloud_image": "template_cloud_image",
+        "template_ubuntu_base": "template_ubuntu_base",
+        "template_ubuntu_docker": "template_ubuntu_docker",
+        "template_dsv_app": "template_dsv_app",
+        "template_iac_public_key": "template_iac_public_key",
     },
     "terraform": {
-        "vault_proxmox_api_token_id": "proxmox_api_token_id",
+        "proxmox_api_url": "proxmox_api_url",
+        "proxmox_api_terraform_token_id": "proxmox_api_token_id",
         "vault_proxmox_api_token_secret": "proxmox_api_token_secret",
-        "vault_proxmox_node": "proxmox_node",
+        "proxmox_node_name": "proxmox_node",
+        "proxmox_storage": "proxmox_storage",
+        "template_dsv_app": "template_id",
+        "app_vm_name": "vm_name",
+        "app_vm_cpu": "vm_cpu",
+        "app_vm_memory": "vm_memory",
+        "app_vm_disk_size": "vm_disk_size",
+        "app_vm_ip": "vm_ip",
+        "proxmox_bridge": "network_bridge",
     },
 }
+
+
+def load_yaml(path):
+    try:
+        with open(path, "r") as f:
+            return yaml.safe_load(f)
+    except FileNotFoundError:
+        print(f"Warning: {path} not found", file=sys.stderr)
+        return {}
 
 
 def main():
@@ -29,19 +80,42 @@ def main():
         print(f"Usage: {sys.argv[0]} {{{'|'.join(MAPPINGS)}}}", file=sys.stderr)
         sys.exit(1)
 
-    mapping = MAPPINGS[sys.argv[1]]
-    data = yaml.safe_load(sys.stdin)
-    if not data:
+    tool = sys.argv[1]
+    mapping = MAPPINGS[tool]
+
+    # Load non-secrets
+    all_vars = load_yaml(ALL_VARS_PATH)
+
+    # Load secrets from stdin
+    secrets = yaml.safe_load(sys.stdin)
+    if not secrets:
         print("Error: no data read from stdin", file=sys.stderr)
         sys.exit(1)
 
-    for vault_key, hcl_key in mapping.items():
-        value = data.get(vault_key)
+    # Combine data
+    combined = {**all_vars, **secrets}
+
+    for src_key, hcl_key in mapping.items():
+        value = combined.get(src_key)
         if value is None:
-            print(f"Warning: '{vault_key}' not found in vault", file=sys.stderr)
+            # Some values might be optional or handled elsewhere
             continue
-        escaped = str(value).replace("\\", "\\\\").replace('"', '\\"')
-        print(f'{hcl_key} = "{escaped}"')
+
+        # Special handling for Proxmox API URL in Packer
+        if tool == "packer" and src_key == "proxmox_api_url":
+            if not value.endswith("/api2/json"):
+                value = f"{value.rstrip('/')}/api2/json"
+
+        # Format for HCL
+        if isinstance(value, bool):
+            out = str(value).lower()
+        elif isinstance(value, (int, float)):
+            out = str(value)
+        else:
+            escaped = str(value).replace("\\", "\\\\").replace('"', '\\"')
+            out = f'"{escaped}"'
+
+        print(f"{hcl_key} = {out}")
 
 
 if __name__ == "__main__":

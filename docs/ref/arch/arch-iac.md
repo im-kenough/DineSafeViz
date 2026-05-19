@@ -1,168 +1,131 @@
 # Infrastructure as Code Architecture
 
-## Purpose
-
-This document describes the IaC strategy for DineSafeViz. It is written for a
-DevOps analyst or engineering manager who needs to understand how
-infrastructure is provisioned, configured, and deployed.
+This document describes the Infrastructure as Code (IaC) strategy for
+DineSafeViz. It explains how infrastructure is provisioned, configured, and
+deployed using a layered approach.
 
 ## Goals
 
 1. **Reproducible infrastructure** — `make up` goes from nothing to a running
-   application
+   application.
 2. **Layered golden images** — enterprise-standard bake-time pipeline using
-   Packer and Ansible
-3. **Secrets hygiene** — no unencrypted secrets in git, no hardcoded
-   passwords, single source of truth in Ansible Vault
-4. **Extensibility** — base and docker image layers are reusable for
-   Kubernetes nodes (planned v0.4.0+)
+   Packer and Ansible.
+3. **Secrets hygiene** — no unencrypted secrets in git; single source of truth
+   in Ansible Vault.
+4. **Single Source of Truth (SSOT)** — centralized configuration in Ansible
+   `group_vars/all.yml`.
 
-## Architecture
+## Architecture Overview
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                    Image Pipeline (Packer + Ansible)      │
-│                                                          │
-│  Ubuntu 24.04 cloud image (template 9000)                │
-│    └─ ubuntu-base (9100)     OS hardening, common pkgs   │
-│         └─ ubuntu-docker (9101)  Docker CE + Compose     │
-│              └─ dsv-app (9102)   VM identity + GH key    │
-│                                                          │
-├──────────────────────────────────────────────────────────┤
-│                    VM Provisioning (Terraform)            │
-│                                                          │
-│  Clone template 9102 → running VM (yyz-app-dsv01)        │
-│  2 CPU / 4 GB RAM / 20 GB disk / IP 10.0.20.80           │
-│                                                          │
-├──────────────────────────────────────────────────────────┤
-│                    App Deployment (Ansible)               │
-│                                                          │
-│  SSH into VM → git clone → template .env → docker        │
-│  compose up → health check                               │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
+DineSafeViz uses a three-stage pipeline to move from a raw OS image to a
+fully operational application environment.
+
+```mermaid
+graph TD
+    subgraph "1. Image Pipeline (Packer + Ansible)"
+        A[Ubuntu 24.04 Cloud Image] --> B[ubuntu-base]
+        B --> C[ubuntu-docker]
+        C --> D[dsv-app Template]
+    end
+
+    subgraph "2. Provisioning (Terraform)"
+        D --> E[Production VM]
+    end
+
+    subgraph "3. Application Deployment (Ansible)"
+        E --> F[Git Clone]
+        F --> G[Docker Compose Up]
+        G --> H[Running App]
+    end
 ```
 
-## Technology Choices
+## Workflow and Toolchain
 
-| Component | Tool | Why |
-|-----------|------|-----|
-| Image building | Packer | Purpose-built for golden images; has a Proxmox plugin |
-| Configuration | Ansible | Agentless, roles map to image layers, Vault built in |
-| Provisioning | Terraform (bpg/proxmox) | Declarative IaC, same provider planned for K8s |
-| Secrets | Ansible Vault | Free, encrypts at rest, committed safely to git |
-| Containers | Docker CE + Compose | Matches the existing application architecture |
+| Component | Tool | Responsibility |
+| :--- | :--- | :--- |
+| **Image Building** | Packer | Automates the creation of Proxmox VM templates. |
+| **Configuration** | Ansible | Provisions software and security settings within images. |
+| **Provisioning** | Terraform | Declares and manages the lifecycle of the final VM. |
+| **Secrets** | Ansible Vault | Encrypts sensitive data at rest in the repository. |
+| **Orchestration** | Makefile | Provides a unified CLI for all infrastructure tasks. |
 
-## Image Pipeline
+## Variable and Secret Management
 
-### Why Layered Images?
+The project implements a strict Single Source of Truth (SSOT) pattern.
+Configuration is centralized in two locations within the `infra/ansible/`
+directory.
 
-Each layer adds one concern. When Docker releases a new version, only the
-docker layer (and its children) need rebuilding — the base layer stays
-unchanged. When K8s comes later, ubuntu-base and ubuntu-docker are reused
-directly.
+### Variable Storage
 
-### Layer Details
+- **Non-sensitive variables**: Stored in `infra/ansible/group_vars/all.yml`. This
+  includes VM specifications (CPU, RAM), network settings, and image IDs.
+- **Secrets**: Stored in `infra/ansible/vault/secrets.yml`. This file is
+  encrypted with Ansible Vault and contains API tokens, private keys, and
+  passwords.
 
-**Layer 1: ubuntu-base (template 9100)**
+### Variable Bridging
 
-Minimal hardened Ubuntu 24.04 server. Reusable across all VM types.
+Because Terraform and Packer cannot natively read Ansible Vault files, a Python
+bridge script (`infra/scripts/render-vars.py`) merges these sources into the
+required formats at runtime.
 
-- Service account (`adm-ubuntu`) with SSH key-only auth
-- Security: UFW firewall, fail2ban, disabled root login, disabled password
-  auth, unattended security upgrades
-- Common packages: curl, wget, git, jq, htop, vim
-- System: NTP, timezone (America/Toronto), DNS (10.0.20.1)
+```mermaid
+sequenceDiagram
+    participant U as Developer
+    participant M as Makefile
+    participant V as Ansible Vault
+    participant S as render-vars.py
+    participant T as Terraform/Packer
 
-Rebuild cadence: monthly or after Ubuntu security advisories.
+    U->>M: make provision-vm
+    M->>V: Decrypt secrets.yml
+    V-->>S: Pipe decrypted YAML
+    S->>S: Merge with group_vars/all.yml
+    S-->>T: Generate .tfvars / .pkrvars.hcl
+    T->>T: Execute with local variables
+```
 
-**Layer 2: ubuntu-docker (template 9101)**
+## Image Pipeline Layers
 
-Docker-ready VM. Base for any containerized workload.
+Each layer in the pipeline adds a specific concern, allowing for efficient
+updates and reuse.
 
-- Docker CE installed via the official apt repository method
-- `adm-ubuntu` can run Docker without sudo
-- Docker and containerd enabled on boot via systemd
-- Docker daemon configured (log rotation)
-- UFW: ports 5000 and 3000 open
+### Layer 1: ubuntu-base
+Minimal hardened Ubuntu 24.04 server.
 
-Rebuild cadence: on Docker major releases or base layer updates.
+- **Security**: UFW firewall, fail2ban, disabled root/password auth.
+- **Common Packages**: `curl`, `git`, `jq`, `htop`, `unattended-upgrades`.
+- **System**: NTP, Timezone (America/Toronto), DNS configuration.
 
-**Layer 3: dsv-app (template 9102)**
+### Layer 2: ubuntu-docker
+Docker-ready VM base for containerized workloads.
 
-Application identity and credentials.
+- Official Docker CE repository setup.
+- Log rotation and daemon optimizations.
+- Firewall rules for Docker services.
 
-- Hostname: yyz-app-dsv01
-- Static IP: 10.0.20.80
-- GitHub App private key for repo cloning
-- App directory created (`/home/adm-ubuntu/app/`)
+### Layer 3: dsv-app
+Application-specific identity and credentials.
 
-Rebuild cadence: on base layer changes or GitHub App key rotation.
-
-## Secrets Management
-
-See [Secrets Management](secrets-mgt.md) for the full strategy.
-
-Summary: Ansible Vault is the single source of truth. Terraform and Packer
-consume secrets via helper scripts that render ephemeral `.tfvars`/`.pkrvars.hcl`
-files at runtime. These files are gitignored and deleted after use.
+- Hostname and static IP assignment.
+- GitHub App private keys for repository access.
+- Application directory structure.
 
 ## Operations
 
-All operations run from `infra/` via Makefile targets:
+All infrastructure operations are managed through the `infra/` directory.
 
 | Command | Description |
-|---------|-------------|
-| `make bake-all` | Build all three image layers (base → docker → app) |
-| `make provision-vm` | Create VM from dsv-app template (Terraform) |
-| `make deploy-app` | Clone repo, template .env, docker compose up (Ansible) |
-| `make destroy-app` | Stop containers, remove volumes, remove repo |
-| `make destroy-app-keep-data` | Stop containers, keep volumes |
-| `make redeploy-app` | destroy-app + deploy-app |
-| `make redeploy-app-keep-data` | destroy-app-keep-data + deploy-app |
-| `make destroy-vm` | Delete the VM (Terraform destroy) |
-| `make up` | provision-vm + deploy-app |
-| `make down` | destroy-app + destroy-vm |
+| :--- | :--- |
+| `make bake-all` | Rebuilds all three image layers from scratch. |
+| `make provision-vm` | Provisions the VM using Terraform. |
+| `make deploy-app` | Deploys the application using Ansible. |
+| `make up` | Full end-to-end: provision VM and deploy app. |
+| `make down` | Full teardown: destroy app and VM. |
 
-## Security
+## Next Steps
 
-### Current (v0.3.0)
-
-- SSH key-only authentication, root login disabled
-- UFW firewall: only SSH (22), app (5000), Grafana (3000)
-- fail2ban: SSH brute-force protection
-- Unattended security upgrades
-- Dedicated Proxmox service accounts with minimal privileges
-- All secrets encrypted with Ansible Vault
-
-### Aspirational
-
-- DISA STIG hardening
-- CIS benchmark compliance
-- Audit logging, AIDE file integrity monitoring
-
-## Future: Kubernetes (v0.4.0+)
-
-The base and docker image layers are designed for reuse:
-
-- `ubuntu-base` → K8s node base (same hardening)
-- `ubuntu-docker` → becomes `ubuntu-k8s` (swap Docker for containerd +
-  kubeadm)
-- A separate K8s-specific design spec covers the cluster architecture
-
-## File Layout
-
-```
-infra/
-├── Makefile                 Orchestrates all operations
-├── scripts/
-│   ├── render-tfvars.py     Vault → terraform.tfvars
-│   └── render-pkrvars.py    Vault → packer .pkrvars.hcl
-├── packer/                  Image build templates (Layers 1-3)
-├── terraform/               VM provisioning
-└── ansible/
-    ├── roles/               Configuration roles per layer + deploy/destroy
-    ├── playbooks/           Packer playbooks + deploy/destroy playbooks
-    ├── group_vars/all.yml   Centralized non-secret config
-    └── vault/secrets.yml    Encrypted secrets (single source of truth)
-```
+- Review the [Secrets Management](secrets-mgt.md) guide for details on Vault
+  usage.
+- See the [Operations Guide](../../ops/index.md) for troubleshooting and
+  maintenance procedures.

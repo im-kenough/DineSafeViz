@@ -72,6 +72,12 @@
       - qemu-guest-agent
     state: present
 
+- name: Enable and start qemu-guest-agent
+  systemd:
+    name: qemu-guest-agent
+    enabled: true
+    state: started
+
 # --- SSH Hardening ---
 
 - name: Create sshd privilege separation directory
@@ -146,7 +152,7 @@
 
 - name: Set timezone
   timezone:
-    name: "{{ vm_timezone }}"
+    name: "{{ app_vm_timezone }}"
 
 - name: Configure systemd-timesyncd NTP
   copy:
@@ -189,27 +195,7 @@
     name: systemd-resolved
     state: restarted
 
-# --- Cleanup (smaller template) ---
+- name: Flush handlers to apply changes before cleanup
+  meta: flush_handlers
 
-- name: Truncate machine-id for template cloning
-  copy:
-    content: ""
-    dest: /etc/machine-id
 
-- name: Clean apt cache
-  apt:
-    autoclean: true
-
-- name: Remove apt lists
-  file:
-    path: /var/lib/apt/lists
-    state: absent
-
-- name: Recreate apt lists directory
-  file:
-    path: /var/lib/apt/lists/partial
-    state: directory
-
-- name: Truncate all log files
-  shell: find /var/log -type f -exec truncate -s 0 {} \;
-  changed_when: true

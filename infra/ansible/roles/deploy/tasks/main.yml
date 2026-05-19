@@ -30,7 +30,7 @@
 
 - name: Wait for Flask app to respond
   uri:
-    url: "http://{{ vm_ip }}:5000/"
+    url: "http://{{ app_vm_ip }}:5000/"
     status_code: 200
   register: health_check
   retries: 30

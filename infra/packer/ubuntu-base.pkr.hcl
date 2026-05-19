@@ -16,63 +16,30 @@ packer {
   }
 }
 
-# --- Variables ---
+# --- Variables (from variables.pkrvars.hcl) ---
 
-variable "proxmox_api_url" {
-  type    = string
-  default = "https://10.0.20.21:8006/api2/json"
-}
-
-variable "proxmox_api_token_id" {
-  type = string
-}
-
+variable "proxmox_api_url" { type = string }
+variable "proxmox_api_token_id" { type = string }
 variable "proxmox_api_token_secret" {
   type      = string
   sensitive = true
 }
+variable "proxmox_node" { type = string }
+variable "proxmox_storage" { type = string }
 
-variable "proxmox_node" {
-  type = string
-}
+variable "template_cloud_image" { type = number }
+variable "template_ubuntu_base" { type = number }
 
-variable "clone_vm_id" {
-  type    = number
-  default = 9000
-}
+variable "ssh_username" { type = string }
+variable "build_ip_base" { type = string }
+variable "network_gateway" { type = string }
 
-variable "template_vm_id" {
-  type    = number
-  default = 9100
-}
-
-variable "template_name" {
-  type    = string
-  default = "ubuntu-base"
-}
-
-variable "ssh_username" {
-  type    = string
-  default = "ubuntu"
-}
-
-variable "build_ip" {
-  type        = string
-  default     = "10.0.20.200"
-  description = "Temporary static IP for the Layer 1 build VM. Must be outside the DHCP range."
-}
-
-variable "network_gateway" {
-  type    = string
-  default = "10.0.20.1"
-}
+variable "cpu" { type = number }
+variable "memory" { type = number }
+variable "disk_size" { type = number }
+variable "proxmox_bridge" { type = string }
 
 # --- Source ---
-
-# Layer 1 uses a static IP instead of DHCP because the seed cloud image
-# (9000) has no qemu-guest-agent — Packer can't discover a DHCP address
-# without the agent. The Ansible base role installs the agent, so Layers
-# 2+ can use qemu_agent = true with DHCP.
 
 source "proxmox-clone" "ubuntu-base" {
   proxmox_url              = var.proxmox_api_url
@@ -81,38 +48,41 @@ source "proxmox-clone" "ubuntu-base" {
   insecure_skip_tls_verify = true
   node                     = var.proxmox_node
 
-  clone_vm_id = var.clone_vm_id
-  vm_id       = var.template_vm_id
-  vm_name     = var.template_name
+  clone_vm_id = var.template_cloud_image
+  vm_id       = var.template_ubuntu_base
+  vm_name     = "ubuntu-base"
 
-  cores           = 4
-  memory          = 6144
+  cores           = var.cpu
+  memory          = var.memory
   scsi_controller = "virtio-scsi-pci"
 
   disks {
     type         = "scsi"
-    storage_pool = "local-lvm"
-    disk_size    = "60G"
+    storage_pool = var.proxmox_storage
+    disk_size    = "${var.disk_size}G"
     discard      = true
   }
 
   network_adapters {
     model  = "virtio"
-    bridge = "vmbr0"
+    bridge = var.proxmox_bridge
   }
 
   ipconfig {
-    ip      = "${var.build_ip}/24"
+    ip      = "${var.build_ip_base}/24"
     gateway = var.network_gateway
   }
 
-  nameserver = var.network_gateway
+  nameserver              = var.network_gateway
+  qemu_agent              = true
+  cloud_init              = true
+  cloud_init_storage_pool = var.proxmox_storage
 
-  ssh_host     = var.build_ip
+  ssh_host     = var.build_ip_base
   ssh_username = var.ssh_username
   ssh_timeout  = "15m"
 
-  template_name        = var.template_name
+  template_name        = "ubuntu-base"
   template_description = "Ubuntu 24.04 base image — hardened, Layer 1. Built by Packer."
 }
 
