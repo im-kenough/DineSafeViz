@@ -1,16 +1,25 @@
 # infra/ansible/roles/dsv-app/tasks/main.yml
 ---
+# --- System Settlement ---
+
+- name: Wait for cloud-init and background apt processes
+  shell: |
+    cloud-init status --wait
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done
+  changed_when: false
+  failed_when: false
+
 # --- VM Identity ---
 
 - name: Set hostname
   hostname:
-    name: "{{ vm_name }}"
+    name: "{{ app_vm_name }}"
 
 - name: Add hostname to /etc/hosts
   lineinfile:
     path: /etc/hosts
     regexp: '^127\.0\.1\.1'
-    line: "127.0.1.1 {{ vm_name }}"
+    line: "127.0.1.1 {{ app_vm_name }}"
 
 - name: Configure static IP via netplan
   copy:
@@ -21,7 +30,7 @@
         ethernets:
           eth0:
             addresses:
-              - {{ vm_ip }}{{ network_cidr }}
+              - {{ app_vm_ip }}{{ network_cidr }}
             routes:
               - to: default
                 via: {{ network_gateway }}

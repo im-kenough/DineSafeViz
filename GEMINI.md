@@ -1,0 +1,114 @@
+## Project context
+
+DineSafeViz is a dockerized app that visualizes data from Toronto Public
+Health's food safety and inspection program, DineSafe. It's a personal homelab
+project serving as a portfolio showcase for prospective employers in sysadmin
+and DevOps roles.
+
+The goal is to demonstrate operational excellence: supporting an application
+using modern enterprise patterns, with well-structured documentation covering
+architecture and operating procedures. Security and privacy are first-class
+concerns throughout.
+
+## About me
+
+I'm a sysadmin and DevOps analyst, not a software developer. Frame suggestions
+from an operations perspective — infrastructure, reliability, observability,
+and process — rather than from a developer's perspective.
+
+## Cost constraints
+
+This is a personal project with a personal budget. Follow this order of
+preference when recommending tooling:
+
+1. Free and open-source
+2. Free tier of a managed service
+3. Low-cost paid option (flag the cost explicitly)
+
+Don't recommend paid tooling without noting the cost and whether a free
+alternative exists.
+
+## 1. Think Before Coding
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+## 2. Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+## 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+## 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+## 5. Journal
+
+At the start of a session, create a new journal file at the root of
+`DineSafeViz/docs/ref/journal/`: `journal-N.md`, where N is one higher than
+the highest existing `journal-*.md` (start at 1 if none exist).
+
+Append an entry for every non-trivial action you take. Write it as
+you do the work, not as a summary at the end.
+
+Each entry should include:
+- ISO timestamp (`YYYY-MM-DD HH:MM`)
+- One-line summary
+- The exact command, if one was run, and the actual result or
+  output (not a paraphrase)
+- Files edited and why
+- Hypotheses and whether they held up
+- Dead-ends, with a note on why the thing didn't work
+- Links read during research
+- Decisions made and the reasoning behind them
+
+Before starting new work, or after a context compaction, read the
+current journal to orient yourself. If this is a fresh attempt at a
+task you've tried before, skim the previous `journal-*.md` files
+too.
+
+## 6. Workflow
+
+- Before editing any file, read it first. Before modifying a function, grep for all callers. Research before you edit.

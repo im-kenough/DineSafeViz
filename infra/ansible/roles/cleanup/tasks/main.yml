@@ -5,10 +5,25 @@
   command: cloud-init clean --logs --seed
   changed_when: true
 
+- name: Ensure cloud-init is not disabled
+  file:
+    path: /etc/cloud/cloud-init.disabled
+    state: absent
+
+- name: Remove residual cloud-init cache
+  file:
+    path: /var/lib/cloud/instance
+    state: absent
+
+- name: Remove SSH host keys
+  shell: rm -f /etc/ssh/ssh_host_*
+  changed_when: true
+
 - name: Truncate machine-id for template cloning
   copy:
     content: ""
     dest: /etc/machine-id
+  # machine-id is usually regenerated if empty on boot
 
 - name: Clean apt cache
   apt:

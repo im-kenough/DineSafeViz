@@ -72,6 +72,12 @@
       - qemu-guest-agent
     state: present
 
+- name: Enable and start qemu-guest-agent
+  systemd:
+    name: qemu-guest-agent
+    enabled: true
+    state: started
+
 # --- SSH Hardening ---
 
 - name: Create sshd privilege separation directory
@@ -146,7 +152,7 @@
 
 - name: Set timezone
   timezone:
-    name: "{{ vm_timezone }}"
+    name: "{{ app_vm_timezone }}"
 
 - name: Configure systemd-timesyncd NTP
   copy:
@@ -188,5 +194,8 @@
   systemd:
     name: systemd-resolved
     state: restarted
+
+- name: Flush handlers to apply changes before cleanup
+  meta: flush_handlers
 
 

@@ -1,11 +1,10 @@
 # infra/terraform/variables.tf
 
-# --- Proxmox Connection (secrets — from terraform.tfvars) ---
+# --- Proxmox Connection ---
 
 variable "proxmox_api_url" {
   description = "Proxmox API endpoint"
   type        = string
-  default     = "https://10.0.20.21:8006"
 }
 
 variable "proxmox_api_token_id" {
@@ -29,7 +28,6 @@ variable "proxmox_node" {
 variable "proxmox_storage" {
   description = "Storage backend for VM disks"
   type        = string
-  default     = "local-lvm"
 }
 
 # --- VM Template ---
@@ -37,7 +35,6 @@ variable "proxmox_storage" {
 variable "template_id" {
   description = "Proxmox VM ID of the dsv-app template to clone"
   type        = number
-  default     = 9102
 }
 
 # --- VM Configuration ---
@@ -45,25 +42,21 @@ variable "template_id" {
 variable "vm_name" {
   description = "VM hostname"
   type        = string
-  default     = "yyz-app-dsv01"
 }
 
 variable "vm_cpu" {
   description = "Number of CPU cores"
   type        = number
-  default     = 2
 }
 
 variable "vm_memory" {
   description = "RAM in MB"
   type        = number
-  default     = 4096
 }
 
 variable "vm_disk_size" {
   description = "Disk size in GB"
   type        = number
-  default     = 60
 }
 
 # --- Network ---
@@ -71,11 +64,9 @@ variable "vm_disk_size" {
 variable "vm_ip" {
   description = "Static IP address for the VM"
   type        = string
-  default     = "10.0.20.80"
 }
 
 variable "network_bridge" {
   description = "Proxmox network bridge"
   type        = string
-  default     = "vmbr0"
 }
