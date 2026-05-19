@@ -45,6 +45,20 @@
   command: netplan apply
   changed_when: true
 
+# --- Firewall rules ---
+
+- name: Allow app port 5000 through UFW
+  ufw:
+    rule: allow
+    port: "5000"
+    proto: tcp
+
+- name: Allow Grafana port 3000 through UFW
+  ufw:
+    rule: allow
+    port: "3000"
+    proto: tcp
+
 # --- GitHub Deploy Key ---
 
 - name: Install GitHub deploy key
