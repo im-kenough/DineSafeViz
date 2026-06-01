@@ -33,12 +33,11 @@
 
 # --- Wait for cloud-init ---
 
-- name: Wait for cloud-init to finish
-  command: cloud-init status --wait
+- name: Wait for cloud-init and background apt processes
+  shell: |
+    cloud-init status --wait
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done
   changed_when: false
-  # cloud-init frequently exits 1 on the final stage (package upgrade conflicts
-  # from the cloud image) but the dpkg lock is released and the system is ready.
-  # We only need it to be done, not to have succeeded.
   failed_when: false
 
 # --- System Updates ---

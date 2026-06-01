@@ -281,7 +281,7 @@ The image pipeline is complete. To provision a VM and deploy the app, see the
 
 ## Proxmox commands
 
-Delete all IaC templates in order
+SSH into proxmox and delete all IaC templates in order
 ```bash
 qm shutdown 8000
 qm destroy 8000
