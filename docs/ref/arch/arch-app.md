@@ -1,6 +1,8 @@
 # Application architecture
 
-This document describes the application architecture of DineSafeViz:
+This document describes the application architecture of DineSafeViz.
+
+It is a dockerized webapp 
 the Docker Compose services, the Flask web app, the analytics
 dashboard, and how they fit together. For data-layer details see
 [data architecture](arch-data.md). For infrastructure and deployment

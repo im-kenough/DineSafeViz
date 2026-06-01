@@ -1,8 +1,9 @@
 # DineSafeViz
 
-A dockerized web app that visualizes data from Toronto Public Health's food
-safety and inspection program, DineSafe. DineSafe publishes restaurant
-inspection results as open data, with over 26 years of history.
+DineSafeViz visualizes data from DineSafe, Toronto Public Health's food
+safety and inspection program.
+
+It's a selfhosted containerized webapp that publishes and visualizes 26+ years of inspection results.
 
 ![DineSafeViz home page](docs/img/root-readme/dsv-home-1.png)
 
@@ -21,19 +22,62 @@ across over 26 years of data.
 
 ![DSV Analytics dashboard](docs/img/root-readme/dsv-dash-1.png)
 
-## Tech stack
+### Selfhosted
 
-DineSafeViz runs as a Docker Compose stack. See the
-[architecture reference](docs/ref/arch/arch-app.md) and
-[DevOps reference](docs/ref/arch/README.MD) for details.
+Small foot print. Deploys to a selfhosted Ubuntu VM in a Proxmox environment.
 
 ## Architecture
 
-Four services work together: a Flask web app, a PostgreSQL database, a
-database initializer that seeds data from the Toronto Open Data API, and a
-Grafana analytics dashboard.
+The DineSafeViz application is a Dockerized webapp with a database backend. It visualizes historic data and updates the dataset daily. 
+
+> [!NOTE]
+> Data update feature Coming Soon (™️)
+
+See the
+[architecture reference](docs/ref/arch/arch-app.md) and
+[DevOps reference](docs/ref/arch/README.MD) for details.
+
+### Application Architecture
+
+The DineSafeViz app has [three main services](docker-compose.yml) and two supporting services:
+
+#### Main services
+1. dsv-app: the user facing webapp to view inspection data and metrics dashboard
+2. dsv-db: stores the City of Toronto DineSafe dataset; a PostgreSQL database 
+3. dsv-analytics: a custom metrics dashboard that visualises DineSafe data; Grafana based.
+
+#### Supporting services
+
+These are one off services used for initial setup of fresh deployment in a VM.
+
+1. dsv-init-db: seeds the DB on first run, refreshes recent data on subsequent runs.
+2. dsv-init-analytics: seeds the initial Grafana based app dashboard
 
 ![Architecture overview diagram](docs/img/root-readme/arch-over.drawio.png)
+
+### Infrastructure as Code Architecture
+
+Terraform, Packer and Ansible are used for Infrastructure as Code tools to automatically:
+- provision an app VM
+- maintain an app image
+- deploy, teardown and redeploy an application
+
+### Information security
+
+Secrets are encrypted using Ansible vault and is stored...
+
+## Getting Started
+
+### Deploying from scratch
+
+First we need to
+To deploy the app:
+- install the infrastructure
+- install the app
+
+### Subsequent deployment
+
+Once the infrastrure is already provisioned you can redeploy the app.
 
 ## Evolution
 
