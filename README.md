@@ -26,6 +26,10 @@ across over 26 years of data.
 
 Small foot print. Deploys to a selfhosted Ubuntu VM in a Proxmox environment.
 
+### Infrastructure as Code
+
+Uses [Infrastructure as Code](docs/ref/arch/arch-iac.md) to automate VM provision and app deployment
+
 ## Architecture
 
 The DineSafeViz application is a Dockerized webapp with a database backend. It visualizes historic data and updates the dataset daily. 
@@ -55,40 +59,45 @@ These are one off services used for initial setup of fresh deployment in a VM.
 
 ![Architecture overview diagram](docs/img/root-readme/arch-over.drawio.png)
 
-### Infrastructure as Code Architecture
+### [Infrastructure as Code](docs/ref/arch/arch-iac.md)
 
 Terraform, Packer and Ansible are used for Infrastructure as Code tools to automatically:
 - provision an app VM
 - maintain an app image
 - deploy, teardown and redeploy an application
 
-### Information security
+### [Information security](docs/ref/arch/arch-security.md)
 
-Secrets are encrypted using Ansible vault and is stored...
+The app's docker-compose configuration are retrieved from a .env file. Secrets are stored in [secrets.yml](DineSafeViz/infra/ansible/vault/secrets.yml) and are injected to the .env file during deployment via IAC.
+
+### [Monitoring](docs/ref/arch/arch-monitoring.md)
+
+Coming Soon (™️)
+
+Grafana dashboards monitors: the VM health, webapp metrics, db metrics
+docs/ref/arch/arch-monitoring.md
+
 
 ## Getting Started
 
-### Deploying from scratch
+### Installing from scratch from scratch
 
 First we need to
 To deploy the app:
 - install the infrastructure
 - install the app
 
-### Subsequent deployment
+### Deployment
 
 Once the infrastrure is already provisioned you can redeploy the app.
+
+## Roadmap
+
+[Coming Soon](https://github.com/users/im-kenough/projects/11) (™️)
+
 
 ## Evolution
 
 Watch how DineSafeViz evolved over time:
 
 v x.y.z - Dockerized app on self hosted VM. Orchestrated with IAC.
-
-
-
-## Documentation
-
-- [Installation guide](docs/how-to/1-install-guide.md) — first-time setup
-- [Deployment guide](docs/how-to/3-deploy-guide.md) — deploy or redeploy
-  after a change
