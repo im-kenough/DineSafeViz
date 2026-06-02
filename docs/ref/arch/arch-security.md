@@ -22,6 +22,8 @@ accounts, and repository-level safeguards.
 
 Ansible Vault is the single store for all credentials. The Makefile orchestrates a decrypt-render-cleanup pipeline so plaintext secrets exist only in memory or in short-lived files that are deleted immediately after use.
 
+Consult this document for the [secrets rotation instructions](docs/how-to/6-rotate-secrets.md)
+
 ### Secrets and variable locations
 
 | File | Contents | In git? |
@@ -31,7 +33,6 @@ Ansible Vault is the single store for all credentials. The Makefile orchestrates
 | `infra/terraform/terraform.tfvars` | Rendered from vault during deployment | No (gitignored) |
 | `infra/packer/variables.pkrvars.hcl` | Rendered from vault during deployment  | No (gitignored) |
 | `.env` (on VM at deploy time) | Templated from vault during deployment | No (never in repo) |
-
 
 ### Vault contents
 
