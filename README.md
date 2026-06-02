@@ -70,9 +70,7 @@ Terraform, Packer and Ansible are used for Infrastructure as Code tools to autom
 
 The app's docker-compose configuration are retrieved from a .env file. Secrets are stored in [secrets.yml](DineSafeViz/infra/ansible/vault/secrets.yml) and are injected to the .env file during deployment via IAC.
 
-### [Monitoring](docs/ref/arch/arch-monitoring.md)
-
-Coming Soon (™️)
+### [Monitoring](docs/ref/arch/arch-monitoring.md) - Coming Soon (™️)
 
 Grafana dashboards monitors: the VM health, webapp metrics, db metrics
 docs/ref/arch/arch-monitoring.md
@@ -80,20 +78,18 @@ docs/ref/arch/arch-monitoring.md
 
 ## Getting Started
 
-[Install Guide](docs/how-to/1-install/README.md) - Installing the application and provisioning the infrastructure from scratch
+- **[Install Guide](docs/how-to/1-install/README.md):** Instructions for installing the application and provisioning the infrastructure from scratch
+- **[Redeploy Guide](docs/how-to/3-redeploy-guide.md):** Instructions to redeploy the app to existing infrastructure
 
-
-### Deployment
-
-Once the infrastrure is already provisioned you can redeploy the app.
 
 ## Roadmap
 
-[Coming Soon](https://github.com/users/im-kenough/projects/11) (™️)
+[Project Roadmap](https://github.com/users/im-kenough/projects/11)
 
 
 ## Evolution
 
 Watch how DineSafeViz evolved over time:
 
-v x.y.z - Dockerized app on self hosted VM. Orchestrated with IAC.
+- v x.y.z - Dockerized app on self hosted VM. Orchestrated with IAC.
+- v x.y.z - Dockerized app on local computer.
