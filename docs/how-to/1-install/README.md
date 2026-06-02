@@ -1,4 +1,4 @@
-# Installation Guide
+# Install Guide
 
 This document provides instructions for deploying this app from scratch in a self hosted environment.
 

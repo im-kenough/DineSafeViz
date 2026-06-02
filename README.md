@@ -80,12 +80,8 @@ docs/ref/arch/arch-monitoring.md
 
 ## Getting Started
 
-### Installing from scratch
+[Install Guide](docs/how-to/1-install/README.md) - Installing the application and provisioning the infrastructure from scratch
 
-First we need to
-To deploy the app:
-- install the infrastructure
-- install the app
 
 ### Deployment
 
