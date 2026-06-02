@@ -80,7 +80,7 @@ docs/ref/arch/arch-monitoring.md
 
 ## Getting Started
 
-### Installing from scratch from scratch
+### Installing from scratch
 
 First we need to
 To deploy the app:

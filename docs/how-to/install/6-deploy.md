@@ -1,15 +1,15 @@
-# IaC Deploy Guide — Day-to-Day Operations
+# Deploy application
 
-Instructions for provisioning, deploying, redeploying, and tearing down the
+This document provides instructions for deploying the
 DineSafeViz application using the IaC toolchain.
 
-**Prerequisites:** Complete the [IaC Install Guide](install-guide-iac.md)
+**Prerequisites:** Complete the [Install Instructions](docs/how-to/install/README.md)
 first. You need templates 9100-9102 built and the Ansible Vault populated.
 
 All commands run from the `infra/` directory and prompt for your vault
 password.
 
-## Provision and Deploy (Fresh Start)
+## Provision VM and deploy application
 
 Create the VM and deploy the app in one command:
 
@@ -25,6 +25,8 @@ This runs:
    `.env` file, and runs `docker compose up -d --build`
 
 The app will be available at `http://10.0.20.80:5000` once deployment completes.
+
+## Appendix
 
 ## Deploy App Only (VM Already Exists)
 

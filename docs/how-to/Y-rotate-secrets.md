@@ -1,10 +1,10 @@
 # Secret rotation process
 
-This document provides instructions to rotate secrets
+This document provides instructions on how to rotate secrets.
 
-# Application
+## Application
 
-# Infrastructure as Code
+## Infrastructure as Code
 
 ## Ansible vault - secrets.yaml
 
@@ -19,3 +19,28 @@ Enter the old password, and then the new one
 ## Proxmox - Terraform API token
 
 ## Proxmox - Packer API token
+
+## Appendix
+
+### Ansible Vault Operations
+
+#### View secrets
+
+```bash
+cd infra/ansible
+ansible-vault view vault/secrets.yml --ask-vault-pass
+```
+
+#### Edit secrets
+
+```bash
+cd infra/ansible
+ansible-vault edit vault/secrets.yml --ask-vault-pass
+```
+
+#### Change vault password
+
+```bash
+cd infra/ansible
+ansible-vault rekey vault/secrets.yml --ask-vault-pass
+```
