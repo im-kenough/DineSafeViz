@@ -69,6 +69,14 @@ from the CSV. `inspectionStatus` (Pass/Conditional Pass/Closed) mapped to `sever
 **Test results:** 18/18 DB tests pass, 53/54 webapp tests pass (1 pre-existing
 version mismatch failure unrelated to this change).
 
-**Remaining: Grafana dashboards** use `severity` column in SQL queries
-(src/dsv-analytics/provisioning/dashboards/dinesafe.json). These will need
-updating separately to use `establishment_status` with new values.
+**Grafana dashboards updated:** All SQL queries in
+`src/dsv-analytics/provisioning/dashboards/dinesafe.json` migrated from
+`severity` (C-Crucial/S-Significant/M-Minor) to `establishment_status`
+(Closed/Conditional Pass/Pass). This covers both historical and recent data.
+
+Changes across 20 SQL queries:
+- Stat panels (Pass/Cond. Pass/Closed counts + %): `severity` → `establishment_status`
+- Severity Breakdown pie → renamed "Status Breakdown", uses `establishment_status` values
+- Detail sections renamed: Crucial→Closed, Significant→Conditional Pass, Minor→Pass
+- All `WHERE severity = '...'` filters → `WHERE establishment_status = '...'`
+- Synced duplicate at `src/grafana/provisioning/dashboards/dinesafe.json`
