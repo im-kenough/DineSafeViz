@@ -1113,7 +1113,7 @@
             "uid": "dinesafe-postgres"
           },
           "format": "table",
-          "rawSql": "SELECT establishment_type AS \"Type\", COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND establishment_type IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(establishment_type, 'Unknown') AS \"Type\", COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A"
         }
       ],
@@ -1208,7 +1208,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT action AS \"action\", COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND action IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(action, 'Unknown') AS \"Action\", COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1320,7 +1320,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT infraction_details AS \"Infraction Details\", COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND infraction_details IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(infraction_details, 'Unknown') AS \"Infraction Details\", COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1432,7 +1432,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT inspection_observation AS \"Observation\", COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND inspection_observation IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(inspection_observation, 'Unknown') AS \"Observation\", COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1557,7 +1557,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT establishment_type AS \"Type\", COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND establishment_type IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(establishment_type, 'Unknown') AS \"Type\", COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1669,7 +1669,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT action AS \"action\", COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND action IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(action, 'Unknown') AS \"Action\", COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1781,7 +1781,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT infraction_details AS \"Infraction Details\", COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND infraction_details IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(infraction_details, 'Unknown') AS \"Infraction Details\", COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1893,7 +1893,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT inspection_observation AS \"Observation\", COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND inspection_observation IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(inspection_observation, 'Unknown') AS \"Observation\", COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2018,7 +2018,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT establishment_type AS \"Type\", COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND establishment_type IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(establishment_type, 'Unknown') AS \"Type\", COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2130,7 +2130,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT action AS \"action\", COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND action IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(action, 'Unknown') AS \"Action\", COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2242,7 +2242,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT infraction_details AS \"Infraction Details\", COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND infraction_details IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(infraction_details, 'Unknown') AS \"Infraction Details\", COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2354,7 +2354,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT inspection_observation AS \"Observation\", COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND inspection_observation IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(inspection_observation, 'Unknown') AS \"Observation\", COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [

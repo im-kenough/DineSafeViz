@@ -79,4 +79,14 @@ Changes across 20 SQL queries:
 - Severity Breakdown pie → renamed "Status Breakdown", uses `establishment_status` values
 - Detail sections renamed: Crucial→Closed, Significant→Conditional Pass, Minor→Pass
 - All `WHERE severity = '...'` filters → `WHERE establishment_status = '...'`
-- Synced duplicate at `src/grafana/provisioning/dashboards/dinesafe.json`
+- Deleted legacy `src/grafana/` directory (stale copy, not used by docker-compose)
+
+**Dashboard time picker fix:** Changed iframe `src` in
+`src/dsv-app/templates/dashboard.html` from `?kiosk` (hides everything
+including time picker) to `?kiosk=tv` (TV mode — hides sidebar/nav but
+keeps the time picker visible so users can select date ranges).
+
+**NULL-safe Grafana queries:** Changed all 12 detail panel queries from
+`WHERE column IS NOT NULL` to `COALESCE(column, 'Unknown')` so rows
+with NULL columns (common in recent data) appear as "Unknown" instead
+of being silently excluded
