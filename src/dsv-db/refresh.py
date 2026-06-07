@@ -21,7 +21,7 @@ import psycopg2
 RECENT_CSV_URL = (
     "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/"
     "b6b4f3fb-2e2c-47e7-931d-b87d22806948/resource/"
-    "eda39233-4791-464e-98e6-094f51a01916/download/Dinesafe.csv"
+    "af0f5b8a-4b73-4a50-8781-65e949792b40/download/dinesafe.csv"
 )
 
 HISTORICAL_ZIP_URL = (

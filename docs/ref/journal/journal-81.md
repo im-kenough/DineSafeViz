@@ -37,3 +37,34 @@ Added `GF_USERS_VIEWERS_CAN_EDIT: "true"` to the `dsv-analytics` service environ
 
 **Files changed:**
 - `docker-compose.yml` — one line added under `dsv-analytics` env
+
+---
+
+## 2026-06-07 — Fix empty DB on fresh provision (broken Toronto Open Data URL)
+
+### Symptom
+
+After fresh VM provision via `make`, DB was empty. `docker compose logs dsv-init-db` showed:
+- Historical data (2001–2022) loaded successfully
+- Recent CSV download returned `HTTP Error 404: Not Found`
+- Because `seed()` calls `conn.commit()` only after both loads, the rollback wiped all historical data too
+
+### Root cause
+
+Toronto Open Data changed/removed the recent CSV resource ID. Old resource:
+`eda39233-4791-464e-98e6-094f51a01916` → 404
+
+### Investigation
+
+Queried the CKAN package API:
+`https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/package_show?id=b6b4f3fb-2e2c-47e7-931d-b87d22806948`
+
+New CSV resource: `af0f5b8a-4b73-4a50-8781-65e949792b40` (`dinesafe.csv`)
+
+Note: historical ZIP filename also changed in the API (`dinesafe-historical-data.zip` vs old `Dinesafe%20Historical%20Data.zip`), but old URL still resolves so left unchanged.
+
+Side note (not fixed): `seed()` commits only after both downloads succeed — a failure in the recent step rolls back all historical data, requiring a full re-seed. Worth hardening in future.
+
+### Fix
+
+Updated `RECENT_CSV_URL` in `src/dsv-db/refresh.py` to new resource ID and filename.

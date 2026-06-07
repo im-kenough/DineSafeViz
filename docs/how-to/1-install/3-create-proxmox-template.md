@@ -6,6 +6,7 @@ installs it during the Layer 1 build on a running system. The Layer 1
 Packer config uses a temporary static IP (`ssh_host`) instead of agent
 IP discovery, so the seed template needs no modification.
 
+ssh into the proxmox VM.
 ```bash
 # Download cloud image
 wget https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img \
