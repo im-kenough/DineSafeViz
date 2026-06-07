@@ -46,8 +46,9 @@ app_vm_timezone: "America/Toronto"
 service_account: "adm-ubuntu"
 
 # --- Application ---
-app_dir: "/home/adm-ubuntu/app/DineSafeViz"
+app_dir: "/home/{{ service_account }}/app/DineSafeViz"
 app_repo: "git@github.com:im-kenough/DineSafeViz.git"
+# app_branch: "main"
 app_branch: "feat/iac-v0.3.0-deploy"
 
 # dinesafeviz analytics db configuration - postgresql db
