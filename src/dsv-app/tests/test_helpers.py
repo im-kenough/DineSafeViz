@@ -88,33 +88,33 @@ def test_parse_non_numeric_params():
 from app import sort_rows, build_days
 
 
-def test_sort_rows_crucial_first():
+def test_sort_rows_closed_first():
     rows = [
-        {"severity": "M - Minor", "action": "a"},
-        {"severity": "C - Crucial", "action": "b"},
-        {"severity": "S - Significant", "action": "c"},
-        {"severity": None, "action": "d"},
+        {"establishment_status": "Pass", "action": "a"},
+        {"establishment_status": "Closed", "action": "b"},
+        {"establishment_status": "Conditional Pass", "action": "c"},
+        {"establishment_status": None, "action": "d"},
     ]
     result = sort_rows(rows)
-    assert [r["severity"] for r in result] == [
-        "C - Crucial", "S - Significant", "M - Minor", None
+    assert [r["establishment_status"] for r in result] == [
+        "Closed", "Conditional Pass", "Pass", None
     ]
 
 
-def test_sort_rows_na_last():
+def test_sort_rows_pass_last():
     rows = [
-        {"severity": "NA", "action": "a"},
-        {"severity": "M - Minor", "action": "b"},
+        {"establishment_status": "Pass", "action": "a"},
+        {"establishment_status": "Conditional Pass", "action": "b"},
     ]
     result = sort_rows(rows)
-    assert result[0]["severity"] == "M - Minor"
-    assert result[1]["severity"] == "NA"
+    assert result[0]["establishment_status"] == "Conditional Pass"
+    assert result[1]["establishment_status"] == "Pass"
 
 
 def test_build_days_newest_first():
     rows = [
-        {"inspection_date": date(2024, 1, 2), "severity": "M - Minor"},
-        {"inspection_date": date(2024, 1, 1), "severity": "C - Crucial"},
+        {"inspection_date": date(2024, 1, 2), "establishment_status": "Pass"},
+        {"inspection_date": date(2024, 1, 1), "establishment_status": "Closed"},
     ]
     start = date(2024, 1, 1)
     end = date(2024, 1, 3)
@@ -126,7 +126,7 @@ def test_build_days_newest_first():
 
 
 def test_build_days_no_data_day_is_empty_list():
-    rows = [{"inspection_date": date(2024, 1, 1), "severity": "M - Minor"}]
+    rows = [{"inspection_date": date(2024, 1, 1), "establishment_status": "Pass"}]
     start = date(2024, 1, 1)
     end = date(2024, 1, 2)
     days = build_days(rows, start, end)
@@ -136,10 +136,10 @@ def test_build_days_no_data_day_is_empty_list():
 
 def test_build_days_rows_sorted_within_day():
     rows = [
-        {"inspection_date": date(2024, 1, 1), "severity": "M - Minor"},
-        {"inspection_date": date(2024, 1, 1), "severity": "C - Crucial"},
+        {"inspection_date": date(2024, 1, 1), "establishment_status": "Pass"},
+        {"inspection_date": date(2024, 1, 1), "establishment_status": "Closed"},
     ]
     start = end = date(2024, 1, 1)
     days = build_days(rows, start, end)
-    assert days[0][1][0]["severity"] == "C - Crucial"
-    assert days[0][1][1]["severity"] == "M - Minor"
+    assert days[0][1][0]["establishment_status"] == "Closed"
+    assert days[0][1][1]["establishment_status"] == "Pass"

@@ -47,7 +47,7 @@ def test_route_renders_day_boxes(client):
 def test_route_shows_inspection_data(client):
     rows = [(
         date(2024, 2, 14),   # inspection_date
-        "C - Crucial",       # severity
+        "Conditional Pass",  # establishment_status
         "Court Order",       # action
         "Rats observed",     # infraction_details
         "Risky Bistro",      # establishment_name
@@ -60,7 +60,7 @@ def test_route_shows_inspection_data(client):
     with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
         resp = client.get("/inspections?year=2024&q=1")
     assert b"Risky Bistro" in resp.data
-    assert b"C - Crucial" in resp.data
+    assert b"Conditional Pass" in resp.data
     assert b"Rats observed" in resp.data
 
 
@@ -76,10 +76,10 @@ def test_route_no_data_day_shows_no_data_text(client):
     assert b"No data" in resp.data
 
 
-def test_severity_class_on_row(client):
+def test_status_class_on_row(client):
     rows = [(
         date(2024, 2, 14),   # inspection_date
-        "C - Crucial",       # severity
+        "Conditional Pass",  # establishment_status
         "Court Order",       # action
         "Rats observed",     # infraction_details
         "Risky Bistro",      # establishment_name
@@ -91,7 +91,7 @@ def test_severity_class_on_row(client):
     )]
     with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
         resp = client.get("/inspections?year=2024&q=1")
-    assert b'class="sev-crucial"' in resp.data
+    assert b'class="status-conditional"' in resp.data
 
 
 def test_footer_content(client):
@@ -186,7 +186,7 @@ def test_recent_years_not_in_archive(client):
 def test_column_headers_in_order(client):
     rows = [(
         date(2024, 2, 14),
-        "M - Minor",
+        "Pass",
         "Notice to Comply",
         "Improper storage",
         "Test Place",
@@ -200,23 +200,23 @@ def test_column_headers_in_order(client):
         resp = client.get("/inspections?year=2024&q=1")
     html = resp.data.decode()
     headers = re.findall(r'<th[^>]*>([^<]+)</th>', html)
-    assert "Severity" in headers
+    assert "Status" in headers
     assert "Infraction Details" in headers
     assert "Establishment" in headers
     assert "Establishment Type" in headers
     assert "Action" in headers
-    severity_idx = headers.index("Severity")
+    status_idx = headers.index("Status")
     infraction_idx = headers.index("Infraction Details")
     establishment_idx = headers.index("Establishment")
     est_type_idx = headers.index("Establishment Type")
     action_idx = headers.index("Action")
-    assert severity_idx < infraction_idx < establishment_idx < est_type_idx < action_idx
+    assert status_idx < infraction_idx < establishment_idx < est_type_idx < action_idx
 
 
 def test_establishment_type_rendered(client):
     rows = [(
         date(2024, 2, 14),
-        "M - Minor",
+        "Pass",
         "Notice to Comply",
         "Improper storage",
         "Pasta Palace",
@@ -234,7 +234,7 @@ def test_establishment_type_rendered(client):
 def test_establishment_cell_contains_name_and_address(client):
     rows = [(
         date(2024, 2, 14),
-        "M - Minor",
+        "Pass",
         "Notice to Comply",
         "Improper storage",
         "Pasta Palace",

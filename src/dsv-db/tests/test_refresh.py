@@ -99,27 +99,25 @@ class TestMapHistoricalRow:
 class TestMapRecentRow:
     SAMPLE_ROW = {
         "_id": "1",
-        "Establishment ID": "10752656",
-        "Inspection ID": "None",
-        "Establishment Name": "HASHTAG INDIA RESTAURANT",
-        "Establishment Type": "Food Take Out",
-        "Establishment Address": "1871 O'CONNOR DR None M4A 1X1",
-        "Infraction Details": "FAIL TO ENSURE EQUIPMENT SURFACE SANITIZED",
-        "Inspection Observation": "One or more minor infractions",
-        "Inspection Date": "2024-03-06",
-        "Severity": "M - Minor",
-        "Action": "Notice to Comply",
-        "Outcome": "None",
-        "Outcome Date": "",
-        "Amount Fined": "",
-        "Latitude": "43.72199",
-        "Longitude": "-79.30349",
         "unique_id": "168f86274045194142c0e7c381ccb75d",
+        "estId": "001Vo000013QjdPIAS",
+        "estName": "HASHTAG INDIA RESTAURANT",
+        "address": "1871 O'Connor Dr None M4A 1X1",
+        "inspectionStatus": "Pass",
+        "inspectionDate": "2024-03-06",
+        "typeDesc": "FAIL TO ENSURE EQUIPMENT SURFACE SANITIZED",
+        "deficiencyDesc": "None",
+        "actionDesc": "Notice to Comply",
+        "OutcomeDate": "",
+        "OutcomeDesc": "None",
+        "amountFined": "",
+        "latitude": "43.72199",
+        "longitude": "-79.30349",
     }
 
     def test_maps_establishment_id(self):
         result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
-        assert result["establishment_id"] == "10752656"
+        assert result["establishment_id"] == "001Vo000013QjdPIAS"
 
     def test_discards_id(self):
         result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
@@ -127,17 +125,17 @@ class TestMapRecentRow:
 
     def test_maps_recent_only_columns(self):
         result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
-        assert result["inspection_observation"] == "One or more minor infractions"
+        assert result["establishment_status"] == "Pass"
         assert result["unique_id"] == "168f86274045194142c0e7c381ccb75d"
 
     def test_historical_only_columns_are_none(self):
         result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
-        assert result["establishment_status"] is None
+        assert result["severity"] is None
         assert result["min_inspections_per_year"] is None
 
     def test_none_string_becomes_none(self):
         result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
-        assert result["inspection_id"] is None
+        assert result["inspection_observation"] is None
         assert result["outcome"] is None
 
     def test_all_inspections_columns_present(self):
