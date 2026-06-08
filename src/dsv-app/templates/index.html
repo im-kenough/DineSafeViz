@@ -2,12 +2,10 @@
 {% block title %}DineSafeViz{% endblock %}
 {% block content %}
     <h2 class="page-heading">DineSafe Inspections</h2>
-    {% set sev_class = {
-        'C - Crucial':     'sev-crucial',
-        'S - Significant': 'sev-significant',
-        'M - Minor':       'sev-minor',
-        'NA':              'sev-na',
-        'None':            'sev-none'
+    {% set status_class = {
+        'Closed':           'status-closed',
+        'Conditional Pass': 'status-conditional',
+        'Pass':             'status-pass'
     } %}
 
     {% for day, rows in days %}
@@ -18,7 +16,7 @@
         <table>
             <thead>
                 <tr>
-                    <th>Severity</th>
+                    <th>Status</th>
                     <th>Infraction Details</th>
                     <th>Establishment</th>
                     <th>Establishment Type</th>
@@ -30,8 +28,8 @@
             </thead>
             <tbody>
                 {% for row in rows %}
-                <tr class="{{ sev_class.get(row.severity, '') }}">
-                    <td>{{ row.severity or '—' }}</td>
+                <tr class="{{ status_class.get(row.establishment_status, '') }}">
+                    <td>{{ row.establishment_status or '—' }}</td>
                     <td>{{ row.infraction_details or '—' }}</td>
                     <td>{{ row.establishment_name or '—' }}<br>----------<br>{{ row.establishment_address or '—' }}</td>
                     <td>{{ row.establishment_type or '—' }}</td>

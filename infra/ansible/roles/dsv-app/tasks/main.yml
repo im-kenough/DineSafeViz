@@ -1,0 +1,90 @@
+# infra/ansible/roles/dsv-app/tasks/main.yml
+---
+# --- System Settlement ---
+
+- name: Wait for cloud-init and background apt processes
+  shell: |
+    cloud-init status --wait
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done
+  changed_when: false
+  failed_when: false
+
+# --- VM Identity ---
+
+- name: Set hostname
+  hostname:
+    name: "{{ app_vm_name }}"
+
+- name: Add hostname to /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1'
+    line: "127.0.1.1 {{ app_vm_name }}"
+
+- name: Configure static IP via netplan
+  copy:
+    dest: /etc/netplan/99-static.yaml
+    content: |
+      network:
+        version: 2
+        ethernets:
+          any_eth:
+            match:
+              name: "e*"
+            addresses:
+              - {{ app_vm_ip }}{{ network_cidr }}
+            routes:
+              - to: default
+                via: {{ network_gateway }}
+            nameservers:
+              addresses:
+                - {{ network_dns }}
+    owner: root
+    group: root
+    mode: "0600"
+
+# --- Firewall rules ---
+
+- name: Allow app port 5000 through UFW
+  ufw:
+    rule: allow
+    port: "5000"
+    proto: tcp
+
+- name: Allow Grafana port 3000 through UFW
+  ufw:
+    rule: allow
+    port: "3000"
+    proto: tcp
+
+# --- GitHub Deploy Key ---
+
+- name: Install GitHub deploy key
+  copy:
+    content: |
+      {{ vault_github_deploy_keys }}
+    dest: "/home/{{ service_account }}/.ssh/deploy-key"
+    owner: "{{ service_account }}"
+    group: "{{ service_account }}"
+    mode: "0600"
+
+- name: Deploy SSH config for GitHub
+  template:
+    src: ssh_config.j2
+    dest: "/home/{{ service_account }}/.ssh/config"
+    owner: "{{ service_account }}"
+    group: "{{ service_account }}"
+    mode: "0644"
+
+# --- App Directory ---
+
+- name: Create app parent directory
+  file:
+    path: "/home/{{ service_account }}/app"
+    state: directory
+    owner: "{{ service_account }}"
+    group: "{{ service_account }}"
+    mode: "0755"
+
+- name: Flush handlers to apply changes before cleanup
+  meta: flush_handlers

@@ -1,0 +1,197 @@
+# infra/ansible/roles/base/tasks/main.yml
+---
+# --- Service Account ---
+
+- name: Create service account
+  user:
+    name: "{{ service_account }}"
+    shell: /bin/bash
+    groups: sudo
+    append: true
+    create_home: true
+
+- name: Allow service account passwordless sudo
+  copy:
+    dest: "/etc/sudoers.d/{{ service_account }}"
+    content: "{{ service_account }} ALL=(ALL) NOPASSWD:ALL\n"
+    mode: "0440"
+    validate: "visudo -cf %s"
+
+- name: Create .ssh directory for service account
+  file:
+    path: "/home/{{ service_account }}/.ssh"
+    state: directory
+    owner: "{{ service_account }}"
+    group: "{{ service_account }}"
+    mode: "0700"
+
+- name: Add IAC public key to service account
+  authorized_key:
+    user: "{{ service_account }}"
+    state: present
+    key: "{{ template_iac_public_key }}"
+
+# --- Wait for cloud-init ---
+
+- name: Wait for cloud-init and background apt processes
+  shell: |
+    cloud-init status --wait
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done
+  changed_when: false
+  failed_when: false
+
+# --- System Updates ---
+
+- name: Update apt cache and upgrade all packages
+  apt:
+    update_cache: true
+    upgrade: dist
+    autoremove: true
+
+# --- Common Packages ---
+
+- name: Install common packages
+  apt:
+    name:
+      - curl
+      - wget
+      - git
+      - jq
+      - htop
+      - vim
+      - ca-certificates
+      - gnupg
+      - ufw
+      - fail2ban
+      - unattended-upgrades
+      - apt-listchanges
+      - qemu-guest-agent
+    state: present
+
+- name: Enable and start qemu-guest-agent
+  systemd:
+    name: qemu-guest-agent
+    enabled: true
+    state: started
+
+# --- SSH Hardening ---
+
+- name: Create sshd privilege separation directory
+  file:
+    path: /run/sshd
+    state: directory
+    mode: "0755"
+
+- name: Deploy hardened sshd_config
+  template:
+    src: sshd_config.j2
+    dest: /etc/ssh/sshd_config
+    owner: root
+    group: root
+    mode: "0644"
+    validate: "sshd -t -f %s"
+  notify: Restart sshd
+
+# --- Firewall (UFW) ---
+
+- name: Set UFW default deny incoming
+  ufw:
+    direction: incoming
+    policy: deny
+
+- name: Set UFW default allow outgoing
+  ufw:
+    direction: outgoing
+    policy: allow
+
+- name: Allow SSH through UFW
+  ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+
+# --- fail2ban ---
+
+- name: Deploy fail2ban SSH jail config
+  copy:
+    src: jail.local
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart fail2ban
+
+- name: Enable and start fail2ban
+  systemd:
+    name: fail2ban
+    enabled: true
+    state: started
+
+# --- Unattended Upgrades ---
+
+- name: Enable unattended-upgrades for security patches
+  copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      APT::Periodic::AutocleanInterval "7";
+    owner: root
+    group: root
+    mode: "0644"
+
+# --- System Config ---
+
+- name: Set timezone
+  timezone:
+    name: "{{ app_vm_timezone }}"
+
+- name: Configure systemd-timesyncd NTP
+  copy:
+    dest: /etc/systemd/timesyncd.conf
+    content: |
+      [Time]
+      NTP=ntp.ubuntu.com
+      FallbackNTP=pool.ntp.org
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Enable and start systemd-timesyncd
+  systemd:
+    name: systemd-timesyncd
+    enabled: true
+    state: started
+
+- name: Create resolved.conf.d directory
+  file:
+    path: /etc/systemd/resolved.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Set DNS resolver
+  copy:
+    dest: /etc/systemd/resolved.conf.d/dns.conf
+    content: |
+      [Resolve]
+      DNS={{ network_dns }}
+      FallbackDNS=1.1.1.1
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Restart systemd-resolved
+  systemd:
+    name: systemd-resolved
+    state: restarted
+
+- name: Flush handlers to apply changes before cleanup
+  meta: flush_handlers
+
+

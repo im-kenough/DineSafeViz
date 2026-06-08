@@ -164,7 +164,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  (SELECT COUNT(*) AS \"Total\" FROM inspections WHERE $__timeFilter(inspection_date))\n -(SELECT COUNT(*) AS \"Closed\" FROM inspections WHERE severity = 'C - Crucial' AND $__timeFilter(inspection_date))\n -(SELECT COUNT(*) AS \"cond_pass\" FROM inspections WHERE severity = 'S - Significant' AND $__timeFilter(inspection_date))\n AS Difference",
+          "rawSql": "SELECT COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND $__timeFilter(inspection_date);",
           "refId": "A",
           "sql": {
             "columns": [
@@ -240,7 +240,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(*)::numeric AS total,\n    COUNT(*) FILTER (WHERE severity = 'S - Significant')::numeric AS conditional_pass,\n    COUNT(*) FILTER (WHERE severity = 'C - Crucial')::numeric AS closed\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE((total - conditional_pass - closed) / NULLIF(total, 0), 0) AS \"Pass %\"\nFROM counts;",
+          "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(*)::numeric AS total,\n    COUNT(*) FILTER (WHERE establishment_status = 'Pass')::numeric AS pass\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE(pass / NULLIF(total, 0), 0) AS \"Pass %\"\nFROM counts;",
 
           "refId": "A",
           "sql": {
@@ -318,7 +318,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) AS \"cond_pass\" FROM inspections WHERE severity = 'S - Significant' AND $__timeFilter(inspection_date);",
+          "rawSql": "SELECT COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND $__timeFilter(inspection_date);",
           "refId": "A",
           "sql": {
             "columns": [
@@ -394,7 +394,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(*)::numeric AS total,\n    COUNT(*) FILTER (WHERE severity = 'S - Significant')::numeric AS conditional_pass\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE(conditional_pass / NULLIF(total, 0), 0) AS \"Conditional Pass %\"\nFROM counts;",
+          "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(*)::numeric AS total,\n    COUNT(*) FILTER (WHERE establishment_status = 'Conditional Pass')::numeric AS conditional_pass\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE(conditional_pass / NULLIF(total, 0), 0) AS \"Conditional Pass %\"\nFROM counts;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -471,7 +471,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) AS \"Closed\" FROM inspections WHERE severity = 'C - Crucial' AND $__timeFilter(inspection_date);",
+          "rawSql": "SELECT COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND $__timeFilter(inspection_date);",
           "refId": "A",
           "sql": {
             "columns": [
@@ -547,7 +547,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(*)::numeric AS total,\n    COUNT(*) FILTER (WHERE severity = 'C - Crucial')::numeric AS closed\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE(closed / NULLIF(total, 0), 0) AS \"Closed %\"\nFROM counts;",
+          "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(*)::numeric AS total,\n    COUNT(*) FILTER (WHERE establishment_status = 'Closed')::numeric AS closed\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE(closed / NULLIF(total, 0), 0) AS \"Closed %\"\nFROM counts;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -904,14 +904,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Severity"
-            },
-            "properties": []
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "No infractions"
+              "options": "Pass"
             },
             "properties": [
               {
@@ -926,13 +919,13 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "M - Minor"
+              "options": "Conditional Pass"
             },
             "properties": [
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "#eac329",
+                  "fixedColor": "#eab308",
                   "mode": "fixed"
                 }
               }
@@ -941,13 +934,13 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "NA"
+              "options": "Closed"
             },
             "properties": [
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "semi-dark-purple",
+                  "fixedColor": "#dc2626",
                   "mode": "fixed"
                 }
               }
@@ -997,7 +990,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH severity_levels AS (\n  SELECT *\n  FROM (\n    VALUES\n      ('NA', 1),\n      ('No infractions', 2),\n      ('M - Minor', 3),\n      ('S - Significant', 4),\n      ('C - Crucial', 5)\n  ) AS levels(severity, sort_order)\n), severity_counts AS (\n  SELECT COALESCE(NULLIF(severity, ''), 'No infractions') AS severity, COUNT(*) AS count\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n  GROUP BY 1\n)\nSELECT levels.severity AS \"Severity\", COALESCE(counts.count, 0) AS \"Count\"\nFROM severity_levels AS levels\nLEFT JOIN severity_counts AS counts ON counts.severity = levels.severity\nORDER BY levels.sort_order;",
+          "rawSql": "WITH status_levels AS (\n  SELECT *\n  FROM (\n    VALUES\n      ('Pass', 1),\n      ('Conditional Pass', 2),\n      ('Closed', 3)\n  ) AS levels(status, sort_order)\n), status_counts AS (\n  SELECT establishment_status AS status, COUNT(*) AS count\n  FROM inspections\n  WHERE establishment_status IS NOT NULL AND $__timeFilter(inspection_date)\n  GROUP BY 1\n)\nSELECT levels.status AS \"Status\", COALESCE(counts.count, 0) AS \"Count\"\nFROM status_levels AS levels\nLEFT JOIN status_counts AS counts ON counts.status = levels.status\nORDER BY levels.sort_order;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1018,7 +1011,7 @@
           }
         }
       ],
-      "title": "Severity Breakdown",
+      "title": "Status Breakdown",
       "type": "piechart"
     },
     {
@@ -1031,7 +1024,7 @@
       },
       "id": 14,
       "panels": [],
-      "title": "Infraction Details - Crucial",
+      "title": "Infraction Details - Closed",
       "type": "row"
     },
     {
@@ -1120,11 +1113,11 @@
             "uid": "dinesafe-postgres"
           },
           "format": "table",
-          "rawSql": "SELECT establishment_type AS \"Type\", COUNT(*) AS \"Crucial\" FROM inspections WHERE severity = 'C - Crucial' AND establishment_type IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(establishment_type, 'Unknown') AS \"Type\", COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A"
         }
       ],
-      "title": "Crucial Infractions by Establishment Type",
+      "title": "Closed - by Establishment Type",
       "type": "barchart"
     },
     {
@@ -1215,7 +1208,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT action AS \"action\", COUNT(*) AS \"Crucial\" FROM inspections WHERE severity = 'C - Crucial' AND action IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(action, 'Unknown') AS \"Action\", COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1236,7 +1229,7 @@
           }
         }
       ],
-      "title": "Crucial Infractions by Enforcement Action Type",
+      "title": "Closed - by Enforcement Action Type",
       "type": "barchart"
     },
     {
@@ -1327,7 +1320,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT infraction_details AS \"Infraction Details\", COUNT(*) AS \"Crucial\" FROM inspections WHERE severity = 'C - Crucial' AND infraction_details IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(infraction_details, 'Unknown') AS \"Infraction Details\", COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1348,7 +1341,7 @@
           }
         }
       ],
-      "title": "Crucial Infractions by Infraction details",
+      "title": "Closed - by Infraction Details",
       "type": "barchart"
     },
     {
@@ -1439,7 +1432,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT inspection_observation AS \"Observation\", COUNT(*) AS \"Crucial\" FROM inspections WHERE severity = 'C - Crucial' AND inspection_observation IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(inspection_observation, 'Unknown') AS \"Observation\", COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1460,7 +1453,7 @@
           }
         }
       ],
-      "title": "Crucial Infractions by Inspection Observations",
+      "title": "Closed - by Inspection Observations",
       "type": "barchart"
     },
     {
@@ -1473,7 +1466,7 @@
       },
       "id": 19,
       "panels": [],
-      "title": "Infraction Details - Significant",
+      "title": "Infraction Details - Conditional Pass",
       "type": "row"
     },
     {
@@ -1564,7 +1557,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT establishment_type AS \"Type\", COUNT(*) AS \"Significant\" FROM inspections WHERE severity = 'S - Significant' AND establishment_type IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(establishment_type, 'Unknown') AS \"Type\", COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1585,7 +1578,7 @@
           }
         }
       ],
-      "title": "Significant infractions by Establishment Type",
+      "title": "Conditional Pass - by Establishment Type",
       "type": "barchart"
     },
     {
@@ -1676,7 +1669,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT action AS \"action\", COUNT(*) AS \"Significant\" FROM inspections WHERE severity = 'S - Significant' AND action IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(action, 'Unknown') AS \"Action\", COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1697,7 +1690,7 @@
           }
         }
       ],
-      "title": "Significant Infractions by Enforcement Action Type",
+      "title": "Conditional Pass - by Enforcement Action Type",
       "type": "barchart"
     },
     {
@@ -1788,7 +1781,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT infraction_details AS \"Infraction Details\", COUNT(*) AS \"Significant\" FROM inspections WHERE severity = 'S - Significant' AND infraction_details IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(infraction_details, 'Unknown') AS \"Infraction Details\", COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1809,7 +1802,7 @@
           }
         }
       ],
-      "title": "Significant Infractions by Infraction details",
+      "title": "Conditional Pass - by Infraction Details",
       "type": "barchart"
     },
     {
@@ -1900,7 +1893,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT inspection_observation AS \"Observation\", COUNT(*) AS \"Significant\" FROM inspections WHERE severity = 'S - Significant' AND inspection_observation IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(inspection_observation, 'Unknown') AS \"Observation\", COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1921,7 +1914,7 @@
           }
         }
       ],
-      "title": "Significant Infractions by Inspection Observations",
+      "title": "Conditional Pass - by Inspection Observations",
       "type": "barchart"
     },
     {
@@ -1934,7 +1927,7 @@
       },
       "id": 24,
       "panels": [],
-      "title": "Infraction Details - Minor",
+      "title": "Infraction Details - Pass",
       "type": "row"
     },
     {
@@ -2025,7 +2018,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT establishment_type AS \"Type\", COUNT(*) AS \"Number of Minor Infractions\" FROM inspections WHERE severity = 'M - Minor' AND establishment_type IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(establishment_type, 'Unknown') AS \"Type\", COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2046,7 +2039,7 @@
           }
         }
       ],
-      "title": "Minor Infractions by Establishment Type",
+      "title": "Pass - by Establishment Type",
       "type": "barchart"
     },
     {
@@ -2137,7 +2130,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT action AS \"action\", COUNT(*) AS \"Number of Minor Infractions\" FROM inspections WHERE severity = 'M - Minor' AND action IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(action, 'Unknown') AS \"Action\", COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2158,7 +2151,7 @@
           }
         }
       ],
-      "title": "Minor Infractions by Enforcement Action",
+      "title": "Pass - by Enforcement Action",
       "type": "barchart"
     },
     {
@@ -2249,7 +2242,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT infraction_details AS \"Infraction Details\", COUNT(*) AS \"Count\" FROM inspections WHERE severity = 'M - Minor' AND infraction_details IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(infraction_details, 'Unknown') AS \"Infraction Details\", COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2270,7 +2263,7 @@
           }
         }
       ],
-      "title": "Minor Infractions by Infraction details",
+      "title": "Pass - by Infraction Details",
       "type": "barchart"
     },
     {
@@ -2361,7 +2354,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT inspection_observation AS \"Observation\", COUNT(*) AS \"Count\" FROM inspections WHERE severity = 'M - Minor' AND inspection_observation IS NOT NULL AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(inspection_observation, 'Unknown') AS \"Observation\", COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2382,7 +2375,7 @@
           }
         }
       ],
-      "title": "Minor Infractions by Inspection Observations",
+      "title": "Pass - by Inspection Observations",
       "type": "barchart"
     }
   ],

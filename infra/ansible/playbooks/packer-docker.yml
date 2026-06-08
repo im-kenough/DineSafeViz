@@ -1,0 +1,8 @@
+# infra/ansible/playbooks/packer-docker.yml
+---
+- name: Build ubuntu-docker image (Layer 2)
+  hosts: all
+  become: true
+  roles:
+    - docker
+    - cleanup

@@ -1,0 +1,55 @@
+# infra/ansible/roles/deploy/tasks/main.yml
+---
+- name: Wait for SSH connectivity
+  wait_for_connection:
+    timeout: 120
+
+- name: Install GitHub deploy key
+  copy:
+    content: |
+      {{ vault_github_deploy_keys }}
+    dest: "/home/{{ service_account }}/.ssh/deploy-key"
+    owner: "{{ service_account }}"
+    group: "{{ service_account }}"
+    mode: "0600"
+
+- name: Deploy SSH config for GitHub
+  template:
+    src: ssh_config.j2
+    dest: "/home/{{ service_account }}/.ssh/config"
+    owner: "{{ service_account }}"
+    group: "{{ service_account }}"
+    mode: "0644"
+
+- name: Clone or update repo
+  git:
+    repo: "{{ app_repo }}"
+    dest: "{{ app_dir }}"
+    version: "{{ app_branch }}"
+    update: true
+    accept_hostkey: true
+  become: false
+
+- name: Template .env file from vault secrets
+  template:
+    src: env.j2
+    dest: "{{ app_dir }}/.env"
+    owner: "{{ service_account }}"
+    group: "{{ service_account }}"
+    mode: "0600"
+
+- name: Start application with Docker Compose
+  command: docker compose up -d --build
+  args:
+    chdir: "{{ app_dir }}"
+  become: false
+  changed_when: true
+
+- name: Wait for Flask app to respond
+  uri:
+    url: "http://{{ app_vm_ip }}:5000/"
+    status_code: 200
+  register: health_check
+  retries: 30
+  delay: 10
+  until: health_check.status == 200

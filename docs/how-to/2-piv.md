@@ -1,6 +1,6 @@
 # Post implementation verification
 
-Run these commands after each deployment to confirm the stack is healthy.
+SSH into the app VM and run these commands after each deployment to confirm the stack is healthy.
 All checks must pass before marking the release complete.
 
 ### Start the stack

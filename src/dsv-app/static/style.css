@@ -38,11 +38,9 @@
     --text-muted:      #7a8094;
     --accent:          #4a7aff;
 
-    --sev-crucial:     rgba(220,  38,  38, 0.6);
-    --sev-significant: rgba(234,  88,  12, 0.6);
-    --sev-minor:       rgba(202, 138,   4, 0.45);
-    --sev-na:          rgba( 22, 163,  74, 0.6);
-    --sev-none:        rgba( 37,  99, 235, 0.6);
+    --status-closed:      rgba(220,  38,  38, 0.6);
+    --status-conditional: rgba(234,  88,  12, 0.6);
+    --status-pass:        rgba( 22, 163,  74, 0.6);
 }
 
 /* ── base ───────────────────────────────────────────────── */
@@ -143,12 +141,10 @@ th {
     color: var(--text-muted);
 }
 
-/* ── severity rows ──────────────────────────────────────── */
-tr.sev-crucial     { background-color: var(--sev-crucial); }
-tr.sev-significant { background-color: var(--sev-significant); }
-tr.sev-minor       { background-color: var(--sev-minor); }
-tr.sev-na          { background-color: var(--sev-na); }
-tr.sev-none        { background-color: var(--sev-none); }
+/* ── status rows ────────────────────────────────────────── */
+tr.status-closed      { background-color: var(--status-closed); }
+tr.status-conditional { background-color: var(--status-conditional); }
+tr.status-pass        { background-color: var(--status-pass); }
 
 /* ── footer ─────────────────────────────────────────────── */
 footer {

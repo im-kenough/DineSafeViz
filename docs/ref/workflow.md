@@ -17,6 +17,9 @@
 
 Create a github issue for planned features and fixes. Apply relevant tags and milestones
 
+See [Project management](project-management.md) for the full issue lifecycle,
+label and milestone conventions, and how to use the GitHub Projects dashboards.
+
 ## Sprint execution
 
 ### Git Strategy - WIP

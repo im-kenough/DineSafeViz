@@ -1,0 +1,14 @@
+# infra/terraform/terraform.tfvars.example
+#
+# Copy to terraform.tfvars and fill in values.
+# In practice, the Makefile renders this from Ansible Vault automatically.
+# This file is gitignored — never commit it with real values.
+
+proxmox_api_token_id     = "svc-terraform@pve!terraform"
+proxmox_api_token_secret = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# Override defaults if needed:
+# proxmox_node = "yyz-hyp01"
+# vm_name      = "yyz-app-dsv01"
+# vm_cpu       = 2
+# vm_memory    = 4096
