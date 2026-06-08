@@ -44,6 +44,11 @@ variable "vm_name" {
   type        = string
 }
 
+variable "vm_id" {
+  description = "Specific Proxmox VM ID"
+  type        = number
+}
+
 variable "vm_cpu" {
   description = "Number of CPU cores"
   type        = number

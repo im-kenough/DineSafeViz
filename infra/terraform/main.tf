@@ -18,6 +18,7 @@ provider "proxmox" {
 
 resource "proxmox_virtual_environment_vm" "dsv_app" {
   name      = var.vm_name
+  vm_id     = var.vm_id
   node_name = var.proxmox_node
 
   clone {

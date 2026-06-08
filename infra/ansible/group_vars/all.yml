@@ -28,13 +28,14 @@ template_dsv_app: 9102
 build_ip_base: "10.0.20.200"
 build_ip_docker: "10.0.20.201"
 build_ip_app: "10.0.20.202"
-packer_ssh_username: "ubuntu"
+packer_ssh_username: "adm-ubuntu"
 packer_cpu: 4
 packer_memory: 6144
 packer_disk_size: 40
 
 # --- Target app VM ---
 app_vm_name: "yyz-app-dsv01"
+app_vm_id: 8000
 app_vm_ip: "10.0.20.80"
 app_vm_cpu: 2
 app_vm_memory: 4096
@@ -45,9 +46,10 @@ app_vm_timezone: "America/Toronto"
 service_account: "adm-ubuntu"
 
 # --- Application ---
-app_dir: "/home/adm-ubuntu/app/DineSafeViz"
+app_dir: "/home/{{ service_account }}/app/DineSafeViz"
 app_repo: "git@github.com:im-kenough/DineSafeViz.git"
-app_branch: "main"
+# app_branch: "main"
+app_branch: "feat/iac-v0.3.0-deploy"
 
 # dinesafeviz analytics db configuration - postgresql db
 app_analytics_db_user: "dinesafe"

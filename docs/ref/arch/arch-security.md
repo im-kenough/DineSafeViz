@@ -4,7 +4,7 @@ This document describes the security architecture of DineSafeViz,
 covering secrets management, VM hardening, network controls, service
 accounts, and repository-level safeguards.
 
-## Principles
+## Design Principles
 
 1. **Single source of truth:** All secrets live in one Ansible Vault
    file (`infra/ansible/vault/secrets.yml`), encrypted at rest.
@@ -20,35 +20,23 @@ accounts, and repository-level safeguards.
 
 ## Secrets management
 
-Ansible Vault is the single store for all credentials. No other secret
-store is used. The Makefile orchestrates a decrypt-render-cleanup
-pipeline so plaintext secrets exist only in memory or in short-lived
-files that are deleted immediately after use.
+Ansible Vault is the single store for all credentials. The Makefile orchestrates a decrypt-render-cleanup pipeline so plaintext secrets exist only in memory or in short-lived files that are deleted immediately after use.
 
-### Architecture
+Consult this document for the [secrets rotation instructions](docs/how-to/6-rotate-secrets.md)
 
-```
-Ansible Vault (encrypted, in git)
-  │
-  ├─ Ansible playbooks
-  │   Read directly via --ask-vault-pass
-  │
-  ├─ Terraform
-  │   Makefile decrypts vault → render-tfvars.py → terraform.tfvars
-  │   (ephemeral, deleted after terraform apply)
-  │
-  ├─ Packer
-  │   Makefile decrypts vault → render-pkrvars.py → variables.pkrvars.hcl
-  │   (ephemeral, deleted after packer build)
-  │
-  └─ Application (.env on VM)
-      Ansible deploy playbook templates .env from vault values
-      (mode 0600, never committed to git)
-```
+### Secrets and variable locations
+
+| File | Contents | In git? |
+|------|----------|---------|
+| `infra/ansible/vault/secrets.yml` | All IAC and application secrets. Encrypted with Ansible Vault. | Yes (encrypted) |
+| `infra/ansible/group_vars/all.yml` | Contains all IAC and app configuration variables | Yes (plaintext) |
+| `infra/terraform/terraform.tfvars` | Rendered from vault during deployment | No (gitignored) |
+| `infra/packer/variables.pkrvars.hcl` | Rendered from vault during deployment  | No (gitignored) |
+| `.env` (on VM at deploy time) | Templated from vault during deployment | No (never in repo) |
 
 ### Vault contents
 
-The vault file (`infra/ansible/vault/secrets.yml`) contains:
+The Ansible Vault encrypted file (`infra/ansible/vault/secrets.yml`) contains secrets for IaC and the app.
 
 | Key | Description | Used by |
 |-----|-------------|---------|
@@ -63,64 +51,8 @@ The vault file (`infra/ansible/vault/secrets.yml`) contains:
 | `vault_analytics_admin_password` | Grafana admin password | Ansible deploy (.env) |
 | `vault_github_deploy_keys` | GitHub deploy key (private key) | Packer dsv-app build |
 
-### What lives where
 
-| File | Contents | In git? |
-|------|----------|---------|
-| `infra/ansible/vault/secrets.yml` | All secrets | Yes (encrypted) |
-| `infra/ansible/group_vars/all.yml` | Non-secret config | Yes (plaintext) |
-| `infra/terraform/terraform.tfvars` | Rendered from vault | No (gitignored) |
-| `infra/packer/variables.pkrvars.hcl` | Rendered from vault | No (gitignored) |
-| `.env` (on VM at deploy time) | Templated from vault | No (never in repo) |
-
-## VM hardening
-
-VM hardening is applied at image build time via the Ansible `base`
-role (`infra/ansible/roles/base/`). Every VM cloned from the base
-template inherits these controls automatically.
-
-### SSH hardening
-
-A hardened `sshd_config` is deployed
-(`infra/ansible/roles/base/templates/sshd_config.j2`):
-
-| Setting | Value | Purpose |
-|---------|-------|---------|
-| `PermitRootLogin` | `no` | Prevents direct root access |
-| `PasswordAuthentication` | `no` | Key-only authentication |
-| `PubkeyAuthentication` | `yes` | SSH keys required |
-| `MaxAuthTries` | `3` | Limits brute-force attempts |
-| `X11Forwarding` | `no` | Disables unnecessary feature |
-| `ClientAliveInterval` | `300` | Drops idle sessions after 5 min |
-| `ClientAliveCountMax` | `2` | Two missed keepalives before disconnect |
-
-### Firewall (UFW)
-
-UFW is configured with a default-deny-incoming policy. Only the
-following ports are explicitly opened:
-
-| Port | Protocol | Service |
-|------|----------|---------|
-| 22 | TCP | SSH |
-| 5000 | TCP | Flask web app |
-| 3000 | TCP | Grafana (admin access) |
-
-### Intrusion prevention (fail2ban)
-
-fail2ban monitors `/var/log/auth.log` for SSH brute-force attempts
-(`infra/ansible/roles/base/files/jail.local`):
-
-| Setting | Value |
-|---------|-------|
-| `maxretry` | 5 |
-| `bantime` | 3600 s (1 hour) |
-| `findtime` | 600 s (10 min) |
-
-### Automatic security patching
-
-`unattended-upgrades` is enabled to apply security patches daily.
-The configuration updates package lists daily, runs unattended
-upgrades daily, and autocleans the apt cache weekly.
+---
 
 ## Service accounts
 
@@ -188,6 +120,62 @@ These are injected into the `.env` file on the VM at deploy time
 (mode `0600`) and consumed by Docker Compose as environment variables.
 The PostgreSQL instance isn't exposed outside the Docker network.
 
+---
+
+
+## VM hardening
+
+The app VM runs a Ubuntu OS with basic hardening.
+
+VM hardening is applied at image build time via the Ansible `base`
+role (`infra/ansible/roles/base/`). Every VM cloned from the base
+template inherits these controls automatically.
+
+### SSH hardening
+
+A hardened `sshd_config` is deployed
+(`infra/ansible/roles/base/templates/sshd_config.j2`):
+
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| `PermitRootLogin` | `no` | Prevents direct root access |
+| `PasswordAuthentication` | `no` | Key-only authentication |
+| `PubkeyAuthentication` | `yes` | SSH keys required |
+| `MaxAuthTries` | `3` | Limits brute-force attempts |
+| `X11Forwarding` | `no` | Disables unnecessary feature |
+| `ClientAliveInterval` | `300` | Drops idle sessions after 5 min |
+| `ClientAliveCountMax` | `2` | Two missed keepalives before disconnect |
+
+### Firewall (UFW)
+
+UFW is configured with a default-deny-incoming policy. Only the
+following ports are explicitly opened:
+
+| Port | Protocol | Service |
+|------|----------|---------|
+| 22 | TCP | SSH |
+| 5000 | TCP | Flask web app |
+| 3000 | TCP | Grafana (admin access) |
+
+### Intrusion prevention (fail2ban)
+
+fail2ban monitors `/var/log/auth.log` for SSH brute-force attempts
+(`infra/ansible/roles/base/files/jail.local`):
+
+| Setting | Value |
+|---------|-------|
+| `maxretry` | 5 |
+| `bantime` | 3600 s (1 hour) |
+| `findtime` | 600 s (10 min) |
+
+### Automatic security patching
+
+`unattended-upgrades` is enabled to apply security patches daily.
+The configuration updates package lists daily, runs unattended
+upgrades daily, and autocleans the apt cache weekly.
+
+---
+
 ## Repository security
 
 Security measures implemented in the GitHub repository.
@@ -246,9 +234,7 @@ unbounded disk usage:
 
 IDE and local development configurations that catch issues early.
 
-No IDE-specific configurations (`.editorconfig`, `.vscode/`,
-`.pre-commit-config.yaml`) are currently in the repository. This is
-an area for future improvement. Potential additions include:
+Coming Soon (™️)
 
 - Pre-commit hooks for secret scanning (for example, `detect-secrets`
   or `gitleaks`)

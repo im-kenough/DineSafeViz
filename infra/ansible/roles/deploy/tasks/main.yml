@@ -4,6 +4,23 @@
   wait_for_connection:
     timeout: 120
 
+- name: Install GitHub deploy key
+  copy:
+    content: |
+      {{ vault_github_deploy_keys }}
+    dest: "/home/{{ service_account }}/.ssh/deploy-key"
+    owner: "{{ service_account }}"
+    group: "{{ service_account }}"
+    mode: "0600"
+
+- name: Deploy SSH config for GitHub
+  template:
+    src: ssh_config.j2
+    dest: "/home/{{ service_account }}/.ssh/config"
+    owner: "{{ service_account }}"
+    group: "{{ service_account }}"
+    mode: "0644"
+
 - name: Clone or update repo
   git:
     repo: "{{ app_repo }}"
