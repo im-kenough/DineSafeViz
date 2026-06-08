@@ -21,7 +21,7 @@ import psycopg2
 RECENT_CSV_URL = (
     "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/"
     "b6b4f3fb-2e2c-47e7-931d-b87d22806948/resource/"
-    "eda39233-4791-464e-98e6-094f51a01916/download/Dinesafe.csv"
+    "af0f5b8a-4b73-4a50-8781-65e949792b40/download/dinesafe.csv"
 )
 
 HISTORICAL_ZIP_URL = (
@@ -82,21 +82,19 @@ HISTORICAL_COLUMN_MAP = {
 # Maps recent CSV headers → unified inspections column names.
 # "_id" is intentionally absent (discarded on import).
 RECENT_COLUMN_MAP = {
-    "Establishment ID": "establishment_id",
-    "Inspection ID": "inspection_id",
-    "Establishment Name": "establishment_name",
-    "Establishment Type": "establishment_type",
-    "Establishment Address": "establishment_address",
-    "Infraction Details": "infraction_details",
-    "Inspection Observation": "inspection_observation",
-    "Inspection Date": "inspection_date",
-    "Severity": "severity",
-    "Action": "action",
-    "Outcome": "outcome",
-    "Outcome Date": "outcome_date",
-    "Amount Fined": "amount_fined",
-    "Latitude": "latitude",
-    "Longitude": "longitude",
+    "estId": "establishment_id",
+    "estName": "establishment_name",
+    "address": "establishment_address",
+    "typeDesc": "infraction_details",
+    "deficiencyDesc": "inspection_observation",
+    "inspectionDate": "inspection_date",
+    "inspectionStatus": "establishment_status",
+    "actionDesc": "action",
+    "OutcomeDesc": "outcome",
+    "OutcomeDate": "outcome_date",
+    "amountFined": "amount_fined",
+    "latitude": "latitude",
+    "longitude": "longitude",
     "unique_id": "unique_id",
 }
 

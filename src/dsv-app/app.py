@@ -16,13 +16,11 @@ app = Flask(__name__)
 
 DATA_START = date(2001, 1, 1)
 _QUARTER_MONTHS = {1: (1, 3), 2: (4, 6), 3: (7, 9), 4: (10, 12)}
-SEVERITY_ORDER = {
-    "C - Crucial": 0,
-    "S - Significant": 1,
-    "M - Minor": 2,
-    "NA": 3,
-    "None": 4
-    }
+STATUS_ORDER = {
+    "Closed": 0,
+    "Conditional Pass": 1,
+    "Pass": 2,
+}
 RECENT_YEARS = 4
 # The recent CSV only covers from Q4 2023 onward; historical data ends 2022.
 RECENT_DATA_START_YEAR = 2023
@@ -151,18 +149,18 @@ def inject_globals():
 
 
 def sort_rows(rows: List[Dict]) -> List[Dict]:
-    """Sort inspection records by severity level.
+    """Sort inspection records by establishment status.
 
-    Uses SEVERITY_ORDER to rank inspections from most to least severe.
-    Unknown severity values are sorted to the end (order value 5).
+    Uses STATUS_ORDER to rank inspections from most to least severe.
+    Unknown status values are sorted to the end (order value 5).
 
     Args:
         rows: List of inspection record dictionaries.
 
     Returns:
-        The same list sorted by severity in ascending order (most severe first).
+        The same list sorted by status in ascending order (most severe first).
     """
-    return sorted(rows, key=lambda r: SEVERITY_ORDER.get(r.get("severity"), 5))
+    return sorted(rows, key=lambda r: STATUS_ORDER.get(r.get("establishment_status"), 5))
 
 
 def build_days(rows: List[Dict], start: date, end: date) -> List[Tuple[date, List[Dict]]]:
@@ -259,7 +257,7 @@ def index():
     conn = psycopg2.connect(**DB_CONFIG)
     cur = conn.cursor()
     cur.execute(
-        "SELECT inspection_date, severity, action, infraction_details,"
+        "SELECT inspection_date, establishment_status, action, infraction_details,"
         "       establishment_name, establishment_address, establishment_type,"
         "       outcome, outcome_date, amount_fined"
         " FROM inspections"
@@ -269,7 +267,7 @@ def index():
     rows = [
         {
             "inspection_date": r[0],
-            "severity": r[1],
+            "establishment_status": r[1],
             "action": r[2],
             "infraction_details": r[3],
             "establishment_name": r[4],

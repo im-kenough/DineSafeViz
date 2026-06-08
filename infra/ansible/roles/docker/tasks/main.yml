@@ -1,0 +1,106 @@
+# infra/ansible/roles/docker/tasks/main.yml
+---
+# --- System Settlement ---
+
+- name: Wait for cloud-init and background apt processes
+  shell: |
+    cloud-init status --wait
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done
+  changed_when: false
+  failed_when: false
+
+# --- Docker CE Installation (official apt repository method) ---
+# Ref: https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository
+
+- name: Create keyrings directory
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Add Docker official GPG key
+  shell: |
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+      -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+  args:
+    creates: /etc/apt/keyrings/docker.asc
+
+- name: Add Docker apt repository
+  shell: |
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+      https://download.docker.com/linux/ubuntu \
+      $(. /etc/os-release && echo "${VERSION_CODENAME}") stable" \
+      > /etc/apt/sources.list.d/docker.list
+  args:
+    creates: /etc/apt/sources.list.d/docker.list
+
+- name: Update apt cache after adding Docker repo
+  apt:
+    update_cache: true
+
+- name: Install Docker CE packages
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+
+# --- Post-install: run Docker without sudo ---
+# Ref: https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user
+
+- name: Add service account to docker group
+  user:
+    name: "{{ service_account }}"
+    groups: docker
+    append: true
+
+# --- Start on boot with systemd ---
+
+- name: Enable Docker service on boot
+  systemd:
+    name: docker
+    enabled: true
+    state: started
+
+- name: Enable containerd service on boot
+  systemd:
+    name: containerd
+    enabled: true
+    state: started
+
+# --- Docker daemon configuration ---
+
+- name: Deploy Docker daemon config
+  template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart docker
+
+# --- Smoke test ---
+
+- name: Run Docker hello-world smoke test
+  command: docker run --rm hello-world
+  become: true
+  register: docker_hello
+  changed_when: false
+
+- name: Verify Docker smoke test passed
+  assert:
+    that: "'Hello from Docker!' in docker_hello.stdout"
+    fail_msg: "Docker smoke test failed"
+
+# --- Cleanup ---
+
+- name: Remove hello-world image
+  command: docker rmi hello-world
+  changed_when: true
+
+- name: Flush handlers to apply changes before cleanup
+  meta: flush_handlers

@@ -1,0 +1,65 @@
+# infra/ansible/group_vars/all.yml
+#
+# Centralized non-secret configuration for all IaC operations.
+# Secrets live in vault/secrets.yml (Ansible Vault encrypted).
+
+# --- Proxmox ---
+proxmox_api_url: "https://10.0.20.21:8006"
+proxmox_node: "yyz-hyp01"
+proxmox_storage: "local-lvm"
+proxmox_bridge: "vmbr0"
+proxmox_api_terraform_token_id: "svc-terraform@pve!terraform"
+proxmox_api_packer_token_id: "svc-packer@pve!packer"
+
+# --- Network ---
+network_gateway: "10.0.20.1"
+network_dns: "10.0.20.1"
+network_cidr: "/24"
+
+# --- Template IDs ---
+template_iac_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFmyYybUB9XU0yUVaViMXy8VHpxLe+MhqTfldUJhpcC8 iac"
+template_cloud_image: 9000
+template_ubuntu_base: 9100
+template_ubuntu_docker: 9101
+template_dsv_app: 9102
+
+# --- Packer Build ---
+# VM Configs used for building incremental images
+build_ip_base: "10.0.20.200"
+build_ip_docker: "10.0.20.201"
+build_ip_app: "10.0.20.202"
+packer_ssh_username: "adm-ubuntu"
+packer_cpu: 4
+packer_memory: 6144
+packer_disk_size: 40
+
+# --- Target app VM ---
+app_vm_name: "yyz-app-dsv01"
+app_vm_id: 8000
+app_vm_ip: "10.0.20.80"
+app_vm_cpu: 2
+app_vm_memory: 4096
+app_vm_disk_size: 60
+app_vm_timezone: "America/Toronto"
+
+# --- Service Account ---
+service_account: "adm-ubuntu"
+
+# --- Application ---
+app_dir: "/home/{{ service_account }}/app/DineSafeViz"
+app_repo: "git@github.com:im-kenough/DineSafeViz.git"
+# app_branch: "main"
+app_branch: "feat/iac-v0.3.0-deploy"
+
+# dinesafeviz analytics db configuration - postgresql db
+app_analytics_db_user: "dinesafe"
+app_analytics_db_name: "dinesafe"
+app_analytics_db_host: "dsv-db"
+app_analytics_db_port: 5432
+
+# dinesafeviz analytics dashboard (grafana)
+app_analytics_admin_user: "admin"
+
+# --- Docker ---
+docker_log_max_size: "10m"
+docker_log_max_file: "3"
