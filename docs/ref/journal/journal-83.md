@@ -130,3 +130,51 @@ All issues assigned to im-kenough, milestone v0.4.0, labeled per
 existing repo label taxonomy (iac, infra, infosec, ci-cd, db, ops, dr,
 documentation, chore, github_actions). Parent #141 includes ASCII
 dependency graph + child checklist.
+
+## 2026-06-10 — Expanded #142 + created #155 for pre-IaC manual prereqs
+
+User asked: "what do I need to do manually before I direct you to write
+the new AKS IAC? What do I need to do to the repo? what do I need to
+provision for Azure? give me requirements as github issues. modify/
+create them if they don't exist"
+
+Audited #142 against the full pre-IaC manual surface. Gaps found:
+local toolchain install, Azure Owner-role verification, resource provider
+registration, MFA enable, subscription-wide budget alert, the missing
+`dsv-shared` environment. Domain registration also missing as its own
+issue (different timing — independent of IaC writing; only blocks #151
+prod DNS cutover).
+
+Actions taken:
+
+- **Modified #142** — retitled to `chore(ci-cd,infra): epic 1 — pre-IaC
+  manual prerequisites`. Body restructured into five sub-sections:
+  Repo hygiene / GitHub Environments (now including `dsv-shared`) /
+  Local toolchain (az, terraform, kubectl, helm, helmfile + kubelogin) /
+  Azure account (MFA, Owner verification, RP registration, $50/mo
+  budget) / GitHub repo variables / Branch + commit. Acceptance criteria
+  rewritten as explicit verifiable bullets. Out-of-scope section calls
+  out #155 (domain) and Epic 2 Step 1 (TF state bootstrap) so future
+  agents don't duplicate or conflate.
+
+- **Created #155** — `chore(infra): domain registration — buy
+  dinesafeviz.com from Namecheap`. Labels: chore, infra, infosec.
+  Milestone: v0.4.0. Blocked-by: none. Blocks: #151 (prod deploy +
+  DNS cutover). Body covers purchase, registrar hygiene (2FA,
+  registrar lock, auto-renew, EPP storage), and pre-cutover notes
+  for #151 (without executing the NS swap).
+
+- **Updated #141** — added #155 to checklist (parallel-to-#142
+  positioning); redrew the ASCII dependency graph showing #155 as
+  a side-channel that converges into #151; updated acceptance
+  criteria to "All 13 child epics + #155 closed".
+
+Decision rationale for the split: keeping domain purchase in a separate
+issue avoids tangling personal-billing/registrar work with developer-
+workstation setup, and reflects real-world dependency — IaC writing
+can proceed in full without the domain existing; only the cutover
+step needs it.
+
+Cost flag: USD ~$13/yr for `.com`. No free alternative noted that
+suits portfolio use. Budget alert of $50/mo added to #142 to cover
+both monthly Azure spend + amortized domain.
