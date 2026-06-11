@@ -17,6 +17,11 @@ from flask import Flask, g, render_template, request
 from prometheus_flask_exporter import PrometheusMetrics
 from prometheus_client import Counter, Histogram
 from pythonjsonlogger import jsonlogger
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry.instrumentation.psycopg2 import Psycopg2Instrumentor
 
 app = Flask(__name__)
 
@@ -37,6 +42,12 @@ _stats_cache_misses = Counter("dsv_stats_cache_misses_total", "Stats cache misse
 _inspection_rows_returned = Histogram(
     "dsv_inspection_query_rows", "Inspection rows per /inspections request"
 )
+
+_otel_provider = TracerProvider()
+_otel_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+trace.set_tracer_provider(_otel_provider)
+FlaskInstrumentor().instrument_app(app)
+Psycopg2Instrumentor().instrument()
 
 DATA_START = date(2001, 1, 1)
 _QUARTER_MONTHS = {1: (1, 3), 2: (4, 6), 3: (7, 9), 4: (10, 12)}
