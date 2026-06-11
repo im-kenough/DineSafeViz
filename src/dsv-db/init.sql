@@ -32,8 +32,9 @@ GRANT USAGE, CREATE ON SCHEMA public TO dinesafe_migrator;
 GRANT ALL PRIVILEGES ON TABLE inspections TO dinesafe_migrator;
 GRANT ALL PRIVILEGES ON SEQUENCE inspections_id_seq TO dinesafe_migrator;
 
-ALTER DEFAULT PRIVILEGES FOR ROLE dinesafe_migrator IN SCHEMA public
+SET ROLE dinesafe_migrator;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
     GRANT SELECT ON TABLES TO dinesafe_app;
 
-ALTER DEFAULT PRIVILEGES FOR ROLE dinesafe_migrator IN SCHEMA public
-    GRANT USAGE ON SEQUENCES TO dinesafe_app;
+RESET ROLE;
