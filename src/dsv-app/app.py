@@ -23,7 +23,7 @@ _db_query_duration = Histogram(
 _stats_cache_hits = Counter("dsv_stats_cache_hits_total", "Stats cache hits")
 _stats_cache_misses = Counter("dsv_stats_cache_misses_total", "Stats cache misses")
 _inspection_rows_returned = Histogram(
-    "dsv_inspection_rows_returned_rows", "Inspection rows per /inspections request"
+    "dsv_inspection_query_rows", "Inspection rows per /inspections request"
 )
 
 DATA_START = date(2001, 1, 1)
@@ -279,10 +279,10 @@ def index():
                 (start, end),
             )
             raw_rows = cur.fetchall()
+        _inspection_rows_returned.observe(len(raw_rows))
         cur.close()
     finally:
         conn.close()
-    _inspection_rows_returned.observe(len(raw_rows))
 
     rows = [
         {
