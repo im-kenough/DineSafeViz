@@ -309,10 +309,12 @@ def healthz():
 def readyz():
     try:
         conn = psycopg2.connect(**DB_CONFIG, connect_timeout=1)
-        cur = conn.cursor()
-        cur.execute("SELECT 1")
-        cur.close()
-        conn.close()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT 1")
+            cur.close()
+        finally:
+            conn.close()
         return "ok", 200
     except Exception:
         return "db unreachable", 503
