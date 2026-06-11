@@ -23,3 +23,13 @@ def test_readyz_returns_503_when_db_fails(client):
     with patch("app.psycopg2.connect", side_effect=Exception("connection refused")):
         resp = client.get("/readyz")
     assert resp.status_code == 503
+
+
+def test_request_id_header_present(client):
+    resp = client.get("/healthz")
+    assert "X-Request-ID" in resp.headers
+
+
+def test_request_id_is_valid_uuid(client):
+    resp = client.get("/healthz")
+    uuid.UUID(resp.headers["X-Request-ID"])  # raises ValueError if invalid

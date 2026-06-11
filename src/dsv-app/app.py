@@ -4,17 +4,29 @@ This module provides a web interface to query and display food safety inspection
 from Toronto's DineSafe program, grouped by inspection date with severity-based sorting.
 """
 import calendar
+import logging
 import os
+import time
+import uuid
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Tuple
 
 import psycopg2
 import requests as http_requests
-from flask import Flask, render_template, request
+from flask import Flask, g, render_template, request
 from prometheus_flask_exporter import PrometheusMetrics
 from prometheus_client import Counter, Histogram
+from pythonjsonlogger import jsonlogger
 
 app = Flask(__name__)
+
+_logger = logging.getLogger("dsv-app")
+_log_handler = logging.StreamHandler()
+_log_handler.setFormatter(
+    jsonlogger.JsonFormatter("%(asctime)s %(name)s %(levelname)s %(message)s")
+)
+_logger.addHandler(_log_handler)
+_logger.setLevel(logging.INFO)
 
 metrics = PrometheusMetrics(app)
 _db_query_duration = Histogram(
@@ -139,6 +151,31 @@ def _read_version() -> str:
 
 
 _VERSION = _read_version()
+
+
+@app.before_request
+def _before_request():
+    g.request_id = str(uuid.uuid4())
+    g.start_time = time.monotonic()
+
+
+@app.after_request
+def _after_request(response):
+    duration_ms = round((time.monotonic() - g.start_time) * 1000, 2)
+    _logger.info(
+        "request",
+        extra={
+            "request_id": g.request_id,
+            "route": request.endpoint,
+            "method": request.method,
+            "status": response.status_code,
+            "duration_ms": duration_ms,
+            "remote_addr": request.remote_addr,
+            "user_agent": request.user_agent.string,
+        },
+    )
+    response.headers["X-Request-ID"] = g.request_id
+    return response
 
 
 @app.context_processor
