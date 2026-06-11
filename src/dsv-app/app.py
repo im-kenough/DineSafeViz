@@ -6,6 +6,7 @@ from Toronto's DineSafe program, grouped by inspection date with severity-based 
 import calendar
 import logging
 import os
+import threading
 import time
 import uuid
 from datetime import date, datetime, timedelta
@@ -40,7 +41,9 @@ _db_query_duration = Histogram(
 _stats_cache_hits = Counter("dsv_stats_cache_hits_total", "Stats cache hits")
 _stats_cache_misses = Counter("dsv_stats_cache_misses_total", "Stats cache misses")
 _inspection_rows_returned = Histogram(
-    "dsv_inspection_query_rows", "Inspection rows per /inspections request"
+    "dsv_inspection_query_rows",
+    "Inspection rows per /inspections request",
+    buckets=(100, 500, 1000, 5000, 10000, 50000),
 )
 
 _otel_provider = TracerProvider()
@@ -60,6 +63,7 @@ RECENT_YEARS = 4
 # The recent CSV only covers from Q4 2023 onward; historical data ends 2022.
 RECENT_DATA_START_YEAR = 2023
 _stats_cache = {"data": None, "fetched_at": None}
+_stats_cache_lock = threading.Lock()
 _STATS_TTL = timedelta(days=5)
 
 
@@ -272,27 +276,36 @@ def _get_home_stats() -> Dict[str, int]:
         _stats_cache_hits.inc()
         return _stats_cache["data"]
 
-    _stats_cache_misses.inc()
-    conn = psycopg2.connect(**DB_CONFIG)
-    try:
-        cur = conn.cursor()
-        with _db_query_duration.labels(route="home").time():
-            cur.execute(
-                "SELECT COUNT(*), MIN(inspection_date), MAX(inspection_date) FROM inspections"
-            )
-            total, min_date, max_date = cur.fetchone()
-        cur.close()
-    finally:
-        conn.close()
+    # Serialize cache fills so concurrent gthread workers don't stampede the DB.
+    with _stats_cache_lock:
+        if (
+            _stats_cache["fetched_at"] is not None
+            and now - _stats_cache["fetched_at"] <= _STATS_TTL
+        ):
+            _stats_cache_hits.inc()
+            return _stats_cache["data"]
 
-    years_of_data = 0
-    if min_date is not None and max_date is not None:
-        years_of_data = max_date.year - min_date.year + 1
+        _stats_cache_misses.inc()
+        conn = psycopg2.connect(**DB_CONFIG, connect_timeout=5)
+        try:
+            cur = conn.cursor()
+            with _db_query_duration.labels(route="home").time():
+                cur.execute(
+                    "SELECT COUNT(*), MIN(inspection_date), MAX(inspection_date) FROM inspections"
+                )
+                total, min_date, max_date = cur.fetchone()
+            cur.close()
+        finally:
+            conn.close()
 
-    stats = {"total_inspections": total, "years_of_data": years_of_data}
-    _stats_cache["data"] = stats
-    _stats_cache["fetched_at"] = now
-    return stats
+        years_of_data = 0
+        if min_date is not None and max_date is not None:
+            years_of_data = max_date.year - min_date.year + 1
+
+        stats = {"total_inspections": total, "years_of_data": years_of_data}
+        _stats_cache["data"] = stats
+        _stats_cache["fetched_at"] = now
+        return stats
 
 
 @app.route("/")
@@ -317,7 +330,7 @@ def index():
     year, q = parse_year_quarter(request.args)
     start, end = get_quarter_bounds(year, q)
 
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = psycopg2.connect(**DB_CONFIG, connect_timeout=5)
     try:
         cur = conn.cursor()
         with _db_query_duration.labels(route="inspections").time():

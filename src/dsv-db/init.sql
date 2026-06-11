@@ -32,9 +32,9 @@ GRANT USAGE, CREATE ON SCHEMA public TO dinesafe_migrator;
 GRANT ALL PRIVILEGES ON TABLE inspections TO dinesafe_migrator;
 GRANT ALL PRIVILEGES ON SEQUENCE inspections_id_seq TO dinesafe_migrator;
 
-SET ROLE dinesafe_migrator;
-
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
+-- Default privs must cover every role that actually creates tables. The
+-- migrator role exists for the intended split; refresh.py currently still
+-- connects as the bootstrap superuser, so list it explicitly too.
+ALTER DEFAULT PRIVILEGES FOR ROLE dinesafe, dinesafe_migrator
+    IN SCHEMA public
     GRANT SELECT ON TABLES TO dinesafe_app;
-
-RESET ROLE;
