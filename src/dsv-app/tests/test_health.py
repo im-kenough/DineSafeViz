@@ -32,4 +32,6 @@ def test_request_id_header_present(client):
 
 def test_request_id_is_valid_uuid(client):
     resp = client.get("/healthz")
-    uuid.UUID(resp.headers["X-Request-ID"])  # raises ValueError if invalid
+    header_value = resp.headers.get("X-Request-ID")
+    assert header_value is not None, "X-Request-ID header missing"
+    uuid.UUID(header_value)  # raises ValueError if not a valid UUID

@@ -161,11 +161,12 @@ def _before_request():
 
 @app.after_request
 def _after_request(response):
-    duration_ms = round((time.monotonic() - g.start_time) * 1000, 2)
+    start = getattr(g, "start_time", None)
+    duration_ms = round((time.monotonic() - start) * 1000, 2) if start is not None else None
     _logger.info(
         "request",
         extra={
-            "request_id": g.request_id,
+            "request_id": getattr(g, "request_id", None),
             "route": request.endpoint,
             "method": request.method,
             "status": response.status_code,
@@ -174,7 +175,9 @@ def _after_request(response):
             "user_agent": request.user_agent.string,
         },
     )
-    response.headers["X-Request-ID"] = g.request_id
+    request_id = getattr(g, "request_id", None)
+    if request_id:
+        response.headers["X-Request-ID"] = request_id
     return response
 
 
