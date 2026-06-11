@@ -12,7 +12,6 @@ from datetime import date, datetime, timedelta
 from typing import Dict, List, Tuple
 
 import psycopg2
-import requests as http_requests
 from flask import Flask, g, render_template, request
 from prometheus_flask_exporter import PrometheusMetrics
 from prometheus_client import Counter, Histogram
@@ -388,25 +387,3 @@ def readyz():
     except Exception:
         return "db unreachable", 503
 
-
-DSV_ANALYTICS_URL = os.environ.get("DSV_ANALYTICS_URL", "http://dsv-analytics:3000")
-_analytics_session = http_requests.Session()
-_HOP_BY_HOP = {"content-encoding", "content-length", "transfer-encoding", "connection"}
-
-
-@app.route("/analytics/", defaults={"path": ""}, methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
-@app.route("/analytics/<path:path>", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
-def analytics_proxy(path):
-    """Reverse-proxy requests to the internal analytics container."""
-    url = f"{DSV_ANALYTICS_URL}/analytics/{path}"
-    if request.query_string:
-        url = f"{url}?{request.query_string.decode()}"
-    resp = _analytics_session.request(
-        method=request.method,
-        url=url,
-        headers={k: v for k, v in request.headers if k.lower() != "host"},
-        data=request.get_data(),
-        allow_redirects=False,
-    )
-    headers = {k: v for k, v in resp.headers.items() if k.lower() not in _HOP_BY_HOP}
-    return resp.content, resp.status_code, headers

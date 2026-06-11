@@ -1,12 +1,20 @@
 name: dsv
 
 services:
-  # DSV-App: Flask web application service
-  # Serves the website frontend and API, proxies analytics dashboard at /analytics/
+  dsv-nginx:
+    image: nginx:stable-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./src/dsv-nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      dsv-app:
+        condition: service_started
+      dsv-analytics:
+        condition: service_started
+
   dsv-app:
     build: ./src/dsv-app
-    ports:
-      - "5000:5000"
     environment:
       DSV_DB_HOST: dsv-db
       DSV_DB_PORT: ${DSV_DB_PORT}
@@ -16,11 +24,7 @@ services:
     depends_on:
       dsv-db:
         condition: service_healthy
-      dsv-analytics:
-        condition: service_started
 
-  # DSV-DB: PostgreSQL database service
-  # Stores City of Toronto DineSafe dataset
   dsv-db:
     image: postgres:17.0
     environment:
@@ -36,7 +40,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # One-shot service: seeds the DB on first run, refreshes recent data on subsequent runs.
   dsv-init-db:
     build: ./src/dsv-db
     environment:
@@ -50,13 +53,12 @@ services:
         condition: service_healthy
     restart: "no"
 
-  # DSV-Analytics: a Grafana dashboard
   dsv-analytics:
     image: grafana/grafana:11.2.0
     ports:
       - "3000:3000"
     environment:
-      GF_SERVER_ROOT_URL: ${DSV_ANALYTICS_ROOT_URL:-http://localhost:5000/analytics/}
+      GF_SERVER_ROOT_URL: ${DSV_ANALYTICS_ROOT_URL:-http://localhost:8080/analytics/}
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
       GF_SECURITY_ADMIN_USER: ${DSV_ANALYTICS_ADMIN_USER}
       GF_SECURITY_ADMIN_PASSWORD: ${DSV_ANALYTICS_ADMIN_PASSWORD}
@@ -77,7 +79,6 @@ services:
       dsv-db:
         condition: service_healthy
 
-  # Grafana 11 RBAC requires explicit dashboard permissions even for anonymous Viewer role.
   dsv-init-analytics:
     image: curlimages/curl:latest
     depends_on:
