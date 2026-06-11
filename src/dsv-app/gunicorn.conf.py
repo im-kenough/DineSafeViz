@@ -6,5 +6,5 @@ graceful_timeout = 30
 keepalive = 5
 accesslog = "-"
 errorlog = "-"
-preload_app = True
+preload_app = True   # safe for 1 worker + gthread; revisit when adding OTLP exporter with multi-worker
 bind = "0.0.0.0:8000"

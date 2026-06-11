@@ -11,6 +11,7 @@ RUN groupadd --gid 65532 nonroot \
 WORKDIR /app
 COPY --from=build /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=build /usr/local/bin/gunicorn /usr/local/bin/gunicorn
+COPY --from=build /usr/local/bin/flask /usr/local/bin/flask
 COPY --chown=nonroot:nonroot . .
 USER nonroot:nonroot
 CMD ["gunicorn", "-c", "gunicorn.conf.py", "app:app"]
