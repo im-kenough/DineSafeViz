@@ -23,7 +23,7 @@ _db_query_duration = Histogram(
 _stats_cache_hits = Counter("dsv_stats_cache_hits_total", "Stats cache hits")
 _stats_cache_misses = Counter("dsv_stats_cache_misses_total", "Stats cache misses")
 _inspection_rows_returned = Histogram(
-    "dsv_inspection_rows_returned", "Inspection rows per /inspections request"
+    "dsv_inspection_rows_returned_rows", "Inspection rows per /inspections request"
 )
 
 DATA_START = date(2001, 1, 1)
@@ -267,19 +267,21 @@ def index():
     start, end = get_quarter_bounds(year, q)
 
     conn = psycopg2.connect(**DB_CONFIG)
-    cur = conn.cursor()
-    with _db_query_duration.labels(route="inspections").time():
-        cur.execute(
-            "SELECT inspection_date, establishment_status, action, infraction_details,"
-            "       establishment_name, establishment_address, establishment_type,"
-            "       outcome, outcome_date, amount_fined"
-            " FROM inspections"
-            " WHERE inspection_date BETWEEN %s AND %s",
-            (start, end),
-        )
-        raw_rows = cur.fetchall()
-    cur.close()
-    conn.close()
+    try:
+        cur = conn.cursor()
+        with _db_query_duration.labels(route="inspections").time():
+            cur.execute(
+                "SELECT inspection_date, establishment_status, action, infraction_details,"
+                "       establishment_name, establishment_address, establishment_type,"
+                "       outcome, outcome_date, amount_fined"
+                " FROM inspections"
+                " WHERE inspection_date BETWEEN %s AND %s",
+                (start, end),
+            )
+            raw_rows = cur.fetchall()
+        cur.close()
+    finally:
+        conn.close()
     _inspection_rows_returned.observe(len(raw_rows))
 
     rows = [
