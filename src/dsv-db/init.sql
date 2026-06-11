@@ -25,7 +25,7 @@ CREATE TABLE inspections (
 
 GRANT CONNECT ON DATABASE dinesafe TO dinesafe_app;
 GRANT USAGE   ON SCHEMA public       TO dinesafe_app;
-GRANT SELECT ON TABLE inspections TO dinesafe_app;
+GRANT SELECT ON TABLE inspections TO dinesafe_app; -- SELECT only: Flask app is read-only; dsv-init-db handles writes
 
 GRANT CONNECT ON DATABASE dinesafe TO dinesafe_migrator;
 GRANT USAGE, CREATE ON SCHEMA public TO dinesafe_migrator;
