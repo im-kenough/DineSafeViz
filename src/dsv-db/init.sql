@@ -25,9 +25,15 @@ CREATE TABLE inspections (
 
 GRANT CONNECT ON DATABASE dinesafe TO dinesafe_app;
 GRANT USAGE   ON SCHEMA public       TO dinesafe_app;
-GRANT SELECT, INSERT, UPDATE ON TABLE inspections TO dinesafe_app;
+GRANT SELECT ON TABLE inspections TO dinesafe_app;
 
 GRANT CONNECT ON DATABASE dinesafe TO dinesafe_migrator;
 GRANT USAGE, CREATE ON SCHEMA public TO dinesafe_migrator;
 GRANT ALL PRIVILEGES ON TABLE inspections TO dinesafe_migrator;
 GRANT ALL PRIVILEGES ON SEQUENCE inspections_id_seq TO dinesafe_migrator;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE dinesafe_migrator IN SCHEMA public
+    GRANT SELECT ON TABLES TO dinesafe_app;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE dinesafe_migrator IN SCHEMA public
+    GRANT USAGE ON SEQUENCES TO dinesafe_app;
