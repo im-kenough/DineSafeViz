@@ -11,8 +11,8 @@ services:
       DSV_DB_HOST: dsv-db
       DSV_DB_PORT: ${DSV_DB_PORT}
       DSV_DB_NAME: ${DSV_DB_NAME}
-      DSV_DB_USER: ${DSV_DB_USER}
-      DSV_DB_PASSWORD: ${DSV_DB_PASSWORD}
+      DSV_DB_USER: ${DSV_DB_APP_USER:-dinesafe_app}
+      DSV_DB_PASSWORD: ${DSV_DB_APP_PASSWORD:-dinesafe_app}
     depends_on:
       dsv-db:
         condition: service_healthy
@@ -68,8 +68,8 @@ services:
       DSV_DB_HOST: dsv-db
       DSV_DB_PORT: ${DSV_DB_PORT}
       DSV_DB_NAME: ${DSV_DB_NAME}
-      DSV_DB_USER: ${DSV_DB_USER}
-      DSV_DB_PASSWORD: ${DSV_DB_PASSWORD}
+      DSV_DB_USER: ${DSV_DB_APP_USER:-dinesafe_app}
+      DSV_DB_PASSWORD: ${DSV_DB_APP_PASSWORD:-dinesafe_app}
     volumes:
       - ./src/dsv-analytics/provisioning:/etc/grafana/provisioning
       - dsv-analytics-data:/var/lib/grafana
