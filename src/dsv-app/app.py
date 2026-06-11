@@ -11,8 +11,20 @@ from typing import Dict, List, Tuple
 import psycopg2
 import requests as http_requests
 from flask import Flask, render_template, request
+from prometheus_flask_exporter import PrometheusMetrics
+from prometheus_client import Counter, Histogram
 
 app = Flask(__name__)
+
+metrics = PrometheusMetrics(app)
+_db_query_duration = Histogram(
+    "dsv_db_query_duration_seconds", "DB query latency", ["route"]
+)
+_stats_cache_hits = Counter("dsv_stats_cache_hits_total", "Stats cache hits")
+_stats_cache_misses = Counter("dsv_stats_cache_misses_total", "Stats cache misses")
+_inspection_rows_returned = Histogram(
+    "dsv_inspection_rows_returned", "Inspection rows per /inspections request"
+)
 
 DATA_START = date(2001, 1, 1)
 _QUARTER_MONTHS = {1: (1, 3), 2: (4, 6), 3: (7, 9), 4: (10, 12)}
@@ -203,18 +215,21 @@ DB_CONFIG = {
 def _get_home_stats() -> Dict[str, int]:
     now = datetime.now()
     if (
-        _stats_cache["fetched_at"] is not None and
-        now - _stats_cache["fetched_at"] <= _STATS_TTL
+        _stats_cache["fetched_at"] is not None
+        and now - _stats_cache["fetched_at"] <= _STATS_TTL
     ):
+        _stats_cache_hits.inc()
         return _stats_cache["data"]
 
+    _stats_cache_misses.inc()
     conn = psycopg2.connect(**DB_CONFIG)
     try:
         cur = conn.cursor()
-        cur.execute(
-            "SELECT COUNT(*), MIN(inspection_date), MAX(inspection_date) FROM inspections"
-        )
-        total, min_date, max_date = cur.fetchone()
+        with _db_query_duration.labels(route="home").time():
+            cur.execute(
+                "SELECT COUNT(*), MIN(inspection_date), MAX(inspection_date) FROM inspections"
+            )
+            total, min_date, max_date = cur.fetchone()
         cur.close()
     finally:
         conn.close()
@@ -223,10 +238,7 @@ def _get_home_stats() -> Dict[str, int]:
     if min_date is not None and max_date is not None:
         years_of_data = max_date.year - min_date.year + 1
 
-    stats = {
-        "total_inspections": total,
-        "years_of_data": years_of_data,
-    }
+    stats = {"total_inspections": total, "years_of_data": years_of_data}
     _stats_cache["data"] = stats
     _stats_cache["fetched_at"] = now
     return stats
@@ -256,14 +268,20 @@ def index():
 
     conn = psycopg2.connect(**DB_CONFIG)
     cur = conn.cursor()
-    cur.execute(
-        "SELECT inspection_date, establishment_status, action, infraction_details,"
-        "       establishment_name, establishment_address, establishment_type,"
-        "       outcome, outcome_date, amount_fined"
-        " FROM inspections"
-        " WHERE inspection_date BETWEEN %s AND %s",
-        (start, end),
-    )
+    with _db_query_duration.labels(route="inspections").time():
+        cur.execute(
+            "SELECT inspection_date, establishment_status, action, infraction_details,"
+            "       establishment_name, establishment_address, establishment_type,"
+            "       outcome, outcome_date, amount_fined"
+            " FROM inspections"
+            " WHERE inspection_date BETWEEN %s AND %s",
+            (start, end),
+        )
+        raw_rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    _inspection_rows_returned.observe(len(raw_rows))
+
     rows = [
         {
             "inspection_date": r[0],
@@ -277,10 +295,8 @@ def index():
             "outcome_date": r[8],
             "amount_fined": r[9],
         }
-        for r in cur.fetchall()
+        for r in raw_rows
     ]
-    cur.close()
-    conn.close()
 
     return render_template(
         "index.html",
