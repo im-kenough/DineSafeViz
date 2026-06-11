@@ -9,7 +9,7 @@ services:
       - ./src/dsv-nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       dsv-app:
-        condition: service_started
+        condition: service_healthy
       dsv-analytics:
         condition: service_started
 
@@ -21,6 +21,12 @@ services:
       DSV_DB_NAME: ${DSV_DB_NAME}
       DSV_DB_USER: ${DSV_DB_APP_USER:-dinesafe_app}
       DSV_DB_PASSWORD: ${DSV_DB_APP_PASSWORD:-dinesafe_app}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
     depends_on:
       dsv-db:
         condition: service_healthy

@@ -31,6 +31,7 @@ _log_handler.setFormatter(
 )
 _logger.addHandler(_log_handler)
 _logger.setLevel(logging.INFO)
+_logger.propagate = False
 
 metrics = PrometheusMetrics(app)
 _db_query_duration = Histogram(
