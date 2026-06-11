@@ -300,6 +300,24 @@ def info():
     return render_template("info.html")
 
 
+@app.route("/healthz")
+def healthz():
+    return "ok", 200
+
+
+@app.route("/readyz")
+def readyz():
+    try:
+        conn = psycopg2.connect(**DB_CONFIG, connect_timeout=1)
+        cur = conn.cursor()
+        cur.execute("SELECT 1")
+        cur.close()
+        conn.close()
+        return "ok", 200
+    except Exception:
+        return "db unreachable", 503
+
+
 DSV_ANALYTICS_URL = os.environ.get("DSV_ANALYTICS_URL", "http://dsv-analytics:3000")
 _analytics_session = http_requests.Session()
 _HOP_BY_HOP = {"content-encoding", "content-length", "transfer-encoding", "connection"}
