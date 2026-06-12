@@ -1,6 +1,19 @@
 # Application architecture
 
-This document describes the application architecture of DineSafeViz.
+This document describes the application architecture of DineSafeViz, which is a [3-tier web application](https://learn.microsoft.com/en-us/azure/architecture/guide/architecture-styles/n-tier). 
+
+**Tier 1 — Presentation / edge**
+dsv-nginx terminates the only externally exposed port (8080) and routes traffic to either the Flask UI or the embedded Grafana UI. Grafana's web UI is also a presentation-layer consumer.
+
+**Tier 2 — Application / business logic**
+dsv-app — the Flask app under gunicorn. Renders templates, handles /healthz, /readyz, /metrics, queries the DB, applies the 5-day in-memory cache for home stats.
+
+**Tier 3 — Data**
+dsv-db (PostgreSQL 17) is the single source of truth. Both dsv-app and dsv-analytics (Grafana) read from it via the SELECT-only dinesafe_app role.
+
+The two one-shot containers (dsv-init-db, dsv-init-analytics) are bootstrap/migration tooling, not their own tier — they exist to bring the data tier and the Grafana tenant into a known state at start.
+
+
 
 It covers the Docker Compose services, the Flask web app, the analytics
 dashboard, and how they fit together. For data-layer details see
