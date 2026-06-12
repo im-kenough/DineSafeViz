@@ -4,15 +4,53 @@ This module provides a web interface to query and display food safety inspection
 from Toronto's DineSafe program, grouped by inspection date with severity-based sorting.
 """
 import calendar
+import logging
 import os
+import threading
+import time
+import uuid
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Tuple
 
 import psycopg2
-import requests as http_requests
-from flask import Flask, render_template, request
+from flask import Flask, g, render_template, request
+from prometheus_flask_exporter import PrometheusMetrics
+from prometheus_client import Counter, Histogram
+from pythonjsonlogger import jsonlogger
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry.instrumentation.psycopg2 import Psycopg2Instrumentor
 
 app = Flask(__name__)
+
+_logger = logging.getLogger("dsv-app")
+_log_handler = logging.StreamHandler()
+_log_handler.setFormatter(
+    jsonlogger.JsonFormatter("%(asctime)s %(name)s %(levelname)s %(message)s")
+)
+_logger.addHandler(_log_handler)
+_logger.setLevel(logging.INFO)
+_logger.propagate = False
+
+metrics = PrometheusMetrics(app)
+_db_query_duration = Histogram(
+    "dsv_db_query_duration_seconds", "DB query latency", ["route"]
+)
+_stats_cache_hits = Counter("dsv_stats_cache_hits_total", "Stats cache hits")
+_stats_cache_misses = Counter("dsv_stats_cache_misses_total", "Stats cache misses")
+_inspection_rows_returned = Histogram(
+    "dsv_inspection_query_rows",
+    "Inspection rows per /inspections request",
+    buckets=(100, 500, 1000, 5000, 10000, 50000),
+)
+
+_otel_provider = TracerProvider()
+_otel_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+trace.set_tracer_provider(_otel_provider)
+FlaskInstrumentor().instrument_app(app)
+Psycopg2Instrumentor().instrument()
 
 DATA_START = date(2001, 1, 1)
 _QUARTER_MONTHS = {1: (1, 3), 2: (4, 6), 3: (7, 9), 4: (10, 12)}
@@ -25,6 +63,7 @@ RECENT_YEARS = 4
 # The recent CSV only covers from Q4 2023 onward; historical data ends 2022.
 RECENT_DATA_START_YEAR = 2023
 _stats_cache = {"data": None, "fetched_at": None}
+_stats_cache_lock = threading.Lock()
 _STATS_TTL = timedelta(days=5)
 
 
@@ -129,6 +168,34 @@ def _read_version() -> str:
 _VERSION = _read_version()
 
 
+@app.before_request
+def _before_request():
+    g.request_id = str(uuid.uuid4())
+    g.start_time = time.monotonic()
+
+
+@app.after_request
+def _after_request(response):
+    start = getattr(g, "start_time", None)
+    duration_ms = round((time.monotonic() - start) * 1000, 2) if start is not None else None
+    _logger.info(
+        "request",
+        extra={
+            "request_id": getattr(g, "request_id", None),
+            "route": request.endpoint,
+            "method": request.method,
+            "status": response.status_code,
+            "duration_ms": duration_ms,
+            "remote_addr": request.remote_addr,
+            "user_agent": request.user_agent.string,
+        },
+    )
+    request_id = getattr(g, "request_id", None)
+    if request_id:
+        response.headers["X-Request-ID"] = request_id
+    return response
+
+
 @app.context_processor
 def inject_globals():
     """Inject global variables into all templates."""
@@ -203,33 +270,42 @@ DB_CONFIG = {
 def _get_home_stats() -> Dict[str, int]:
     now = datetime.now()
     if (
-        _stats_cache["fetched_at"] is not None and
-        now - _stats_cache["fetched_at"] <= _STATS_TTL
+        _stats_cache["fetched_at"] is not None
+        and now - _stats_cache["fetched_at"] <= _STATS_TTL
     ):
+        _stats_cache_hits.inc()
         return _stats_cache["data"]
 
-    conn = psycopg2.connect(**DB_CONFIG)
-    try:
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT COUNT(*), MIN(inspection_date), MAX(inspection_date) FROM inspections"
-        )
-        total, min_date, max_date = cur.fetchone()
-        cur.close()
-    finally:
-        conn.close()
+    # Serialize cache fills so concurrent gthread workers don't stampede the DB.
+    with _stats_cache_lock:
+        if (
+            _stats_cache["fetched_at"] is not None
+            and now - _stats_cache["fetched_at"] <= _STATS_TTL
+        ):
+            _stats_cache_hits.inc()
+            return _stats_cache["data"]
 
-    years_of_data = 0
-    if min_date is not None and max_date is not None:
-        years_of_data = max_date.year - min_date.year + 1
+        _stats_cache_misses.inc()
+        conn = psycopg2.connect(**DB_CONFIG, connect_timeout=5)
+        try:
+            cur = conn.cursor()
+            with _db_query_duration.labels(route="home").time():
+                cur.execute(
+                    "SELECT COUNT(*), MIN(inspection_date), MAX(inspection_date) FROM inspections"
+                )
+                total, min_date, max_date = cur.fetchone()
+            cur.close()
+        finally:
+            conn.close()
 
-    stats = {
-        "total_inspections": total,
-        "years_of_data": years_of_data,
-    }
-    _stats_cache["data"] = stats
-    _stats_cache["fetched_at"] = now
-    return stats
+        years_of_data = 0
+        if min_date is not None and max_date is not None:
+            years_of_data = max_date.year - min_date.year + 1
+
+        stats = {"total_inspections": total, "years_of_data": years_of_data}
+        _stats_cache["data"] = stats
+        _stats_cache["fetched_at"] = now
+        return stats
 
 
 @app.route("/")
@@ -254,16 +330,24 @@ def index():
     year, q = parse_year_quarter(request.args)
     start, end = get_quarter_bounds(year, q)
 
-    conn = psycopg2.connect(**DB_CONFIG)
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT inspection_date, establishment_status, action, infraction_details,"
-        "       establishment_name, establishment_address, establishment_type,"
-        "       outcome, outcome_date, amount_fined"
-        " FROM inspections"
-        " WHERE inspection_date BETWEEN %s AND %s",
-        (start, end),
-    )
+    conn = psycopg2.connect(**DB_CONFIG, connect_timeout=5)
+    try:
+        cur = conn.cursor()
+        with _db_query_duration.labels(route="inspections").time():
+            cur.execute(
+                "SELECT inspection_date, establishment_status, action, infraction_details,"
+                "       establishment_name, establishment_address, establishment_type,"
+                "       outcome, outcome_date, amount_fined"
+                " FROM inspections"
+                " WHERE inspection_date BETWEEN %s AND %s",
+                (start, end),
+            )
+            raw_rows = cur.fetchall()
+        _inspection_rows_returned.observe(len(raw_rows))
+        cur.close()
+    finally:
+        conn.close()
+
     rows = [
         {
             "inspection_date": r[0],
@@ -277,10 +361,8 @@ def index():
             "outcome_date": r[8],
             "amount_fined": r[9],
         }
-        for r in cur.fetchall()
+        for r in raw_rows
     ]
-    cur.close()
-    conn.close()
 
     return render_template(
         "index.html",
@@ -300,24 +382,22 @@ def info():
     return render_template("info.html")
 
 
-DSV_ANALYTICS_URL = os.environ.get("DSV_ANALYTICS_URL", "http://dsv-analytics:3000")
-_analytics_session = http_requests.Session()
-_HOP_BY_HOP = {"content-encoding", "content-length", "transfer-encoding", "connection"}
+@app.route("/healthz")
+def healthz():
+    return "ok", 200
 
 
-@app.route("/analytics/", defaults={"path": ""}, methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
-@app.route("/analytics/<path:path>", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
-def analytics_proxy(path):
-    """Reverse-proxy requests to the internal analytics container."""
-    url = f"{DSV_ANALYTICS_URL}/analytics/{path}"
-    if request.query_string:
-        url = f"{url}?{request.query_string.decode()}"
-    resp = _analytics_session.request(
-        method=request.method,
-        url=url,
-        headers={k: v for k, v in request.headers if k.lower() != "host"},
-        data=request.get_data(),
-        allow_redirects=False,
-    )
-    headers = {k: v for k, v in resp.headers.items() if k.lower() not in _HOP_BY_HOP}
-    return resp.content, resp.status_code, headers
+@app.route("/readyz")
+def readyz():
+    try:
+        conn = psycopg2.connect(**DB_CONFIG, connect_timeout=1)
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT 1")
+            cur.close()
+        finally:
+            conn.close()
+        return "ok", 200
+    except Exception:
+        return "db unreachable", 503
+

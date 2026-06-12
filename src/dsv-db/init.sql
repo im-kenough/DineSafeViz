@@ -1,3 +1,6 @@
+CREATE ROLE dinesafe_migrator WITH LOGIN PASSWORD 'dinesafe_migrator';
+CREATE ROLE dinesafe_app      WITH LOGIN PASSWORD 'dinesafe_app';
+
 CREATE TABLE inspections (
     id                          SERIAL PRIMARY KEY,
     establishment_id            TEXT,
@@ -19,3 +22,19 @@ CREATE TABLE inspections (
     establishment_status        TEXT,
     min_inspections_per_year    TEXT
 );
+
+GRANT CONNECT ON DATABASE dinesafe TO dinesafe_app;
+GRANT USAGE   ON SCHEMA public       TO dinesafe_app;
+GRANT SELECT ON TABLE inspections TO dinesafe_app; -- SELECT only: Flask app is read-only; dsv-init-db handles writes
+
+GRANT CONNECT ON DATABASE dinesafe TO dinesafe_migrator;
+GRANT USAGE, CREATE ON SCHEMA public TO dinesafe_migrator;
+GRANT ALL PRIVILEGES ON TABLE inspections TO dinesafe_migrator;
+GRANT ALL PRIVILEGES ON SEQUENCE inspections_id_seq TO dinesafe_migrator;
+
+-- Default privs must cover every role that actually creates tables. The
+-- migrator role exists for the intended split; refresh.py currently still
+-- connects as the bootstrap superuser, so list it explicitly too.
+ALTER DEFAULT PRIVILEGES FOR ROLE dinesafe, dinesafe_migrator
+    IN SCHEMA public
+    GRANT SELECT ON TABLES TO dinesafe_app;
