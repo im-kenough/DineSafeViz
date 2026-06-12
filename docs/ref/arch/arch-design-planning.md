@@ -74,6 +74,8 @@ This app will use Azure Kubernetes Service.
 
 Azure Virtual Machines: yes this application can be totally hosted on a simple VM with load balancers and a WAF placed in front of it, but the point is to illustrate DevOps skills
 
+[Choose AKS](/docs/img/choose-aks.png)
+
 Azure APp Service:
 
 Azure Functions:
