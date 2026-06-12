@@ -53,6 +53,7 @@ app_branch: "feat/iac-v0.3.0-deploy"
 
 # dinesafeviz analytics db configuration - postgresql db
 app_analytics_db_user: "dinesafe"
+app_analytics_db_app_user: dinesafe_app
 app_analytics_db_name: "dinesafe"
 app_analytics_db_host: "dsv-db"
 app_analytics_db_port: 5432
