@@ -65,16 +65,22 @@ The app is a N-tier architecture, single-region, with role-segmented data-tier a
 
 
 
-## (Technology choices)[https://learn.microsoft.com/en-us/azure/architecture/guide/technology-choices/technology-choices-overview] for Azure solutions
+## [Technology choices](https://learn.microsoft.com/en-us/azure/architecture/guide/technology-choices/technology-choices-overview) for Azure solutions
 
 ### Choose a compute service
+
+Q: What compute service do I choose?
+
+A: AKS
+
 This app will use Azure Kubernetes Service.
 
 [Considerations](https://learn.microsoft.com/en-us/azure/architecture/guide/technology-choices/compute-decision-tree)
 
+![Choose AKS](/docs/img/choose-aks.png)
+
 Azure Virtual Machines: yes this application can be totally hosted on a simple VM with load balancers and a WAF placed in front of it, but the point is to illustrate DevOps skills
 
-[Choose AKS](/docs/img/choose-aks.png)
 
 Azure APp Service:
 
@@ -100,6 +106,16 @@ DineVizSafe is a traditional web app.
 There's no 
 
 ### Choose a container option
+
+You can use multiple methods to build and deploy containerized applications in Azure. The following articles can help you evaluate container services.
+
+- Choose an Azure container service: Evaluate which Azure container service best suits your specific workload scenarios and requirements.
+
+- Compare Azure Container Apps with other Azure container options: Learn when to use Container Apps and how it compares to other container options, including Azure Container Instances, Azure App Service, Azure Functions, and Azure Kubernetes Service (AKS).
+
+- Choose a Kubernetes at the edge compute option: Learn about trade-offs and considerations for various Kubernetes options for extending compute at the edge.
+
+
 
 ### Choose a hybrid service
 
