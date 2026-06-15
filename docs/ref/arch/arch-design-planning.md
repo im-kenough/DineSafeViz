@@ -79,41 +79,69 @@ This app will use Azure Kubernetes Service.
 
 ![Choose AKS](/docs/img/choose-aks.png)
 
-Azure Virtual Machines: yes this application can be totally hosted on a simple VM with load balancers and a WAF placed in front of it, but the point is to illustrate DevOps skills
+#### Decision tree path
 
+DineSafeViz is a greenfield (build-new) workload, not a migration. Following the
+decision tree:
 
-Azure APp Service:
+1. Need full IaaS control? **No** — want managed infrastructure where practical
+2. HPC or batch processing? **No**
+3. Event-driven / serverless triggers? **No** — serves HTTP pages continuously
+4. Managed web hosting only (no containers)? **No** — container orchestration is
+   the point
+5. Need container orchestration? **Yes**
+6. Need direct Kubernetes API and control plane access? **Yes** → **AKS**
+   (Container Apps abstracts away the K8s API, reducing demonstration value)
 
-Azure Functions:
+#### Candidates evaluated
 
-Azure Kubernetes Service: chosing this to demonstrate a widely used enterprise tool.
-
-Azure Container Instances: My image can be run on ACI, but is the infrastructure is managed, defeating the purpose
-
-Azure Red Hat OpenShift: Not applicable. Not using Openshift
-
-Azure Batch: Not applicable. Not a HPC app
-
-Azure VMWare Solution: Not applicable. Not a VMware workload.
+| Service | Decision | Reason |
+|---|---|---|
+| Azure Virtual Machines | Rejected | IaaS; full OS/patching overhead; could host the app but teaches nothing new about container ops |
+| Azure App Service | Rejected | PaaS web hosting only; no Kubernetes exposure; suited to web-queue-worker style, not N-tier with container ops |
+| Azure Functions | Rejected | FaaS / event-driven compute; no fit for a continuous page-serving web app |
+| Azure Kubernetes Service | **Selected** | Managed Kubernetes; exposes control plane and K8s API directly; widely used enterprise tool for DevOps showcase |
+| Azure Container Apps | Rejected | Built on Kubernetes but hides the K8s API; reduces hands-on orchestration demonstration value |
+| Azure Container Instances | Rejected | Runs a single container group with no orchestration layer; too simple for a DevOps showcase |
+| Azure Red Hat OpenShift | Rejected | Not applicable — no OpenShift requirement or existing investment |
+| Azure Batch | Rejected | Not applicable — HPC/parallel processing workload |
+| Azure VMware Solution | Rejected | Not applicable — VMware workload migration only |
 
 #### Traditional [Web App vs Single Page App](https://learn.microsoft.com/en-us/dotnet/architecture/modern-web-apps-azure/choose-between-traditional-web-and-single-page-apps)
 
-DineVizSafe is a traditional web app.
-- Every page is read only. No user creates, edits or submits data
-- No auth wall. Public URL & Static URLs per page
-- Inspections are a table, home is a stats & the dashboard is an iframe
+DineSafeViz is a traditional web app. The Microsoft decision criteria confirm this:
 
-There's no 
+- **Read-only client-side requirements** — every page is read-only; no user
+  creates, edits, or submits data
+- **Public-facing with SEO benefit** — no auth wall; static, bookmarkable URLs
+  per page benefit from search engine indexing
+- **No rich interactive UI** — the inspections page is a table, home is stats,
+  and the dashboard is an embedded iframe; no drag-and-drop or complex form flows
+- **No existing API to expose** — there is no web API contract driving a need
+  for a SPA front-end
+
+A SPA would be overkill for this use case. Blazor is not relevant because this
+is not a .NET project.
 
 ### Choose a container option
 
-You can use multiple methods to build and deploy containerized applications in Azure. The following articles can help you evaluate container services.
+The compute decision in the previous section already resolved the container
+service question: AKS is the chosen platform. This section records why the other
+container-specific options were set aside.
 
-- Choose an Azure container service: Evaluate which Azure container service best suits your specific workload scenarios and requirements.
+**Azure Container Apps** is the closest alternative. It is a managed service
+built on top of Kubernetes and provides Dapr integration, per-app scaling, and
+scale-to-zero out of the box. However, it does not expose the Kubernetes API or
+control plane. For a DevOps portfolio project the hands-on K8s surface is the
+point, so Container Apps is ruled out.
 
-- Compare Azure Container Apps with other Azure container options: Learn when to use Container Apps and how it compares to other container options, including Azure Container Instances, Azure App Service, Azure Functions, and Azure Kubernetes Service (AKS).
+**Azure Container Instances** can run the application image directly and is the
+simplest path to a running container in Azure. It has no orchestration, no
+scheduling, and no built-in health management. It is useful for one-off or
+sidecar workloads but not suitable here.
 
-- Choose a Kubernetes at the edge compute option: Learn about trade-offs and considerations for various Kubernetes options for extending compute at the edge.
+**Kubernetes at the edge** (Arc-enabled K8s, etc.) is not applicable — this is
+a single-region cloud deployment.
 
 
 
