@@ -55,3 +55,50 @@ A SPA would be overkill. Blazor is also not relevant (not a .NET project).
   section with decision tree path, candidate evaluation table, and completed the
   Traditional Web App vs SPA subsection. Also added analysis stub to the
   "Choose a container option" section.
+
+---
+
+## 2026-06-15 — Complete "Choose a hybrid service" section
+
+### Context
+
+User asked to complete the hybrid section, providing four reference articles and
+clarifying the full stack topology:
+
+- App: AKS on Azure
+- CI/CD: GitHub Actions (SaaS)
+- Container images: ACR (Azure)
+- Observability: self-hosted VMs *(planned)* for Grafana, Prometheus, Uptime
+  Kuma, Alertmanager, etc. — running outside Azure
+
+The initial draft treated the app as pure cloud with no hybrid footprint. The
+self-hosted monitoring VMs change that — they are existing/custom VM workloads
+that sit outside Azure, which is exactly the scenario the hybrid decision tree
+addresses.
+
+### Key decision: Azure Arc-enabled servers
+
+Following the decision tree:
+- Hardware: existing/custom → server-class hardware (not IoT edge devices)
+- Workload: VM-based Linux servers
+- → Azure Arc-enabled servers
+
+Arc installs a lightweight agent and projects the VMs into Azure Resource
+Manager. This gives Azure Monitor, Defender for Cloud, Azure Policy, and portal
+inventory coverage over the self-hosted machines — a unified operations plane
+alongside the AKS cluster.
+
+Deferred to the monitoring phase. Not in scope for the initial AKS deployment.
+
+### Articles read
+
+- https://learn.microsoft.com/en-us/azure/architecture/guide/technology-choices/hybrid-considerations
+- https://learn.microsoft.com/en-us/azure-stack/user/azure-stack-considerations
+- https://learn.microsoft.com/en-us/azure/azure-local/concepts/compare-windows-server
+- https://learn.microsoft.com/en-us/windows-server/storage/storage-spaces/choose-drives
+
+### Files changed
+
+- `docs/ref/arch/arch-design-planning.md` — rewrote "Choose a hybrid service"
+  section with updated stack context, decision tree path, full candidate table,
+  and note on the choose-drives sub-article.

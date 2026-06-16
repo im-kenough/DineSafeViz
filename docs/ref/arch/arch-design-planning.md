@@ -129,11 +129,12 @@ The compute decision in the previous section already resolved the container
 service question: AKS is the chosen platform. This section records why the other
 container-specific options were set aside.
 
-**Azure Container Apps** is the closest alternative. It is a managed service
-built on top of Kubernetes and provides Dapr integration, per-app scaling, and
-scale-to-zero out of the box. However, it does not expose the Kubernetes API or
-control plane. For a DevOps portfolio project the hands-on K8s surface is the
-point, so Container Apps is ruled out.
+**Azure Container Apps** is the closest alternative. Per the
+[compute options for microservices](https://learn.microsoft.com/en-us/azure/architecture/microservices/design/compute-options)
+comparison, Container Apps is a managed service built on top of Kubernetes with
+Dapr integration, per-app scaling, and scale-to-zero — but it does not expose
+the Kubernetes API or control plane. For a DevOps portfolio project the
+hands-on K8s surface is the point, so Container Apps is ruled out.
 
 **Azure Container Instances** can run the application image directly and is the
 simplest path to a running container in Azure. It has no orchestration, no
@@ -146,6 +147,59 @@ a single-region cloud deployment.
 
 
 ### Choose a hybrid service
+
+If you alaready have infrastructure that isn't in Azure how do you connect to it or run azure services on it?
+
+Per the [Azure hybrid options](https://learn.microsoft.com/en-us/azure/architecture/guide/technology-choices/hybrid-considerations)
+guide, hybrid solutions extend Azure management and services to infrastructure
+that lives outside Azure datacenters — on-premises hardware, edge devices, or
+other cloud providers. The decision tree starts by asking whether you are using
+existing or custom hardware versus Azure-specified hardware appliances, then
+branches on workload type (containers, VMs, SQL, IoT, data transfer).
+
+The DineSafeViz stack spans two hosting environments:
+
+- **Azure** — AKS cluster, ACR for container images, and all supporting Azure
+  resources. Pure cloud; no hybrid service needed.
+- **GitHub** — repository and CI/CD via GitHub Actions. SaaS; no hybrid service
+  needed.
+- **Self-hosted VMs** *(planned)* — a separate observability stack running
+  monitoring, metrics, uptime detection, and alerting tools (Grafana, Prometheus,
+  Uptime Kuma, Alertmanager, etc.) on self-hosted virtual machines outside Azure.
+  This is the only footprint that introduces a hybrid consideration.
+
+#### Decision tree path for the self-hosted observability VMs
+
+Following the existing/custom hardware branch of the decision tree:
+
+1. Hardware type: **datacenter / server** (not restricted/IoT hardware)
+2. Workload type: **VM-based** (Linux VMs running monitoring services)
+3. → Candidate: **Azure Arc-enabled servers**
+
+Azure Arc-enabled servers install a lightweight agent on each VM and project it
+into Azure Resource Manager as a first-class resource. This enables Azure
+Monitor, Azure Policy, Defender for Cloud, and the Azure portal inventory to
+cover the self-hosted machines alongside the AKS cluster — a single pane of
+glass across both hosting environments.
+
+#### Candidates evaluated
+
+| Service | Decision | Reason |
+|---|---|---|
+| Azure Arc (Arc-enabled servers) | **Future candidate** | The self-hosted observability VMs are VM-based workloads on existing hardware — the exact scenario Arc-enabled servers is designed for. Deferred to the monitoring phase; not in scope for initial AKS deployment. |
+| Azure Stack Hub | Rejected | Runs a full Azure control plane on-premises for disconnected or regulated environments. Reviewed the [Azure Stack Hub considerations](https://learn.microsoft.com/en-us/azure-stack/user/azure-stack-considerations) — it requires operator-managed hardware, custom API endpoints, and delivers only a subset of Azure services. No data sovereignty or air-gap requirement exists here; the overhead is unjustified. |
+| Azure Local (HCI) | Rejected | Hyperconverged infrastructure for running VMs and containers on validated on-premises hardware clusters. The [Azure Local vs Windows Server](https://learn.microsoft.com/en-us/azure/azure-local/concepts/compare-windows-server) comparison shows it requires a minimum multi-node cluster, always-on Azure connectivity, and HCI-specific hardware. The self-hosted monitoring VMs are standalone machines, not an HCI cluster. |
+| Azure Stack Edge | Rejected | A physical hardware appliance for edge data transfer and ML inference at remote or ruggedized locations. No edge location or near-real-time data processing requirement exists. |
+| Azure IoT Edge / IoT Hub | Rejected | Designed for mass IoT device management and on-device inference. Not an IoT application. |
+| Azure VMware Solution | Rejected | Runs VMware vSphere workloads natively on Azure bare metal. No VMware environment to migrate or extend. |
+
+#### Note on the choose-drives article
+
+The [choosing drives for Storage Spaces Direct](https://learn.microsoft.com/en-us/windows-server/storage/storage-spaces/choose-drives)
+article covers NVMe/SSD/HDD drive configurations for Azure Local and Windows
+Server HCI clusters. It is a sub-article of the Azure Local path and only
+relevant when sizing on-premises HCI cluster storage. Azure Local is rejected
+above; this article does not apply to DineSafeViz.
 
 ### Choose a data store
 
