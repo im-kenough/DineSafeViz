@@ -6,6 +6,12 @@ __pycache__/
 # C extensions
 *.so
 
+# photo temp files
+*.bkp
+
+# draw.io temp files
+
+
 # Distribution / packaging
 .Python
 build/
