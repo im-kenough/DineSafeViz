@@ -71,8 +71,9 @@ The app is a N-tier architecture, single-region, with role-segmented data-tier a
 ### Tecnology Choicses Summary
 
 - Compute Service: AKS
-- Container Option: ...
+- Container Option: AKS
 - Hybrid Service: None, but maybe Azure Arc in the future.
+- Identity Service: MS Entra ID
 
 
 ### Choose a compute service
@@ -190,28 +191,19 @@ It's out of scope for now and will be revisited when the observability stack is 
 
 ### Choose an identity service
 
-This section evaluates Microsoft's directory-based identity services for DineSafeViz. The app has no user authentication requirement and no on-premises Active Directory; the only identity concern is workload identity — AKS pods authenticating to Azure services (ACR, Key Vault) without storing credentials. Microsoft Entra ID, the cloud identity service already provisioned with every Azure subscription, covers this use case directly at no additional cost.
+This section evaluates a Microsoft Identity solution service for DineSafeViz. The app has no user authentication requirement and no on-premises Active Directory. The only identity concern is workload identity; AKS pods authenticating to Azure services (ACR, Key Vault) without storing credentials.
 
-The [compare Microsoft directory-based services](https://learn.microsoft.com/en-us/entra/identity/domain-services/compare-identity-solutions) article distinguishes three identity solutions: cloud-native Microsoft Entra ID, managed Microsoft Entra Domain Services (legacy protocol support for domain-joined VMs), and self-managed Active Directory Domain Services on Windows Server VMs. None of the legacy or on-premises options apply here.
-
-#### Decision tree path
-
-1. Existing on-premises Active Directory? **No** — cloud-only environment
-2. Need legacy protocols (Kerberos, NTLM, LDAP) for domain-joined VMs? **No** — workloads run as AKS pods using modern APIs
-3. Need to domain-join compute resources? **No** — pods authenticate via OIDC federation, not domain membership
-4. Result: **Microsoft Entra ID** with AKS Workload Identity (OIDC + federated credentials) satisfies all requirements
+We will use **Microsoft Entra ID** , which comes standard with every Azure subscription, with no additional cost.
 
 #### Candidates evaluated
 
+Microsoft offers three [Identity and Access Management services](https://learn.microsoft.com/en-us/entra/identity/domain-services/compare-identity-solutions), a cloud native and on premesis option.
+
 | Service | Decision | Reason |
 |---|---|---|
-| Microsoft Entra ID (with AKS Workload Identity) | **Selected** | Cloud-native identity service included with every Azure subscription. AKS Workload Identity uses OIDC federation to bind a Kubernetes service account to an Entra managed identity, letting pods authenticate to Azure services without any stored credentials. |
-| Microsoft Entra Domain Services | Rejected | Managed service providing Kerberos/NTLM/LDAP for domain-joined VMs in a lift-and-shift scenario. No domain-joined VMs exist in this stack; the feature set is irrelevant and the service carries an hourly cost. |
-| Active Directory Domain Services (self-managed on VMs) | Rejected | Requires operator-managed Windows Server domain controller VMs. No on-premises AD exists to extend, and no legacy protocol requirement justifies the infrastructure overhead. |
-
-#### Note on hybrid authentication methods
-
-The [choose an authentication method for Microsoft Entra hybrid identity](https://learn.microsoft.com/en-us/entra/identity/hybrid/connect/choose-ad-authn) article covers password hash sync, pass-through authentication, and AD FS federation for organizations synchronizing an on-premises AD with Entra ID. The article explicitly excludes organizations with no on-premises directory footprint. DineSafeViz is cloud-only with no on-premises AD, so hybrid authentication is out of scope.
+| Microsoft Entra ID (with AKS Workload Identity) | **Selected** | Cloud-based identity and mobile device management that provides user account and authentication services for resources such as Microsoft 365, the Microsoft Entra admin center, or SaaS applications. AKS Workload Identity uses OIDC federation to bind a Kubernetes service account to an Entra managed identity, letting pods authenticate to Azure services without any stored credentials. |
+| Microsoft Entra Domain Services | Rejected | A Microsoft Managed Azure hosted Domain controller. Rejected. Not applicable in my situation. Will be even more expensive than running my own domain controller. |
+| Active Directory Domain Services (self-managed on VMs) | Rejected | Microsoft's on premesis self hosted LDAP server that provies IAM, object management, group policy and trust. Rejected, I'm not running a Windows Domain Controller. |
 
 ### Choose a data store
 
