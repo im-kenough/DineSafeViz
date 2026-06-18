@@ -201,9 +201,111 @@ Server HCI clusters. It is a sub-article of the Azure Local path and only
 relevant when sizing on-premises HCI cluster storage. Azure Local is rejected
 above; this article does not apply to DineSafeViz.
 
+### Choose an identity service
+
+This section evaluates Microsoft's directory-based identity services for DineSafeViz. The app has no user authentication requirement and no on-premises Active Directory; the only identity concern is workload identity — AKS pods authenticating to Azure services (ACR, Key Vault) without storing credentials. Microsoft Entra ID, the cloud identity service already provisioned with every Azure subscription, covers this use case directly at no additional cost.
+
+The [compare Microsoft directory-based services](https://learn.microsoft.com/en-us/entra/identity/domain-services/compare-identity-solutions) article distinguishes three identity solutions: cloud-native Microsoft Entra ID, managed Microsoft Entra Domain Services (legacy protocol support for domain-joined VMs), and self-managed Active Directory Domain Services on Windows Server VMs. None of the legacy or on-premises options apply here.
+
+#### Decision tree path
+
+1. Existing on-premises Active Directory? **No** — cloud-only environment
+2. Need legacy protocols (Kerberos, NTLM, LDAP) for domain-joined VMs? **No** — workloads run as AKS pods using modern APIs
+3. Need to domain-join compute resources? **No** — pods authenticate via OIDC federation, not domain membership
+4. Result: **Microsoft Entra ID** with AKS Workload Identity (OIDC + federated credentials) satisfies all requirements
+
+#### Candidates evaluated
+
+| Service | Decision | Reason |
+|---|---|---|
+| Microsoft Entra ID (with AKS Workload Identity) | **Selected** | Cloud-native identity service included with every Azure subscription. AKS Workload Identity uses OIDC federation to bind a Kubernetes service account to an Entra managed identity, letting pods authenticate to Azure services without any stored credentials. |
+| Microsoft Entra Domain Services | Rejected | Managed service providing Kerberos/NTLM/LDAP for domain-joined VMs in a lift-and-shift scenario. No domain-joined VMs exist in this stack; the feature set is irrelevant and the service carries an hourly cost. |
+| Active Directory Domain Services (self-managed on VMs) | Rejected | Requires operator-managed Windows Server domain controller VMs. No on-premises AD exists to extend, and no legacy protocol requirement justifies the infrastructure overhead. |
+
+#### Note on hybrid authentication methods
+
+The [choose an authentication method for Microsoft Entra hybrid identity](https://learn.microsoft.com/en-us/entra/identity/hybrid/connect/choose-ad-authn) article covers password hash sync, pass-through authentication, and AD FS federation for organizations synchronizing an on-premises AD with Entra ID. The article explicitly excludes organizations with no on-premises directory footprint. DineSafeViz is cloud-only with no on-premises AD, so hybrid authentication is out of scope.
+
 ### Choose a data store
 
+DineSafeViz stores structured, relational data — normalized inspection records with clear foreign key relationships between establishments, inspections, and infractions — and serves them to two read clients: a Flask web app and a Grafana dashboard. The decision tree from [Prepare to choose a data store in Azure](https://learn.microsoft.com/en-us/azure/architecture/guide/technology-choices/data-stores-getting-started) and the model taxonomy in [Understand data store models](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/understand-data-store-models) both lead directly to a relational OLTP store. PostgreSQL is the existing engine, and Azure Database for PostgreSQL — Flexible Server is the managed lift for it in Azure.
+
+The data is structured, schema-on-write, and accessed primarily by joins and filters against a static ~100k-row dataset. Nothing about the workload requires NoSQL flexibility, analytical pre-aggregation, object storage, or full-text indexing.
+
+#### Decision tree path / data model fit
+
+[Understand data store models](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/understand-data-store-models) frames the first question as: what are the workload access patterns? DineSafeViz access patterns are point reads and filtered range queries over normalized relational tables — the textbook fit for a relational store. The heuristic table in that article maps "strict multi-entity transactions" and "complex joins" to relational; DineSafeViz uses both.
+
+[Prepare to choose a data store in Azure](https://learn.microsoft.com/en-us/azure/architecture/guide/technology-choices/data-stores-getting-started) then asks:
+
+1. **What is the data format?** Structured tables with well-defined schema. → relational.
+2. **OLTP or OLAP?** The [OLTP article](https://learn.microsoft.com/en-us/azure/architecture/data-guide/relational-data/online-transaction-processing) defines OLTP as managing transactional data with strong ACID consistency and supporting queries on that data. DineSafeViz does not process live business transactions, but its data characteristics — normalized schema, moderate reads, occasional bulk-load writes from the ETL — match the OLTP profile far better than OLAP. The [OLAP article](https://learn.microsoft.com/en-us/azure/architecture/data-guide/relational-data/online-analytical-processing) describes OLAP as heavy-read aggregations over historical data using star schemas, cubes, or MPP engines; the inspection dataset is too small and the queries too simple to justify that overhead.
+3. **Full-text or search index needed?** No. Grafana and Flask query by field value, not free-text relevance.
+4. **Relational database technology?** Yes — the codebase already targets PostgreSQL via SQLAlchemy. Azure Database for PostgreSQL is the natural managed target.
+5. **PaaS or IaaS?** PaaS. There is no requirement for OS-level access or custom engine configuration that would force IaaS.
+
+#### Candidates evaluated
+
+| Service | Decision | Reason |
+|---|---|---|
+| Azure Database for PostgreSQL — Flexible Server | **Selected** | Managed PaaS PostgreSQL; zero engine migration cost; free tier (Burstable B1ms, 32 GB storage) fits a portfolio project; supports the existing SQLAlchemy connection string and Grafana PostgreSQL data source with no driver changes. |
+| Azure SQL Database | Rejected | SQL Server engine requires driver and dialect changes in SQLAlchemy and Grafana; no cost or capability advantage over managed PostgreSQL for this workload. |
+| Azure Cosmos DB | Rejected | Document / multi-model NoSQL; adds schema-on-read complexity and loses relational joins for a dataset that is inherently normalized and relational. |
+| Azure Managed Redis | Rejected | In-memory key-value store; appropriate for caching, not for the primary data store. Could be revisited as a query cache layer if read latency becomes a concern. |
+| Azure Data Explorer | Rejected | Optimized for high-ingest telemetry and time-series logs; the inspection dataset is neither high-velocity nor append-only time-series. |
+| Azure AI Search | Rejected | Full-text search index; no free-text search requirement exists. Noted in [Choose a search data store](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/search-options): SQL Database's built-in full-text search would suffice if ever needed. |
+| Azure Blob Storage / Data Lake Storage Gen2 | Rejected | Object stores for unstructured or bulk analytical data. [Choose a data storage technology](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/data-storage) positions these for big data ingestion and analytics pipelines, not as the serving layer for a web app. |
+| Microsoft Fabric / OneLake | Rejected | Enterprise analytics SaaS platform; appropriate for organization-wide BI with petabyte-scale data. A ~100k-row inspection table routed through a Fabric warehouse would be significant over-engineering. |
+
+#### Notes on tangential sub-articles
+
+**[Data lake scenarios](https://learn.microsoft.com/en-us/azure/architecture/data-guide/scenarios/data-lake):** A data lake is designed for raw, schema-on-read storage of massive and diverse datasets feeding downstream analytics or ML pipelines. DineSafeViz has a small, stable, structured dataset with no ML pipeline and no raw-to-curated transformation layer. The data lake pattern does not apply.
+
+**[Choose a pipeline orchestration technology](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/pipeline-orchestration-data-movement):** Azure Data Factory, Fabric Data Factory, SSIS, and Apache Oozie are the candidates. The DineSafeViz ETL is a lightweight Python script that fetches the DineSafe open data feed and bulk-loads it into PostgreSQL on a schedule. That script runs as a Kubernetes CronJob. A managed orchestration service like ADF would add cost and operational surface area (the free tier does not cover production-grade activity volumes) with no benefit over a CronJob for a single-source, single-destination batch load. This article is noted for future reference if the ETL grows to multiple sources or requires retry orchestration, branching logic, or SLA monitoring.
+
+**[Choose a search data store](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/search-options):** Azure AI Search and Elasticsearch both require maintaining a separate index synchronized with the primary database. No user-facing free-text search exists in DineSafeViz. SQL full-text search in PostgreSQL would be the first option if a search requirement ever emerges; a dedicated search index is not warranted.
+
 ### Choose an analytics solution
+
+DineSafeViz uses Grafana, running as a container in AKS, to visualize inspection data stored in PostgreSQL. That is the full extent of the analytics requirement: a dashboarding tool that reads from a relational database. No data warehouse, no batch pipeline, and no streaming ingestion exist in this stack.
+
+The Microsoft guidance on [analytical data stores](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/analytical-data-stores) and [analysis, visualizations, and reporting](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/analysis-visualizations-reporting) is written for big data architectures with serving layers, hot/cold paths, and Lambda-style pipelines. None of those patterns apply here. Grafana's built-in PostgreSQL data source handles the query layer directly; no intermediate analytical store sits between the database and the visualization.
+
+#### Decision tree path
+
+Following the key selection criteria from the analytical data stores article:
+
+1. Do you need a hot-path serving layer separate from your operational database? **No** — Grafana queries PostgreSQL directly.
+2. Do you need massively parallel processing or query scale-out? **No** — the dataset is a single city's inspection records; volume is small.
+3. Do you prefer a relational data store? **Yes** — PostgreSQL is already chosen; no additional store is needed.
+4. Do you collect time-series or append-only data requiring a specialist store? **No** — inspection records are relational, low-volume, and updated in place.
+
+Following the key selection criteria from the analysis and reporting article:
+
+1. Do you need to connect to hundreds of data sources and centralize reporting across a domain? **No** — one PostgreSQL database.
+2. Do you need embedding capabilities? **Yes** — the Grafana dashboard is embedded in the web app via iframe.
+3. Do you need offline capabilities? **No**.
+4. Do you need a managed cloud visualization service? **No** — Grafana runs self-hosted in the AKS cluster, which keeps costs at zero.
+
+Conclusion: PostgreSQL serves as both the operational database and the analytical data store. Grafana handles all visualization. No additional Azure analytics service is required.
+
+#### Candidates evaluated
+
+| Service | Decision | Reason |
+|---|---|---|
+| Grafana (self-hosted in AKS) | **Selected** | Open-source; runs in the existing AKS cluster; native PostgreSQL data source; embeds in the web app via iframe; zero additional cost. |
+| Power BI | Rejected | Paid SaaS (free tier lacks embedding without licensing); adds an external dependency for a problem already solved by Grafana. |
+| Jupyter / Zeppelin notebooks | Rejected | Interactive data science tools for exploration and model development, not operational dashboards. Not applicable to this use case. |
+| Microsoft Fabric (Lakehouse, Warehouse, Eventhouse) | Rejected | Enterprise-scale unified analytics platform; requires moderate-to-large data volumes to justify cost and complexity. The [Fabric analytical data stores](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/fabric-analytical-data-stores) decision tree leads to SQL Database at small volumes with structured data — which is already covered by PostgreSQL. |
+| Azure Analysis Services | Rejected | Tabular semantic model layer for OLAP queries over large datasets; no SQL language support; not applicable to a small relational dataset. |
+| Azure Cosmos DB | Rejected | Document/key-value/graph store for high-throughput NoSQL workloads; no fit for a relational inspection dataset with no scale requirement. |
+| Azure Databricks | Rejected | Spark-based platform for big data engineering and ML pipelines; significant cost and operational overhead with no applicable workload here. |
+
+#### Notes on tangential sub-articles
+
+**[Batch processing](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/batch-processing)** covers Microsoft Fabric and Azure Databricks for processing large volumes of data in scheduled jobs. Batch processing assumes a pipeline that transforms raw data before serving it. DineSafeViz has no such pipeline — the application ingests and stores inspection data directly into PostgreSQL, and Grafana reads it. Not applicable.
+
+**[Stream processing](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/stream-processing)** covers real-time event ingestion through services like Event Hubs, Stream Analytics, and Fabric eventstreams. Stream processing applies to high-velocity, continuous data sources such as IoT sensors or application logs. The DineSafe dataset is a periodic batch feed from Toronto Public Health; there is no continuous stream to process. Not applicable.
 
 ### Choose an AI service
 
@@ -211,7 +313,50 @@ Not applicable.
 
 ### Choose a networking service
 
+AKS handles routing within the cluster, but every public-facing deployment still needs a decision about how traffic enters from the internet. The [Azure load-balancing overview](https://learn.microsoft.com/en-us/azure/architecture/guide/technology-choices/load-balancing-overview) covers six services (API Management, Application Gateway, Application Gateway for Containers, Azure Front Door, Load Balancer, Traffic Manager) and provides a decision tree to narrow the choice. For DineSafeViz the answer is to use none of them as a standalone service: AKS with an nginx ingress controller satisfies all routing requirements inside the cluster, and the explicit preference is to avoid a separate load balancer to contain cost.
+
+#### Decision tree path
+
+The load-balancing decision tree starts with two questions: is this an HTTP(S) application, and is it internet-facing?
+
+1. **HTTP(S) web application?** Yes — Flask and Grafana both serve HTTP.
+2. **Internet-facing?** Yes — the app is public.
+3. **Global / multi-region?** No — single-region deployment.
+4. **Hosting type?** AKS.
+
+For a single-region, internet-facing HTTP workload on AKS the decision tree points to Application Gateway (regional Layer-7 proxy) or Application Gateway for Containers (Layer-7 ingress native to Kubernetes). Both are ruled out on cost grounds. The nginx ingress controller deployed inside AKS performs the same Layer-7 routing (host/path-based rules, TLS termination) and is free and open-source. An Azure Load Balancer standard SKU is still provisioned automatically by AKS when the ingress controller's `Service` type is `LoadBalancer`, but this is a cluster-internal implementation detail rather than a separately managed load-balancing service.
+
+#### Candidates evaluated
+
+| Service | Decision | Reason |
+|---|---|---|
+| Azure Load Balancer | Not applicable as a standalone service | AKS provisions one automatically for the nginx ingress controller `Service`; it is not configured or managed separately as part of this design. |
+| Application Gateway | Rejected | Regional Layer-7 proxy; overlaps with nginx ingress and adds cost without meaningful benefit for a single-region, single-cluster deployment. |
+| Application Gateway for Containers | Rejected | Kubernetes-native Layer-7 ingress built on Application Gateway; functionally equivalent to nginx ingress for this workload but carries a managed-service cost. |
+| Azure Front Door | Rejected | Global CDN and load balancer; designed for multi-region or acceleration use cases. Single-region deployment; not applicable. |
+| Traffic Manager | Rejected | DNS-based global traffic distribution; only relevant for multi-region failover or routing. Not applicable. |
+| API Management | Rejected | API gateway product, not a general-purpose load balancer. No API gateway requirement exists. |
+| nginx ingress controller (in-cluster) | **Selected** | Free, open-source, widely adopted Kubernetes ingress controller. Handles host/path routing, TLS termination, and upstream selection inside the AKS cluster without a separate billable Azure networking service. |
+
+#### Note on virtual network peering
+
+The [virtual network peering reference architecture](https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/hybrid-networking/virtual-network-peering) covers connecting two or more Azure virtual networks — either within a region or across regions — and spoke-to-spoke communication patterns in hub-and-spoke topologies. DineSafeViz is a single-region deployment with one AKS cluster, one virtual network, and no on-premises connectivity, cross-region peering, or hub-and-spoke topology. Virtual network peering is not applicable to this deployment.
 
 ### Choose a messaging service
 
 Not applicable.
+
+### Choose an integration and automation service
+
+Azure offers four overlapping services for integration and automation: Power Automate, Logic Apps, Azure Functions, and WebJobs. None of them are needed for DineSafeViz. The project has no event-driven workflows, no SaaS connector integrations, and no background job scheduling requirements. CI/CD — the only automation this project requires — is already handled by GitHub Actions.
+
+[Integration and automation platform options in Azure](https://learn.microsoft.com/en-us/azure/azure-functions/functions-compare-logic-apps-ms-flow-webjobs) describes these four services as tools for solving integration problems and automating business processes. All four are triggered by events, schedules, or connectors, and all target use cases that are absent from DineSafeViz's scope.
+
+#### Candidates evaluated
+
+| Service | Decision | Reason |
+|---|---|---|
+| Power Automate | Not applicable | A no-code/low-code workflow tool for office workers and citizen developers integrating SaaS applications. DineSafeViz has no SaaS connectors, no approval flows, and no business process automation needs. |
+| Azure Logic Apps | Not applicable | A designer-first workflow integration platform for connecting services and automating multi-step processes. No integration workflows of any kind exist in this project. |
+| Azure Functions | Not applicable | Serverless event-driven compute. Already evaluated and rejected in the compute section; DineSafeViz serves HTTP pages continuously and has no function-trigger use cases. |
+| Azure App Service WebJobs | Not applicable | Background task runner attached to an App Service web app. The project does not use App Service, and there are no background processing requirements. |
