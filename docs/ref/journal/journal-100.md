@@ -92,3 +92,37 @@ Added:
 - `##### Key selection criteria` — moved service list inline, answered all 9
   key questions as a sequential elimination funnel leading to self-hosted
   PostgreSQL.
+
+---
+
+## 2026-06-19 — Complete "Design Pattern" section in design-planning/Readme.md
+
+### Context
+
+The `## Design Pattern` section in `docs/ref/arch/design-planning/Readme.md`
+was blank. User asked to evaluate all 15 patterns from the MS Learn
+operational excellence design patterns article and identify which apply to
+deploying DineSafeViz on AKS.
+
+### Work log
+
+URL fetched: https://learn.microsoft.com/en-us/azure/well-architected/operational-excellence/design-patterns
+
+Evaluated all 15 patterns. 7 applicable, 8 not applicable.
+
+Applicable:
+- Compute Resource Consolidation: shared AKS node pool for all workloads
+- Deployment Stamps: versioned Helm + Terraform; DR cold cluster is a stamp
+- External Configuration Store: ConfigMaps + Key Vault CSI driver
+- Gateway Offloading: nginx ingress TLS termination
+- Gateway Routing: nginx ingress path routing Flask/Grafana
+- Health Endpoint Monitoring: AKS liveness/readiness probes + /health endpoint
+- Sidecar: postgres_exporter sidecar for metrics
+
+Not applicable: Anti-Corruption Layer, Strangler Fig (no legacy), Choreography,
+Publisher/Subscriber, Messaging Bridge (no event bus), Gateway Aggregation
+(no multi-backend clients), Edge Workload Configuration (not edge), Quarantine
+(weak fit for v0.4 — flagged for future revisit).
+
+Notable: Gateway Offloading + Gateway Routing both satisfied by a single nginx
+ingress controller — highlighted in the table and noted for reviewers.
