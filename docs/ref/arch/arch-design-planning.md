@@ -322,7 +322,86 @@ Kubernetes CronJob with no pipeline orchestration requirement.
 
 ### Choose a data store
 
-DineSafeViz stores structured, relational data — normalized inspection records with clear foreign key relationships between establishments, inspections, and infractions — and serves them to two read clients: a Flask web app and a Grafana dashboard. The decision tree from [Prepare to choose a data store in Azure](https://learn.microsoft.com/en-us/azure/architecture/guide/technology-choices/data-stores-getting-started) and the model taxonomy in [Understand data store models](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/understand-data-store-models) both lead directly to a relational OLTP store. PostgreSQL is the existing engine. The remaining decision is whether to consume it as a managed Azure PaaS service or run it self-hosted inside the AKS cluster; this section concludes that **self-hosted PostgreSQL on AKS, managed by the [CloudNativePG](https://cloudnative-pg.io/) operator (CNCF Sandbox project)**, is the right fit for this project's budget, scale, and portfolio goals.
+DineSafeViz stores structured, relational data (normalized inspection records) with clear foreign key relationships between establishments, inspections, and infractions. The data is served to two read clients, a Flask web app and a Grafana dashboard. 
+
+#### Data Model
+
+The [Understand data store models](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/understand-data-store-models) article classifies storage engines into nine models: 
+- relational
+- document
+- column-family
+- key-value
+- graph
+- time-series
+- object
+- search
+- vector
+
+DineSafeViz uses the **relational (OLTP)** model.
+
+DineSafeViz's inspection data is structured, schema-on-write, and organized into normalized tables (`establishments`, `inspections`, `infractions`) with well-defined foreign key relationships. Queries are dominated by filtered joins — reading all infractions for a given establishment, for example — and writes arrive as periodic bulk loads from the ETL CronJob rather than as a continuous high-rate stream. The article's heuristic table maps both "strict multi-entity transactions" and "complex joins" to the relational model; which is  the access patterns DineSafeViz uses.
+
+No other model applies: the dataset is too small and structured for an analytics or OLAP store, there is no free-text search requirement, no high-rate telemetry stream, no graph traversal, and no schemaless document flexibility needed.
+
+#### Prepare to choose a data store in Azure
+
+Per the [Prepare to choose a data store in Azure](https://learn.microsoft.com/en-us/azure/architecture/guide/technology-choices/data-stores-getting-started) article, DineSafeViz fits the **Online transactional processing (OLTP)** model.
+
+##### Functional requirements
+
+- **Data format:** Structured tables. Three normalized relational tables — `establishments`, `inspections`, `infractions` — with well-defined schema and foreign key relationships. No semi-structured or unstructured data.
+- **Purpose:** OLTP. Periodic bulk-load writes from the ETL CronJob; read-heavy queries from Flask and Grafana. Not OLAP — no star schema, no MPP aggregation, no pre-aggregated cubes needed.
+- **Search needs:** None. Queries filter by field value (establishment name, inspection date, infraction severity). No full-text relevance ranking is required.
+- **Specialized:** None. No vector embeddings and no graph traversal.
+- **Data access method:** Direct SQL. Flask uses SQLAlchemy with the `psycopg2` driver; Grafana uses its native PostgreSQL data source. No proprietary API layer.
+- **Data relationships:** Joins. `inspections` joins `establishments`; `infractions` joins `inspections`. No graph traversal or hierarchical structures.
+- **Consistency model:** Strong. The ETL bulk-loads new records in a single transaction; Flask and Grafana must read consistent data at all times.
+- **Schema flexibility:** Schema-on-write. The DineSafe inspection dataset has a stable, well-defined schema. No schema-on-read flexibility is needed.
+- **Concurrency needs:** Low. The ETL CronJob is the only writer; Flask and Grafana are read-only clients. No high-write concurrency or complex locking concern.
+- **Data life cycle:** Long-term hot data. Historical inspection records accumulate over time but remain actively queried. No cold or archival tiering is needed at this scale.
+- **Data movement:** ETL. A Python CronJob extracts records from the City of Toronto DineSafe open data feed, transforms them, and loads them into PostgreSQL. No ELT or pipeline orchestration is required.
+
+##### Nonfunctional requirements
+
+- **Latency and throughput:** Batch processing. The ETL runs on a nightly CronJob schedule. Flask and Grafana serve read queries at low traffic volumes. Sub-second query response is sufficient; real-time ingestion is not required.
+- **Scalability:** Vertical. The dataset is small (~100k rows) and grows slowly. Upgrading the AKS node is sufficient for the foreseeable future. No global distribution is needed.
+- **Reliability and availability:** No formal SLA. This is a personal portfolio project. CloudNativePG provides pod-level self-healing via Kubernetes. DR is a manual active-passive failover with RPO ≤ 24 h and RTO ≈ 20–30 min.
+- **Limits:** Well within PostgreSQL defaults. A ~100k-row dataset requires only basic tuning of `shared_buffers`, `work_mem`, and `max_connections`.
+
+##### Cost and management considerations
+
+- **Managed versus self-hosted:** Self-hosted (containerized). PostgreSQL runs in the AKS cluster managed by the CloudNativePG operator. Managed PaaS (Azure Database for PostgreSQL — Flexible Server) costs ~$16–20/mo at list price versus ~$2–3/mo self-hosted and removes the operational surface the portfolio is meant to demonstrate. See the cost comparison table in the section below.
+- **Region availability:** Canada Central. No data residency or compliance constraint beyond keeping data in Canada.
+- **Cost optimization:** No tiered storage or caching layer is needed. The PVC is Standard HDD — the cheapest Azure block tier. Queries are infrequent and low-volume enough that a cache layer would add complexity with no measurable benefit.
+- **Licensing and portability:** PostgreSQL is open-source (PostgreSQL License) with no vendor lock-in. Although MySQL would be technically sufficient for this workload, PostgreSQL is chosen to showcase enterprise-grade relational database administration. MS SQL is excluded: no perpetual free tier exists and the licensing overhead is not justified for a personal project.
+
+##### Security and governance
+
+- **Encryption:** At-rest encryption is provided by default via Microsoft-managed keys on Azure Managed Disk. Encryption at host is enabled on the AKS node pool. In-transit: cluster-internal TLS is issued by `cert-manager`, even for traffic that never leaves the cluster.
+- **Authentication and authorization:** Superuser and application-user credentials are stored in Azure Key Vault and surfaced via the Secrets Store CSI driver. No credentials in Git. AKS Workload Identity (Entra managed identity) authenticates pods to Key Vault.
+- **Auditing and monitoring:** PostgreSQL activity logging via the `postgres_exporter` sidecar feeds the future Prometheus stack on the self-hosted observability VMs. Formal audit logging is out of scope for v0.4.
+- **Networking:** A `NetworkPolicy` restricts PostgreSQL pod ingress to the Flask, Grafana, and ETL service accounts only. No public endpoint is exposed. No Azure private endpoint is needed — all traffic stays within the AKS cluster virtual network.
+
+##### DevOps and team readiness
+
+- **Skill sets:** PostgreSQL administration, Kubernetes, and Helm. SQLAlchemy for Flask. Grafana's native PostgreSQL data source. CloudNativePG's CRD-based management model — no shelling into the container for routine operations.
+- **Client support:** Python (`psycopg2` via SQLAlchemy) and Grafana's native data source both use mature, well-maintained PostgreSQL drivers with no compatibility concerns.
+- **Tooling integration:** CloudNativePG integrates with Kubernetes-native tooling (`kubectl`, Helm). Observability feeds into a future Prometheus/Grafana stack on the self-hosted VMs. CI/CD uses GitHub Actions for application deployment and Terraform for infrastructure.
+
+##### Key questions
+
+- **What level of control do you need over the OS and database engine?** Full control. CloudNativePG runs in pods owned end-to-end: PVC, config, version, extensions, and backup schedule. Demonstrating this operational surface is a primary portfolio goal.
+- **Will your workloads use a relational database technology?** Yes — PostgreSQL. MySQL would be technically sufficient, but PostgreSQL is chosen to showcase enterprise-grade relational database administration.
+- **Will your workloads use SQL Server?** No. MS SQL is excluded on cost and licensing grounds; PostgreSQL meets all requirements at zero licensing cost.
+- **Does your Azure solution include Power Platform or Dynamics 365 workloads?** No.
+- **Will your workloads use key-value database storage?** No. A Redis cache layer would only be considered if read latency became a concern, which it has not.
+- **Will your workloads use document or graph data?** No. The inspection dataset is normalized and relational. No document flexibility or graph traversal is needed.
+- **Will your workloads use column-family data?** No.
+- **Will your workloads require high-capacity data analytics capabilities?** No. Grafana queries PostgreSQL directly via its native data source. No MPP engine, data warehouse, or OLAP pre-aggregation layer is needed.
+- **Will your workloads require search engine capabilities?** No. Queries filter by field value; no full-text relevance search exists in the application.
+- **Will your workloads use time-series data?** No. Inspection records are relational and normalized. The inspection date is a filter field, not the primary index dimension.
+
+and the model taxonomy in [Understand data store models](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/understand-data-store-models) both lead directly to a relational OLTP store. PostgreSQL is the existing engine. The remaining decision is whether to consume it as a managed Azure PaaS service or run it self-hosted inside the AKS cluster; this section concludes that **self-hosted PostgreSQL on AKS, managed by the [CloudNativePG](https://cloudnative-pg.io/) operator (CNCF Sandbox project)**, is the right fit for this project's budget, scale, and portfolio goals.
 
 The data is structured, schema-on-write, and accessed primarily by joins and filters against a static ~100k-row dataset. Nothing about the workload requires NoSQL flexibility, analytical pre-aggregation, object storage, or full-text indexing.
 
