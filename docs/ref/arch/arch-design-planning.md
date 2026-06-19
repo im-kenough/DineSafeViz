@@ -23,6 +23,8 @@ The app is a N-tier architecture, single-region, with role-segmented data-tier a
 - Restrict access to the data tier by allowing requests from a middle tier only.
   - Don't want to pay for a load balancer
 
+---
+
 ## [Design Principles](https://learn.microsoft.com/en-us/azure/architecture/guide/design-principles/) for Azure Applications
 
 ### Core Principles
@@ -63,12 +65,13 @@ The app is a N-tier architecture, single-region, with role-segmented data-tier a
 - Perform failure mode analysis for services
   - to do: conduct failure mode analysis (FMA) during architecture and design phases. Rate each failure mode by risk and impact, then determine appropriate response and recovery mechanisms.
 
+---
 
 
 ## [Technology choices](https://learn.microsoft.com/en-us/azure/architecture/guide/technology-choices/technology-choices-overview) for Azure solutions
 
 
-### Tecnology Choicses Summary
+### Technology Choices Summary
 
 - Compute Service: AKS
 - Container Option: AKS
@@ -83,6 +86,13 @@ The app is a N-tier architecture, single-region, with role-segmented data-tier a
 - Data Store: Self-hosted PostgreSQL on AKS, managed by the CloudNativePG operator
   - Data model: relational OLTP
   - Data store: data store: selfhosted PostgresQL on AKS with CloudNativePG operator
+- Analytics Service: future on prem vm monitoring, logging, alerting and observability stack
+- AI Service: not applicable
+- Networking Service:
+  - Nginx Ingress Controller (in cluster)
+- Messaging Service: Not applicable
+- Integration and automation service:
+  - CI/CD: GitHub actions
 
 ### Choose a compute service
 
@@ -448,24 +458,9 @@ and the model taxonomy in [Understand data store models](https://learn.microsoft
 The data is structured, schema-on-write, and accessed primarily by joins and filters against a static ~100k-row dataset. Nothing about the workload requires NoSQL flexibility, analytical pre-aggregation, object storage, or full-text indexing.
 
 
-#### Best practices for self-hosted PostgreSQL on AKS
 
-The deployment uses the [CloudNativePG](https://cloudnative-pg.io/) Kubernetes operator. CloudNativePG is the modern best-in-class community choice for production PostgreSQL on Kubernetes: it manages StatefulSets, streaming replication, scheduled physical base backups, continuous WAL archiving to object storage, declarative failover, and rolling minor-version upgrades, all through a small set of custom resources (`Cluster`, `ScheduledBackup`, `Backup`).
 
-| Concern | Practice |
-|---|---|
-| Workload definition | A CloudNativePG `Cluster` custom resource. Single instance for v0.4; scale to two instances for streaming replication once node headroom permits. |
-| Storage | `ReadWriteOnce` PVC on Azure Managed Disk (Standard HDD per the storage section); `fsGroup` set on the pod for data-directory permissions. |
-| Resource sizing | Explicit CPU and memory requests and limits on the postgres container; `shared_buffers`, `work_mem`, and `max_connections` tuned for the node size, not left at defaults. |
-| Identity and secrets | Database superuser and application user credentials stored in Azure Key Vault, surfaced via the [Secrets Store CSI driver](https://learn.microsoft.com/en-us/azure/aks/csi-secrets-store-driver). No secrets in Git. |
-| TLS in transit | Cluster-internal TLS issued by `cert-manager`, even for traffic that never leaves the cluster. |
-| Encryption at rest | Microsoft-managed-key encryption on the underlying Managed Disk (default); encryption at host enabled on the AKS node pool (per the storage section). |
-| Continuous backup | CloudNativePG continuous WAL archiving to an Azure Blob container via `barmanObjectStore`, enabling point-in-time restore. |
-| Periodic backup | A `ScheduledBackup` resource for a daily physical base backup at 02:00 local time, after the 00:30 ETL CronJob completes. |
-| Network policy | `NetworkPolicy` restricting PostgreSQL pod ingress to the Flask, Grafana, and ETL service accounts only. |
-| Observability | `postgres_exporter` sidecar feeding the future Prometheus stack on the self-hosted observability VMs. |
-
-#### Candidates evaluated
+##### Candidates evaluated
 
 | Service | Decision | Reason |
 |---|---|---|
@@ -557,6 +552,8 @@ For a single-region, internet-facing HTTP workload on AKS the decision tree poin
 #### Note on virtual network peering
 
 The [virtual network peering reference architecture](https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/hybrid-networking/virtual-network-peering) covers connecting two or more Azure virtual networks — either within a region or across regions — and spoke-to-spoke communication patterns in hub-and-spoke topologies. DineSafeViz is a single-region deployment with one AKS cluster, one virtual network, and no on-premises connectivity, cross-region peering, or hub-and-spoke topology. Virtual network peering is not applicable to this deployment.
+
+When connecting on prem VMs with AKS, will consider tailscale overlay network.
 
 ### Choose a messaging service
 
