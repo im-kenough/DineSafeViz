@@ -1,7 +1,7 @@
 # Architecture Design planning
 
 ## Architecture Style
-The DineVizSafe application considers Design solutions from the Azure Architecture Centre. It 
+The DineVizSafe application considers Design solutions from the Azure Architecture Centre. It
 
 The context of this repo is to demonstrate good DevOps and Cloud Systems Engineering practices, so I'll be deploying this in AKS.
 
@@ -74,7 +74,12 @@ The app is a N-tier architecture, single-region, with role-segmented data-tier a
 - Container Option: AKS
 - Hybrid Service: None, but maybe Azure Arc in the future.
 - Identity Service: MS Entra ID
-
+- Storage Service:
+  - OS disk: Standard HDD, upgrade to Standard SSD in Q1 2028
+  - Data disk (PostgreSQL PVC): Standard HDD
+  - Object storage: Azure Blob Storage (Terraform remote state)
+  - Data transfer: Azure CLI, AzCopy, or Azure PowerShell
+  - Redundancy: Local Redundant Storage
 
 ### Choose a compute service
 
@@ -204,6 +209,115 @@ Microsoft offers three [Identity and Access Management services](https://learn.m
 | Microsoft Entra ID (with AKS Workload Identity) | **Selected** | Cloud-based identity and mobile device management that provides user account and authentication services for resources such as Microsoft 365, the Microsoft Entra admin center, or SaaS applications. AKS Workload Identity uses OIDC federation to bind a Kubernetes service account to an Entra managed identity, letting pods authenticate to Azure services without any stored credentials. |
 | Microsoft Entra Domain Services | Rejected | A Microsoft Managed Azure hosted Domain controller. Rejected. Not applicable in my situation. Will be even more expensive than running my own domain controller. |
 | Active Directory Domain Services (self-managed on VMs) | Rejected | Microsoft's on premesis self hosted LDAP server that provies IAM, object management, group policy and trust. Rejected, I'm not running a Windows Domain Controller. |
+
+### Choose a storage service
+
+DineSafeViz has three distinct storage needs:
+- OS disks for AKS node pool VMs,
+- a persistent volume for the PostgreSQL container
+- object storage for Terraform remote state. 
+
+The [Review your storage options](https://learn.microsoft.com/en-us/azure/architecture/guide/technology-choices/storage-options) article maps these needs to Azure Managed Disks for block storage and Azure Blob
+Storage for object storage. No cloud-native file shares, HPC storage, big data
+lake, or large-scale physical data transfer are required.
+
+#### Select storage tools and services to support your workloads
+
+Key questions:
+
+1. Do your workloads require disk storage to support the deployment of infrastructure as a service (IaaS) virtual machines?
+   - Yes. AKS node pool VMs require OS disks and PostgreSQL requires a persistent volume backed by block storage.
+2. Do you need to consolidate that block storage across or are you migrating an on-premises SAN?
+   - No.
+3. Will you need to provide downloadable images, documents, or other media as part of your workloads?
+   - No. Flask serves rendered HTML; no static media is served from blob storage.
+4. Will you need a location to store virtual machine logs, application logs, and analytics data?
+   - No. Will host on prem metrics, centralized logging and observability VMs.
+5. Will you need to provide a location for backup, disaster recovery, or archiving workload-related data?
+   - Yes. Blob Storage will store Terraform remote state. PostgreSQL backups are a future consideration for the DR roadmap.
+6. Will you need to support big data analytics workloads?
+   - No.
+7. Will you need to provide cloud-native file shares?
+   - No. PostgreSQL uses a block (ReadWriteOnce) persistent volume, not a shared file system.
+8. Will you need to support high-performance computing (HPC) workloads?
+   - No.
+9. Will you need to perform large-scale archiving and syncing of your on-premises data?
+   - No.
+10. Do you want to expand an existing on-premises file share to use cloud storage?
+    - No.
+
+#### Azure Managed Disk types
+
+The [disk types article](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-types)
+defines five tiers: Ultra Disk, Premium SSD v2, Premium SSD, Standard SSD, and
+Standard HDD.
+
+- **OS disk:** [Standard SSD](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-types#standard-ssds) —
+  recommended for web servers and lightly-used enterprise applications; lower
+  cost than Premium SSD with consistent single-digit-millisecond latency.
+- **PostgreSQL data disk (PVC):** [Standard HDD](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-types#standard-hdds) —
+  sufficient for a small, non-critical demo workload with low I/O frequency.
+  Planned upgrade to Standard SSD in Q1 2028 if latency becomes a concern.
+
+Note: Standard HDD OS disks are [retiring](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-hdd-os-retirement) on September 8, 2028. Can still be used as data storage sisks.
+
+![Managed disk decision tree](/docs/img/tech-choose-managed-disk.png)
+
+##### Data redundancy and availability
+
+Azure Storage has various [redundancy and high availability options](https://learn.microsoft.com/en-us/azure/storage/common/storage-redundancy): Locally redundant storage, Zone-redundant storage, Geo-redundant storage (GRS), Read-access GRS (RA-GRS), Read-access GZRS (RA-GZRS).
+
+Locally Redundant Storage (LRS) is sufficient for my needs.
+
+LRS replicates data to three disks within a data centre in the primary region. Can't specify an availability zone.
+
+In an enterprise production app, at a minimum Zone Redundant Storage would be selected so one copy is replicated to each availability zone
+
+#### Azure Blob Storage
+
+Azure Blob Storage stores Terraform remote state, as noted in the design
+principles section. The standard LRS hot tier is sufficient; no replication or
+archival tier is needed for a state file workload.
+
+#### Security
+
+Azure Storage provides [several security controls](https://learn.microsoft.com/en-us/azure/architecture/guide/technology-choices/storage-options#security) relevant to this deployment.
+
+**Encryption at rest** is enabled by default for all Azure managed disks, snapshots, and images using Microsoft-managed platform keys. No configuration is required. Azure Blob Storage is also encrypted at rest by default.
+
+**Encryption at host** should be enabled on the AKS node pool. It extends encryption end-to-end from the VM through to the storage layer, covering temp disks, disk caches, and compute-to-storage data flows. Server-side encryption alone only covers data at rest on the storage clusters; encryption at host closes the remaining gap.
+
+**Azure Disk Encryption (ADE)**, which uses BitLocker on Windows and dm-crypt on Linux, is [retiring on September 15, 2028](https://learn.microsoft.com/en-us/azure/virtual-machines/disk-encryption-overview). New VMs should use encryption at host instead. ADE will not be used in this deployment.
+
+**Blob Storage access** for Terraform state is secured via Azure RBAC and Entra ID. HTTPS is enforced by default. No shared access signatures are needed; the Terraform `azurerm` backend authenticates via Managed Identity.
+
+#### Choose a [data transfer](https://learn.microsoft.com/en-us/azure/architecture/data-guide/scenarios/data-transfer) technology
+
+Data transfer into Azure uses command-line tools: Azure CLI, AzCopy, or Azure
+PowerShell. Physical transfer options (Data Box, Import/Export service) are not
+needed — no large-scale bulk migration from on-premises exists. Azure Data
+Factory is not needed — the ETL is a single Python script running as a
+Kubernetes CronJob with no pipeline orchestration requirement.
+
+#### Candidates evaluated
+
+| Service | Decision | Reason |
+|---|---|---|
+| Azure Managed Disks — Standard SSD | **Selected — OS disk** | Recommended for web and application servers; cheaper than Premium SSD; usable as an OS disk; compatible with AKS node pool provisioning. |
+| Azure Managed Disks — Standard HDD | **Selected — PostgreSQL data disk** | Lowest cost for a non-critical, small-volume persistent volume in a demo project. Planned upgrade to Standard SSD in Q1 2028. |
+| Azure Blob Storage | **Selected — Terraform state** | Stores Terraform remote state via the native `azurerm` backend. Standard LRS hot tier; negligible cost for a state file workload. |
+| AzCopy / Azure CLI / Azure PowerShell | **Selected — data transfer** | Free command-line tools for scripted data transfer. Sufficient for all data movement this project requires. |
+| Azure Managed Disks — Premium SSD | Rejected | Production-grade, low-latency block storage for mission-critical workloads; higher cost with no performance benefit for a small demo project. |
+| Azure Managed Disks — Premium SSD v2 | Rejected | Adjustable IOPS and throughput for production databases; no performance tuning requirement exists for this workload. |
+| Azure Managed Disks — Ultra Disk | Rejected | NVMe-based storage for SAP HANA and high-transaction workloads; cannot be used as an OS disk; not applicable. |
+| Azure Elastic SAN | Rejected | Cloud-native SAN over iSCSI for consolidating block storage across multiple VMs; no multi-VM shared storage or SAN migration requirement. |
+| Azure Container Storage | Rejected | Managed persistent volume orchestration for AKS; adds managed-service cost and complexity. The native AKS storage class with managed disks handles a single PostgreSQL PVC adequately. |
+| Azure Files | Rejected | SMB/NFS cloud-native file shares; no shared file system requirement exists. PostgreSQL uses a block (ReadWriteOnce) PVC. |
+| Azure NetApp Files | Rejected | Enterprise high-performance NFS/SMB for SAP, HPC, and large-scale file workloads; not applicable. |
+| Azure Managed Lustre | Rejected | Distributed parallel file system for HPC workloads; not applicable. |
+| Data Lake Storage Gen2 | Rejected | Big data analytics object storage built on Blob Storage; not applicable. |
+| Azure Data Box / Import/Export service | Rejected | Physical hardware for bulk data migration where network transfer is impractical; no large-scale on-premises migration exists. |
+| Azure Data Factory | Rejected | Managed ETL orchestration for complex multi-source pipelines; not needed. The ETL is a single Python script running as a Kubernetes CronJob. |
 
 ### Choose a data store
 
