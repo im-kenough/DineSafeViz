@@ -69,3 +69,26 @@ Key decisions captured:
   enterprise-grade portfolio demonstration value.
 - MS SQL excluded: no perpetual free tier; licensing overhead unjustified.
 - Self-hosted over PaaS: cost delta ~$15/mo; removes operational showcase.
+
+---
+
+## 2026-06-19 — Complete "OLTP Solutions" section
+
+### Context
+
+`#### OLTP Solutions` was a stub: the Azure service list and key selection
+criteria were copied verbatim from the MS Learn article with no DineSafeViz
+answers.
+
+### Work log
+
+URL fetched: https://learn.microsoft.com/en-us/azure/architecture/data-guide/relational-data/online-transaction-processing
+
+Added:
+- Intro paragraph noting DineSafeViz isn't a classic business-transaction
+  system but matches the OLTP trait profile.
+- `##### Workload trait fit` table mapping each of the 13 OLTP traits to
+  DineSafeViz's actual characteristics.
+- `##### Key selection criteria` — moved service list inline, answered all 9
+  key questions as a sequential elimination funnel leading to self-hosted
+  PostgreSQL.

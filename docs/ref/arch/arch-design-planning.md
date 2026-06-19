@@ -81,6 +81,8 @@ The app is a N-tier architecture, single-region, with role-segmented data-tier a
   - Data transfer: Azure CLI, AzCopy, or Azure PowerShell
   - Redundancy: Local Redundant Storage
 - Data Store: Self-hosted PostgreSQL on AKS, managed by the CloudNativePG operator
+  - Data model: relational OLTP
+  - Data store: data store: selfhosted PostgresQL on AKS with CloudNativePG operator
 
 ### Choose a compute service
 
@@ -324,6 +326,10 @@ Kubernetes CronJob with no pipeline orchestration requirement.
 
 DineSafeViz stores structured, relational data (normalized inspection records) with clear foreign key relationships between establishments, inspections, and infractions. The data is served to two read clients, a Flask web app and a Grafana dashboard. 
 
+DineSafeViz:
+- uses the relational OLTP data model
+- data store: selfhosted PostgresQL on AKS with CloudNativePG operator
+
 #### Data Model
 
 The [Understand data store models](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/understand-data-store-models) article classifies storage engines into nine models: 
@@ -343,9 +349,45 @@ DineSafeViz's inspection data is structured, schema-on-write, and organized into
 
 No other model applies: the dataset is too small and structured for an analytics or OLAP store, there is no free-text search requirement, no high-rate telemetry stream, no graph traversal, and no schemaless document flexibility needed.
 
-#### Prepare to choose a data store in Azure
+#### OLTP Solutions
 
-Per the [Prepare to choose a data store in Azure](https://learn.microsoft.com/en-us/azure/architecture/guide/technology-choices/data-stores-getting-started) article, DineSafeViz fits the **Online transactional processing (OLTP)** model.
+The [OLTP solutions](https://learn.microsoft.com/en-us/azure/architecture/data-guide/relational-data/online-transaction-processing) article defines OLTP as the management of transactional data — typically business interactions recorded as they occur. DineSafeViz does not process live business transactions (no payments, orders, or inventory movements), but its data characteristics match the OLTP trait profile: highly normalized schema, schema-on-write enforcement, strong consistency, and a mix of bulk writes (ETL) and moderate reads (Flask, Grafana).
+
+##### Workload trait fit
+
+| OLTP trait | DineSafeViz |
+|---|---|
+| Normalization | Highly normalized — `establishments`, `inspections`, `infractions` |
+| Schema | Schema-on-write; enforced by SQLAlchemy models and PostgreSQL constraints |
+| Consistency | Strong; ETL loads atomically, readers must see consistent state |
+| Integrity | High; foreign key constraints across all three tables |
+| Uses transactions | Yes; ETL bulk-loads within a single transaction |
+| Locking strategy | Optimistic; single writer (ETL CronJob), multiple read-only clients |
+| Updateable | Yes; ETL can update existing records on re-run |
+| Appendable | Yes; new inspection records are appended nightly |
+| Workload | Moderate reads (Flask page requests, Grafana queries); low-frequency writes (nightly ETL) |
+| Indexing | Primary keys; secondary indexes on commonly filtered columns (establishment ID, inspection date) |
+| Datum size | Small; each inspection record is a handful of columns |
+| Query flexibility | High; SQLAlchemy ORM and raw SQL via Grafana |
+| Scale | Small; ~100k rows, growing slowly |
+
+##### Key selection criteria
+
+Azure offers the following OLTP data stores: Azure SQL Database, Azure SQL Managed Instance, SQL Server on Azure VM, Azure Database for MySQL, Azure Database for PostgreSQL, and Azure Cosmos DB. The article's key selection criteria narrow the choice:
+
+- **Do you want a managed service rather than managing your own servers?** No — self-hosted PostgreSQL in AKS via CloudNativePG. A managed service (Azure Database for PostgreSQL — Flexible Server) costs ~$16–20/mo versus ~$2–3/mo self-hosted, and removes the operational surface the portfolio is meant to demonstrate. This eliminates all managed PaaS options.
+- **Does your solution have specific dependencies for Microsoft SQL Server, MySQL, or PostgreSQL compatibility?** Yes — PostgreSQL. Flask uses SQLAlchemy with the `psycopg2` driver; Grafana uses its native PostgreSQL data source. Both work equally against a self-hosted instance; no Azure PaaS offering is required. This eliminates Azure SQL Database, SQL Managed Instance, SQL Server on Azure VM, and Azure Cosmos DB.
+- **Are your write throughput requirements high?** No. The only writer is the nightly ETL CronJob. In-memory tables and global distribution capabilities are not needed.
+- **Is your solution multitenant?** No. Single-tenant personal project; elastic pools and Cosmos DB isolation models do not apply.
+- **Does your data need to be readable with low latency in multiple regions?** No. Single-region deployment; Canada Central only.
+- **Does your database need to be highly available across geographic regions?** Not for v0.4. DR is a manual active-passive failover to a cold DR region (see the DR roadmap section). Geo-replication and automatic failover are out of scope for now.
+- **Does your workload require guaranteed ACID transactions?** Yes. The ETL bulk-load must succeed or fail atomically; partial loads must not be committed. PostgreSQL's MVCC-based transaction model satisfies this requirement natively.
+- **Does your database have specific security needs?** Standard needs: encryption at rest and in transit, role-based access (application user vs. superuser), and network isolation via `NetworkPolicy`. No row-level security or data masking is required.
+- **Does your solution require distributed transactions?** No. All data lives in a single PostgreSQL instance; no cross-database or cross-service transaction coordination is needed.
+
+**Conclusion:** self-hosted PostgreSQL on AKS, managed by the CloudNativePG operator. The first criterion (cost and portfolio rationale) eliminates all managed PaaS options; the remaining criteria confirm that no advanced scale, multi-region, or distributed-transaction capabilities are required.
+
+#### Prepare to choose a data store in Azure
 
 ##### Functional requirements
 
@@ -405,42 +447,6 @@ and the model taxonomy in [Understand data store models](https://learn.microsoft
 
 The data is structured, schema-on-write, and accessed primarily by joins and filters against a static ~100k-row dataset. Nothing about the workload requires NoSQL flexibility, analytical pre-aggregation, object storage, or full-text indexing.
 
-#### Decision tree path / data model fit
-
-[Understand data store models](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/understand-data-store-models) frames the first question as: what are the workload access patterns? DineSafeViz access patterns are point reads and filtered range queries over normalized relational tables — the textbook fit for a relational store. The heuristic table in that article maps "strict multi-entity transactions" and "complex joins" to relational; DineSafeViz uses both.
-
-[Prepare to choose a data store in Azure](https://learn.microsoft.com/en-us/azure/architecture/guide/technology-choices/data-stores-getting-started) then asks:
-
-1. **What is the data format?** Structured tables with well-defined schema. → relational.
-2. **OLTP or OLAP?** OLTP. The [OLTP article](https://learn.microsoft.com/en-us/azure/architecture/data-guide/relational-data/online-transaction-processing) describes managing transactional data with ACID semantics. DineSafeViz does not process live business transactions, but the data characteristics — normalized schema, moderate reads, periodic bulk-load writes from the ETL — match the OLTP profile far better than OLAP's star-schema/MPP pattern, which is overkill for a ~100k-row dataset.
-3. **Full-text or search index needed?** No. Grafana and Flask query by field value, not free-text relevance.
-4. **Relational database technology?** Yes — the codebase targets PostgreSQL via SQLAlchemy.
-5. **Managed (PaaS) or self-hosted (IaaS / containerized)?** Self-hosted in AKS. The PaaS path would be Azure Database for PostgreSQL — Flexible Server; it is rejected on cost and portfolio grounds documented below.
-6. **What level of control over the OS and engine?** Full control. CloudNativePG runs the engine in pods we own end to end — PVC, config, version, extensions, backup schedule.
-
-#### Is managed Azure Database for PostgreSQL overkill?
-
-For this workload, yes. The decision turns on three factors: cost vs. value delivered, fit with the planned DR strategy, and portfolio narrative.
-
-**Cost comparison (list price, Canada Central, USD, approximate):**
-
-| Option | Monthly cost | Notes |
-|---|---|---|
-| Azure Database for PostgreSQL — Flexible Server, Burstable B1ms (1 vCore, 2 GB RAM) | ~$12–15 compute + ~$4 storage (32 GiB P4) + backup storage ≈ **$16–20/mo** | No permanent free tier exists for Flexible Server. The Azure free-account 12-month B1ms credit is a one-off; after expiry the workload pays full pay-as-you-go rates. |
-| Self-hosted PostgreSQL container in AKS, 32 GiB Standard HDD PVC | $0 incremental compute (rides existing AKS node) + ~$1.54/mo for PVC + ~$0.05/GiB/mo for snapshots ≈ **~$2–3/mo** | The AKS node pool is already provisioned for Flask, Grafana, and ingress; PostgreSQL fits in the same node's headroom for this workload. |
-| **Delta** | **~$15/mo (~$180/yr)** | Modest absolute cost; significant for a personal homelab budget and worth re-evaluating at each renewal. |
-
-List prices are estimates and should be verified against the Azure pricing calculator at provisioning time; reservations and regional pricing can shift these by 10–30%.
-
-**Value the managed service would add that this project does not need:**
-
-- **Automated patching, monitoring, and engine upgrades** — useful in production, but these are exactly the operations the portfolio is intended to demonstrate.
-- **Zone-redundant HA and cross-region geo-replication** — paid add-ons; this is a single-region demo with a custom DR plan (see roadmap below).
-- **7-day automated point-in-time restore** — replaced by the explicit nightly snapshot plus GitHub Actions cross-region replication described below.
-
-**Portfolio rationale:** the target role for this repo is sysadmin / DevOps. Managing a stateful Kubernetes workload — an operator-managed PostgreSQL with WAL archiving, scheduled snapshots, restore drills, and a documented failover runbook — directly showcases the operations work an employer wants to see. Outsourcing that work to a PaaS removes the showcase.
-
-**Conclusion:** managed Azure Database for PostgreSQL is over-engineered for the data volume, costs roughly an order of magnitude more than self-hosting, and removes the very operational surface this portfolio is meant to demonstrate.
 
 #### Best practices for self-hosted PostgreSQL on AKS
 
@@ -459,34 +465,6 @@ The deployment uses the [CloudNativePG](https://cloudnative-pg.io/) Kubernetes o
 | Network policy | `NetworkPolicy` restricting PostgreSQL pod ingress to the Flask, Grafana, and ETL service accounts only. |
 | Observability | `postgres_exporter` sidecar feeding the future Prometheus stack on the self-hosted observability VMs. |
 
-#### Backup and disaster recovery roadmap
-
-The DR design target is **active-passive failover** from a single primary region to a passive DR region, with manual cutover and near-zero cost at rest. Working targets: **RPO ≤ 24 h**, **RTO ≈ 20–30 minutes** (AKS provisioning + restore + DNS TTL). Out of scope for v0.4; planned for the backup-and-DR phase.
-
-**Daily cycle (primary region):**
-
-1. **00:30** — ETL CronJob runs in AKS, pulling any new records that the City of Toronto has published and loading them into PostgreSQL.
-2. **02:00** — `ScheduledBackup` triggers CloudNativePG to take a physical base backup against the WAL archive in Azure Blob Storage (primary region). Continuous WAL archiving keeps the recovery window fresh between base backups.
-3. **02:15** — A scheduled GitHub Actions workflow runs `az storage blob copy` (or `azcopy sync`) to replicate the previous night's base backup and WAL segments from the primary-region storage account to a DR-region storage account.
-
-**DR-region steady state:**
-
-- Terraform code for the DR AKS cluster, networking, and CloudNativePG installation lives in the repo but is not applied. No compute cost at rest.
-- The DR-region storage account holds the latest replicated backup. Storage cost only — Standard LRS hot tier at ~$0.02/GiB/mo plus per-operation charges on the nightly copy.
-
-**Failover runbook (manual):**
-
-1. Confirm primary-region outage and decide to cut over.
-2. `terraform apply` the DR-region AKS cluster, networking, and CloudNativePG installation.
-3. Bootstrap a new CloudNativePG `Cluster` with `bootstrap.recovery` pointing at the replicated WAL archive in the DR Blob container. The operator restores from the most recent base backup and replays WAL up to the latest available segment.
-4. Deploy the Flask app and Grafana to the DR AKS cluster.
-5. Update DNS records at the DNS provider to point at the DR ingress IP. Note expected propagation time given the configured TTL.
-6. Verify with smoke tests; mark cutover complete.
-
-**Failback** is a separate planned operation once the primary region is restored: rebuild primary AKS, restore from DR backups, switch DNS back, decommission the DR-region compute.
-
-The at-rest cost of this DR posture is essentially the DR-region storage account. No standby compute, no managed-service replica fees, no cross-region peering charges.
-
 #### Candidates evaluated
 
 | Service | Decision | Reason |
@@ -502,14 +480,6 @@ The at-rest cost of this DR posture is essentially the DR-region storage account
 | Azure AI Search | Rejected | Full-text search index; no free-text search requirement exists. Per [Choose a search data store](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/search-options), PostgreSQL's built-in full-text search would suffice if a search requirement ever emerges. |
 | Azure Blob Storage / Data Lake Storage Gen2 | Rejected | Object stores for unstructured or bulk analytical data. [Choose a data storage technology](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/data-storage) positions these for big data ingestion and analytics pipelines, not as the serving layer for a web app. |
 | Microsoft Fabric / OneLake | Rejected | Enterprise analytics SaaS platform; appropriate for organization-wide BI with petabyte-scale data. A ~100k-row inspection table routed through a Fabric warehouse would be significant over-engineering. |
-
-#### Notes on tangential sub-articles
-
-**[Data lake scenarios](https://learn.microsoft.com/en-us/azure/architecture/data-guide/scenarios/data-lake):** A data lake is designed for raw, schema-on-read storage of massive and diverse datasets feeding downstream analytics or ML pipelines. DineSafeViz has a small, stable, structured dataset with no ML pipeline and no raw-to-curated transformation layer. The data lake pattern does not apply.
-
-**[Choose a pipeline orchestration technology](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/pipeline-orchestration-data-movement):** Azure Data Factory, Fabric Data Factory, SSIS, and Apache Oozie are the candidates. The DineSafeViz ETL is a lightweight Python script that fetches the DineSafe open data feed and bulk-loads it into PostgreSQL on a schedule. That script runs as a Kubernetes CronJob. A managed orchestration service like ADF would add cost and operational surface area (the free tier does not cover production-grade activity volumes) with no benefit over a CronJob for a single-source, single-destination batch load. This article is noted for future reference if the ETL grows to multiple sources or requires retry orchestration, branching logic, or SLA monitoring.
-
-**[Choose a search data store](https://learn.microsoft.com/en-us/azure/architecture/data-guide/technology-choices/search-options):** Azure AI Search and Elasticsearch both require maintaining a separate index synchronized with the primary database. No user-facing free-text search exists in DineSafeViz. SQL full-text search in PostgreSQL would be the first option if a search requirement ever emerges; a dedicated search index is not warranted.
 
 ### Choose an analytics solution
 
