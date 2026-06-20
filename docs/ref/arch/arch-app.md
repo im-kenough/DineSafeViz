@@ -3,7 +3,10 @@
 This document describes the application architecture of DineSafeViz, which is a [3-tier web application](https://learn.microsoft.com/en-us/azure/architecture/guide/architecture-styles/n-tier). 
 
 **Tier 1 — Presentation / edge**
-dsv-nginx terminates the only externally exposed port (8080) and routes traffic to either the Flask UI or the embedded Grafana UI. Grafana's web UI is also a presentation-layer consumer.
+dsv-nginx is the primary entry point, listening on host port 8080, and routes
+traffic to either the Flask UI or the Grafana UI. Grafana's web UI is also a
+presentation-layer consumer. Note: `dsv-analytics` also binds host port 3000
+directly (see [Services](#long-running-services)), which bypasses nginx.
 
 **Tier 2 — Application / business logic**
 dsv-app — the Flask app under gunicorn. Renders templates, handles /healthz, /readyz, /metrics, queries the DB, applies the 5-day in-memory cache for home stats.
@@ -26,35 +29,66 @@ reverse proxy).
 
 ![Architecture overview](../img/root-readme/arch-over.drawio.png)
 
+The following diagram shows runtime interactions between services — traffic
+flows, database roles, and one-shot bootstrap dependencies.
+
+```mermaid
+graph LR
+    Browser(["Browser"])
+    Toronto(["Toronto Open Data"])
+
+    subgraph stack["Docker Compose — dsv"]
+        Nginx["dsv-nginx\nnginx:stable-alpine\nhost :8080"]
+        App["dsv-app\npython:3.14-slim\ngunicorn :8000"]
+        Grafana["dsv-analytics\ngrafana:11.2.0\nhost :3000"]
+        DB[("dsv-db\nPostgreSQL 17\n:5432")]
+        InitDB["dsv-init-db\nrefresh.py\none-shot"]
+        InitAnalytics["dsv-init-analytics\ncurl\none-shot"]
+    end
+
+    Browser -->|"host :8080"| Nginx
+    Nginx -->|"/* → :8000"| App
+    Nginx -->|"/analytics/ → :3000\n+ WebSocket upgrade"| Grafana
+    App -->|"SELECT\ndinesafe_app role"| DB
+    Grafana -->|"SELECT\ndinesafe_app role"| DB
+    InitDB -->|"superuser\nseed / refresh"| DB
+    Toronto -->|"HTTPS CSV download"| InitDB
+    InitAnalytics -->|"Grafana REST API\ndashboard permissions"| Grafana
+```
+
 ## Services
 
 ### Long-running services
 
-- **`dsv-nginx`** — `nginx:stable-alpine`. The only externally exposed
-  service, listening on port 8080. Routes `/analytics/` to
-  `dsv-analytics:3000` (with WebSocket upgrade headers for Grafana
-  Live) and all other requests to `dsv-app:8000`. Starts only after
-  `dsv-app` passes its healthcheck.
+- **`dsv-nginx`** — `nginx:stable-alpine`. Listens on host port 8080 (internal
+  port 80). Routes `/analytics/` to `dsv-analytics:3000` (with WebSocket
+  upgrade headers for Grafana Live) and all other requests to `dsv-app:8000`.
+  Blocks `/metrics` externally (returns 404). Starts only after `dsv-app`
+  passes its healthcheck.
 
-- **`dsv-app`** — `python:3.12-slim-bookworm` (multi-stage build).
+- **`dsv-app`** — `python:3.14-slim-bookworm` (multi-stage build).
   Runs the Flask app under gunicorn (gthread worker, 1 worker, 4
   threads) on port 8000. Internal-only — not exposed on the host.
   Runs as `nonroot` (UID/GID 65532). Connects to `dsv-db` using the
   `dinesafe_app` role (SELECT-only). Exposes `/healthz` and `/readyz`
   for health gating. Starts after `dsv-db` is healthy.
 
-- **`dsv-analytics`** — `grafana/grafana:11.2.0`. Serves a
-  pre-provisioned Grafana dashboard on port 3000. Uses `dsv-db` as its
-  PostgreSQL data source via the `dinesafe_app` role. Dashboard state
-  persists in a named volume (`dsv-analytics-data`). Anonymous viewer
-  access is enabled.
+- **`dsv-analytics`** — `grafana/grafana:11.2.0`. Serves a pre-provisioned
+  Grafana dashboard on port 3000. Port 3000 is bound on the host directly
+  (in addition to being reverse-proxied via nginx at `/analytics/`). Uses
+  `dsv-db` as its PostgreSQL data source via the `dinesafe_app` role.
+  Dashboard state persists in a named volume (`dsv-analytics-data`).
+  Anonymous viewer access is enabled.
 
 ### One-shot services
 
 - **`dsv-init-db`** — Runs `refresh.py` on startup. Seeds the database
-  on first run; refreshes recent data on subsequent runs. Exits after
-  completion (`restart: "no"`). Connects using the superuser credentials
-  (`DSV_DB_USER`). See [data architecture — data
+  on first run (historical 2001–2022 + recent CSV); refreshes recent data on
+  subsequent runs. Exits after completion (`restart: "no"`). Connects using
+  the superuser credentials (`DSV_DB_USER`), which has full DDL and write
+  access — distinct from the read-only `dinesafe_app` role used by the app
+  and analytics, and the `dinesafe_migrator` role defined in `init.sql` for
+  future schema migration use. See [data architecture — data
   ingestion](arch-data.md#data-ingestion) for details.
 
 - **`dsv-init-analytics`** — `curlimages/curl:latest`. Waits for
@@ -83,11 +117,12 @@ directly.
 
 ### Inspection browsing
 
-Inspections are grouped by date and sorted by severity within each
-day (Crucial > Significant > Minor > NA > None). Year and quarter
-navigation covers 2001 to the present. The navigation uses a dropdown
-with flyout menus — recent years are shown directly, older years are
-nested under an "Archive" section.
+Inspections are grouped by date and sorted by establishment status within each
+day (Closed > Conditional Pass > Pass; unknown statuses sort last). Year and
+quarter navigation covers 2001 to the present. The navigation uses a dropdown
+with flyout menus — the four most recent years are shown directly, older years
+are nested under an "Archive" section. Note: 2023 navigation only shows Q4,
+because the recent CSV starts from Q4 2023 and historical data ends in 2022.
 
 ### Home page caching
 
@@ -103,8 +138,9 @@ request is logged at INFO level with `request_id` (UUIDv4),
 same `request_id` is echoed back in the `X-Request-ID` response
 header.
 
-Prometheus metrics are exposed at `/metrics` via
-`prometheus-flask-exporter`. Four custom metrics are defined:
+Prometheus metrics are exposed at `/metrics` via `prometheus-flask-exporter`.
+nginx blocks this endpoint externally (returns 404), so scraping must happen
+from within the Docker network. Four custom metrics are defined:
 
 | Metric | Type | Description |
 |---|---|---|

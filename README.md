@@ -34,6 +34,8 @@ Uses [Infrastructure as Code](docs/ref/arch/arch-iac.md) to automate VM provisio
 
 The DineSafeViz application is a Dockerized webapp with a database backend. It visualizes historic data and updates the dataset daily. 
 
+![DineSafeViz Application - Simple](docs/img/root-readme/dsv-app-simple.png)
+
 > [!NOTE]
 > Data update feature Coming Soon (™️)
 

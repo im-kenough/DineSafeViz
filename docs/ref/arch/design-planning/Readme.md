@@ -56,3 +56,16 @@ Start your design strategy based on the design review checklist for Operational 
 
 https://learn.microsoft.com/en-us/azure/aks/best-practices
 https://learn.microsoft.com/en-us/azure/architecture/operator-guides/aks/day-2-operations-guide
+
+
+---
+
+https://learn.microsoft.com/en-us/azure/aks/best-practices?source=recommendations
+
+For guidance on a designing an enterprise-scale implementation of AKS, see Plan your AKS design.
+https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/containers/aks-start-here?toc=/azure/aks/toc.json&bc=/azure/aks/breadcrumb/toc.json
+
+To choose the right cluster mode for your workload and operating model, see AKS Automatic and AKS Standard feature comparison.
+https://learn.microsoft.com/en-us/azure/aks/intro-aks-automatic#aks-automatic-and-standard-feature-comparison
+
+https://learn.microsoft.com/en-us/azure/aks/best-practices

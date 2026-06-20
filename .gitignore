@@ -10,7 +10,7 @@ __pycache__/
 *.bkp
 
 # draw.io temp files
-
+*.dtmp
 
 # Distribution / packaging
 .Python
