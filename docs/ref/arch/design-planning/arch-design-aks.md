@@ -1,44 +1,128 @@
-# Azure Kubernetess Service Architecture - Planning
+# Azure Kubernetes Service Architecture - Planning
 
-## AKS
-
-We will use [AKS Standard (Standard Cluster mode)](https://learn.microsoft.com/en-us/azure/aks/what-is-aks#choose-your-aks-mode) to showcase devops and cloud administration skills.
-
-https://learn.microsoft.com/en-us/azure/aks/what-is-aks
-
-- [Cluster Mode](https://learn.microsoft.com/en-us/azure/aks/best-practices#choose-your-aks-mode-first): Standard
-- [Price Tier](https://learn.microsoft.com/en-us/azure/aks/free-standard-pricing-tiers): Free
-
-AKS limits: https://learn.microsoft.com/en-us/azure/aks/quotas-skus-regions#supported-vm-sizes
-
-AKS Pricing: 
-
----
-
-
-This document explains how the DineSafeViz Azure Kubernetes Service
-(AKS) deployment maps to Microsoft's published reference architectures
-and to the Azure Well-Architected Framework (WAF). It captures scope,
-intentional divergences from the reference, and items deliberately
-deferred to later phases.
-
-The deployment implements a cost-optimized adaptation of the
-**AKS Baseline Architecture** augmented with a **passive-cold
-disaster recovery** pattern (cross-region replicated Postgres WAL
-archive, no running secondary cluster). Phase 2 evolves toward the
-**AKS Baseline for multi-region clusters** as a configuration change
-rather than a redesign.
+This document is the single planning reference for deploying DineSafeViz
+(DSV) to Azure Kubernetes Service. It opens with the concrete
+**requirements** for the production and staging environments, then
+records the **design rationale**: how the deployment maps to Microsoft's
+published reference architectures and to the Azure Well-Architected
+Framework (WAF), where it intentionally diverges, and what is deferred to
+later phases.
 
 The full implementation spec is in
-[`docs/superpowers/specs/2026-06-09-aks-deployment-design.md`](../../superpowers/specs/2026-06-09-aks-deployment-design.md);
-this doc is the design-rationale companion to that spec. The reading
-list driving each section below is in
-[`arch-checklist.md`](arch-checklist.md).
+[`docs/superpowers/specs/2026-06-09-aks-deployment-design.md`](../../../superpowers/specs/2026-06-09-aks-deployment-design.md);
+this document is the requirements-and-rationale companion to that spec.
 
-> [!NOTE]
-> Sections marked **TODO** require completing the corresponding item in
-> [`arch-checklist.md`](arch-checklist.md) and capturing concrete
-> scope-in / scope-out items from the Microsoft checklist.
+## Requirements
+
+- Deploy DineSafeViz (DSV) to AKS
+- Store secrets in AZ keyvault, images in ACR
+- DSV Prod
+  - namespace: prod
+  - 1 active prod AKS cluster in east-us-2
+    - system node pool
+      - VMSS
+        - min 1 node, max 2. scale up upon resource contention
+        - 1 node in az-1
+        - distribute each node evenly across each availability zone
+    - user node pool
+      - VMSS
+        - min 1 node, max 3. scale up upon resource contention
+          - demo project. not expecting any real traffic to trigger scale up
+        - distribute each node evenly across each availability zone
+  - Passive-cold disaster recovery — data only (phase 2)
+    - Generic term: backup-and-restore (the coldest DR tier). Azure
+      term: passive-cold. No standing DR cluster runs in west-us-2.
+    - Postgres WAL segments and daily basebackups replicate
+      continuously to an Azure Blob storage account using
+      geo-redundant storage (GRS); Azure replicates the data to the
+      paired region (west-us-2).
+    - On failover: provision the west-us-2 environment from IaC,
+      restore Postgres from the WAL archive, then repoint DNS.
+    - RPO <= 24h; RTO <= 4h (manual provisioning and promotion).
+  - Monitoring (phase 3)
+    - selfhosted prod VMs (monitoring, observability, centralized logging)
+
+- DSV Stg
+  - namespace: stg
+  - 1 active stg AKS cluster in east-us-2
+    - system node pool
+      - VMSS
+        - min 1 node, max 2. scale up upon resource contention
+        - 1 node in az-1
+        - distribute each node evenly across each availability zone
+    - user node pool
+      - VMSS
+        - min 1 node, max 3. scale up upon resource contention
+          - demo project. not expecting any real traffic to trigger scale up
+        - distribute each node evenly across each availability zone
+  - Passive-cold disaster recovery — data only (phase 2)
+    - Same pattern as prod: no standing DR cluster. Staging WAL and
+      basebackups also use GRS so the data exists cross-region; the
+      west-us-2 environment is provisioned from IaC at failover.
+    - On failover: provision the west-us-2 environment from IaC,
+      restore Postgres from the WAL archive, then repoint DNS.
+    - RPO <= 24h; RTO <= 4h (manual provisioning and promotion).
+  - Monitoring (phase 3)
+    - selfhosted stg VMs (monitoring, observability, centralized logging)
+
+- FinOps
+  - budget = $100 USD /month (hard cap)
+  - Send warning at 50%, 80% of budget
+  - Shut everything down at 100% of budget
+  - Steady-state target is $25 to $50 /month (clusters stopped by default)
+
+Phase 1:
+- provision AZ prod, stg environment
+- manually deploy app to stg and prod env
+  - write manual deploy docs
+
+Phase 2:
+- provision AZ DR environments
+- IAC - create Github actions jobs
+  - deploy to prod
+  - deploy to stg
+  - failover to prod dr
+  - cut over to prod primary
+    - run `deploy-to-prod`
+    - tear down prod dr
+    - cut over to prod
+    - clean up
+  - failover to stg dr
+  - cut over to stg primary
+    - run `deploy-to-prod`
+    - tear down prod dr
+    - cut over to prod
+    - clean up
+
+Phase 3:
+- manually deploy monitoring VMs & on prem connectivity, tailscale mesh network
+
+Phase 4:
+- IAC - create Github actions jobs
+  - refresh dataset
+  - deploy monitoring prod
+  - deploy monitoring stg
+
+Phase 5:
+- setup on prem DMZ for monitoring VMs
+
+## AKS cluster configuration
+
+We will use [AKS Standard (Standard cluster mode)](https://learn.microsoft.com/en-us/azure/aks/what-is-aks#choose-your-aks-mode)
+to showcase devops and cloud administration skills.
+
+- [Cluster mode](https://learn.microsoft.com/en-us/azure/aks/best-practices#choose-your-aks-mode-first): Standard
+- [Price tier](https://learn.microsoft.com/en-us/azure/aks/free-standard-pricing-tiers): Free
+- VM size: Standard_B2s (burstable), both pools
+- OS: Ubuntu Linux
+- OS disks: Standard SSD (E10)
+- User pool capacity: Spot VMs (capped at on-demand price)
+- Container runtime: containerd
+- Network: Azure CNI Overlay with Cilium network policy
+- Node pools
+  - System node pool
+  - User node pool
+- AKS version: latest version
 
 ## Context
 
@@ -111,13 +195,16 @@ Each divergence is rationalized below in the
 The deployment matches the [passive-cold solution for AKS]
 [passive-cold] pattern: production runs in East US 2; the disaster
 recovery site is pre-positioned in West US 2 but is **not running** in
-Phase 1.
+Phase 1. In vendor-neutral DR terms this is the **backup-and-restore**
+strategy (the coldest tier): no standing secondary cluster, only the
+replicated data.
 
 Data replication is implemented now so the DR cluster can be activated
 as a Phase 2 configuration change:
 
 - CloudNativePG writes WAL segments and daily basebackups to an Azure
-  Blob storage account with **geo-redundant storage (GRS)**.
+  Blob storage account with **geo-redundant storage (GRS)**. Both prod
+  and staging use GRS so each environment has a cross-region copy.
 - The secondary region's read-only endpoint (`-secondary`) is the
   source the DR cluster will use when promoted.
 - Recovery point objective: at most 24 hours.
@@ -183,8 +270,7 @@ here so a reviewer knows it was considered).
 
 Each subsection captures what is scope-in, scope-out, or modified for
 that pillar. The TODO blocks call out checklist items that need
-verification against Microsoft's per-pillar guide; complete each as the
-corresponding row in [`arch-checklist.md`](arch-checklist.md) is read.
+verification against Microsoft's per-pillar guide.
 
 ### Reliability
 
@@ -266,10 +352,12 @@ This is the strongest pillar; most of the design is driven by it.
 - B2s burstable VMs for both system and user pools.
 - Spot user pool capped at on-demand price.
 - Standard SSD (E10) storage class; not Premium SSD.
-- Azure Monitor budget alert at 80% of $50/mo cap.
+- Azure Monitor budget alerts at 50% and 80% of the $100/mo cap, with
+  automated shutdown at 100%.
 - Azure Monitor alert when an AKS cluster runs continuously for more
   than 12 hours (cost guardrail against a forgotten cluster).
-- LRS storage for staging WAL (DR not needed for non-production data).
+- GRS storage for prod and staging WAL. Staging carries passive-cold
+  DR too, so its backups must exist cross-region (~$1/mo uplift).
 
 **TODO** (after reading the WAF Cost Optimization checklist):
 
@@ -356,10 +444,24 @@ Ad-hoc decisions taken during implementation are captured here in
 date order. Each entry: date, decision, rationale, affected design
 sections.
 
-_Empty. To be populated as implementation proceeds._
+- **2026-06-22 — DR model set to passive-cold (data only) for both prod
+  and staging.** No standing DR cluster; only Postgres WAL/basebackups
+  replicate to GRS storage, and the west-us-2 environment is provisioned
+  from IaC at failover. Rationale: two stopped cold-standby clusters
+  would add ~$20–65/mo (disks + Public IPs) against a $25–50/mo
+  steady-state target, while passive-cold adds ~$2/mo and arguably
+  demonstrates stronger operational maturity (full reconstitution from
+  IaC + geo-redundant backups). Affects: Requirements, Passive-cold
+  disaster recovery, Cost optimization (staging WAL now GRS).
 
 ## References
 
+- AKS overview: https://learn.microsoft.com/en-us/azure/aks/what-is-aks
+- AKS best practices:
+  https://learn.microsoft.com/en-us/azure/aks/best-practices
+- AKS quotas, SKUs, and regions:
+  https://learn.microsoft.com/en-us/azure/aks/quotas-skus-regions#supported-vm-sizes
+- AKS FAQ: https://learn.microsoft.com/en-us/azure/aks/faq
 - AKS Baseline Architecture:
   https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/containers/aks/baseline-aks
 - Passive-cold solution for AKS:
@@ -375,21 +477,10 @@ _Empty. To be populated as implementation proceeds._
 - Mission-critical workloads (Well-Architected):
   https://learn.microsoft.com/en-us/azure/well-architected/mission-critical/mission-critical-overview
 - Implementation spec:
-  [`docs/superpowers/specs/2026-06-09-aks-deployment-design.md`](../../superpowers/specs/2026-06-09-aks-deployment-design.md)
-- Reading checklist: [`arch-checklist.md`](arch-checklist.md)
+  [`docs/superpowers/specs/2026-06-09-aks-deployment-design.md`](../../../superpowers/specs/2026-06-09-aks-deployment-design.md)
 
 [aks-baseline]: https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/containers/aks/baseline-aks
 [passive-cold]: https://learn.microsoft.com/en-us/azure/aks/passive-cold-solution
 [aks-multi-region]: https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/containers/aks-multi-region/aks-multi-cluster
 [aks-lza]: https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/scenarios/app-platform/aks/landing-zone-accelerator
 [mission-critical]: https://learn.microsoft.com/en-us/azure/well-architected/mission-critical/mission-critical-overview
-
-
-
-## Appendix
-
-### References
-
-Referenced Articles
-- https://learn.microsoft.com/en-us/azure/aks/best-practices#choose-your-aks-mode-first
-  - https://learn.microsoft.com/en-us/azure/aks/core-aks-concepts
