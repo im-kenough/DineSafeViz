@@ -1,0 +1,4 @@
+- 2026-06-22 16:52 Standardized DR environment names to "prod-dr" and "stg-dr" in `docs/ref/arch/design-planning/arch-design-aks.md`.
+- Replaced "dr-prod", "dr prod", and "production DR" with "prod-dr".
+- Replaced "dr-stg", "dr stg", and "stg DR" with "stg-dr".
+- Updated job names and descriptions to reflect this consistent naming scheme.

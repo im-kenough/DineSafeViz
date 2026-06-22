@@ -1,0 +1,3 @@
+- 2026-06-22 15:42
+- Consolidated use cases to group related operations under single use cases with multiple conditions (C1, C2).
+- Rewrote `docs/ref/sys-analysis-design/use-cases.md` to remove "Description:" tags and use bullet points for sub-steps.

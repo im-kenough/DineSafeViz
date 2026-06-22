@@ -1,0 +1,3 @@
+- 2026-06-22 15:28
+- Added detailed failover and switchback scenarios for production and staging to `docs/ref/sys-analysis-design/use-cases.md`
+- Replaced the generic DR failover use case with specific, actionable use cases involving AKS provisioning and cut-off activities.

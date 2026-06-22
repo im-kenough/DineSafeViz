@@ -1,0 +1,4 @@
+- 2026-06-22 16:34 Added start up and shut down AKS cluster sys admin use cases to `docs/ref/sys-analysis-design/use-cases.md`.
+- Read existing `use-cases.md` to see numbering and style.
+- Replaced the Sysadmin block by inserting `UC-SYS-01: Start Up AKS Cluster` and `UC-SYS-02: Shut Down AKS Cluster`, each with cases for Prod, Stg, DR-Stg, and DR-Prod.
+- Shifted the numbering of the original `UC-SYS-*` use cases up by 2 to accommodate the new ones.
