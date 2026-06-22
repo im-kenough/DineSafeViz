@@ -113,122 +113,38 @@ to showcase devops and cloud administration skills.
 
 ## Infrastructure as Code
 
-WIP
+The following GitHub Actions automate cluster lifecycle and application deployment. Each action uses `workflow_dispatch` with input parameters to support multiple environments, avoiding the need for environment-specific wrapper workflows.
 
-### _start-aks-cluster (phase 2)
+### start-aks-cluster (phase 2)
 
-Github action used for starting up an existing AKS cluster, takes in params for a specific environment
+Starts an existing AKS cluster.
+- **Inputs:** `environment` (Dropdown: `prod`, `stg`, `prod-dr`, `stg-dr`)
 
-### start-prod-aks (phase 2)
+### stop-aks-cluster (phase 2)
 
-Wrapper job.
-- Runs github action `_start-aks-cluster` with prod parameters
+Stops an existing AKS cluster.
+- **Inputs:** `environment` (Dropdown: `prod`, `stg`, `prod-dr`, `stg-dr`)
 
-### start-stg-aks (phase 2)
+### deploy-application (phase 2)
 
-Wrapper job.
-- Runs github action `_start-aks-cluster` with stg parameters
+Deploys the application to the specified environment. For DR environments, also performs necessary cut-over activities to route data.
+- **Inputs:** `environment` (Dropdown: `prod`, `stg`, `prod-dr`, `stg-dr`)
 
-### start-prod-dr-aks (phase 2)
+### failback-to-primary-environment (phase 2)
 
-Wrapper job.
-- Runs github action `_start-aks-cluster` with prod-dr parameters
-
-### start-stg-dr-aks (phase 2)
-
-Wrapper job.
-- Runs github action `_start-aks-cluster` with stg-dr parameters
-
-### _stop-aks-cluster (phase 2)
-
-Github action used for stoping up an existing AKS cluster, takes in params for a specific environment
-
-### stop-prod-aks (phase 2)
-
-Wrapper job.
-- Runs github action `_stop-aks-cluster` with prod parameters
-
-### stop-stg-aks (phase 2)
-
-Wrapper job.
-- Runs github action `_stop-aks-cluster` with stg parameters
-
-### stop-prod-dr-aks (phase 2)
-
-Wrapper job.
-- Runs github action `_stop-aks-cluster` with prod-dr parameters
-
-### stop-stg-dr-aks (phase 2)
-
-Wrapper job.
-- Runs github action `_stop-aks-cluster` with stg-dr parameters
-
-
-### _deploy-application (phase 2)
-
-Github Action deploys the app to any Azure region when parameters are pased in
-
-### deploy-to-prod (phase 2)
-
-- Wrapper job. Runs github action `deploy-application` with prod parameters
-
-### deploy-to-stg (phase 2)
-
-- Wrapper job. Runs github action `deploy-application` with prod parameters
-
-### deploy-to-prod-dr (phase 2)
-
-Wrapper job. 
-
-- Runs github action `deploy-application` with prod-dr parameters
-- Performs cut-off activities to route data to the prod-dr environment
-
-### deploy-to-stg-dr (phase 2)
-
-Wrapper job. 
-
-- Runs github action `deploy-application` with stg-dr parameters
-- Performs cut-off activities to route data to the stg-dr environment
-
-### _failback-to-primary-environment (phase 2)
-
-TBD
-
-- if `redeploy` param == y:
-  - run github action `_deploy-application` with the passed in param
-
-- Perform cutoff activities to region passed in from params
-
-### failback-to-prod (phase 2)
-
-Wrapper job
-
-- Runs github action `failback-to-primary-environment` with prod params
-- Passes in `redeploy` param (y/n) to force redeploy of the environment
-- Passes in dr-region params to tear down
-
-### failback-to-stg (phase 2)
-
-Wrapper job
-
-- Runs github action `failback-to-primary-environment` with prod params
-- Passes in `redeploy` param (y/n) to force redeploy of the environment
-- Passes in dr-region params to tear down
+Tears down the DR environment and routes data back to the primary environment.
+- **Inputs:** 
+  - `primary_environment` (Dropdown: `prod`, `stg`)
+  - `redeploy` (Boolean: true/false to force redeploy of the primary environment)
 
 ### refresh-dataset (phase 4)
+
 TBD
 
-### _deploy-monitoring (phase 4)
+### deploy-monitoring (phase 4)
 
-Deploys monitoring VMs using supplied params
-
-### deploy-monitoring-prod (phase 4)
-
-- Runs github action `deloy-monitoring` with production params
-
-### deploy-monitoring-stg (phase 4)
-
-- Runs github action `deloy-monitoring` with staging params
+Deploys monitoring VMs.
+- **Inputs:** `environment` (Dropdown: `prod`, `stg`)
 
 ## Context
 
