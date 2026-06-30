@@ -11,6 +11,85 @@ TO do: https://github.com/im-kenough/DineSafeViz/issues/62
 
 To do: https://learn.microsoft.com/en-us/azure/architecture/operator-guides/aks/aks-backup-and-recovery
 
+## Cost-aware availability: the holding-page cutover
+
+AKS is not free, and running it 24/7 for an intermittent portfolio demo is
+wasteful. The plan is to run the cluster only when it is needed — demos,
+filming, DR drills — and to serve a static **holding page** from
+`dinesafeviz.com` the rest of the time. The holding page links to the repo
+and, later, a recorded walkthrough, so the project stays presentable while the
+cluster is parked.
+
+This is the same cutover muscle as the regional DR runbook below (a manual
+`workflow_dispatch` plus a DNS-layer swap), applied to a cheaper and more
+frequent event: intentionally parking a *healthy* demo to stop paying for idle
+compute.
+
+### Options considered
+
+| Option | Standing cost | Trigger | Verdict |
+|---|---|---|---|
+| Azure Front Door Standard | ~$35/mo base, always on | health probe (auto) | **Rejected.** The base fee bills even while AKS is scaled to zero — it defeats the cost saving the holding page exists to deliver. |
+| Cloudflare Load Balancing | ~$12–15/mo | health probe (auto) | **Deferred.** Automatic failover is nice, but it adds always-on cost and a moving part not justified for a demo I park on a schedule I control. |
+| Manual DNS flip via Cloudflare | ~$0 beyond the domain | manual `workflow_dispatch` | **Chosen.** I decide when the demo is up; a GitHub Action does the flip. No standing cost. |
+
+### Mechanism
+
+- `dinesafeviz.com` stays **proxied** (orange-cloud) through Cloudflare. The
+  public DNS record always points at Cloudflare's anycast IPs and never
+  changes, so there is no client-side DNS propagation to wait on. What changes
+  is the **origin** Cloudflare proxies to, applied at the edge in seconds.
+- Two states behind that one stable hostname:
+  - **Parked (default):** a Cloudflare rule serves the static holding page.
+    Until the holding page is built, this is a **302** redirect to the GitHub
+    repo — 302 not 301, so the destination can change later without
+    browser-cached redirects fighting the switch.
+  - **Live:** the rule points the origin at the AKS ingress.
+- A GitHub Actions `workflow_dispatch` job performs the flip with **one scoped
+  Cloudflare API call** (a token that may edit DNS/origin rules on this one
+  zone and nothing else, stored as a repo secret). The Cloudflare portal is
+  setup-only; there is no console login in the day-to-day.
+- The **holding page is the fail-safe default.** A failed or half-finished
+  deploy leaves `dinesafeviz.com` on the holding page, never on a 502.
+
+### Ordering (avoid flapping and split state)
+
+- **Wake:** `terraform apply` AKS → wait for ingress readiness/health → *then*
+  flip the origin to the cluster.
+- **Park:** flip the origin to the holding page *first* → *then*
+  `terraform destroy` / scale to zero.
+
+In that order the public hostname is never pointed at a cluster that is not
+ready, and never left pointed at a cluster being torn down.
+
+### Relationship to the regional DR cutover
+
+Same pattern, different trigger and blast radius. The DR cutover (below)
+rebuilds a cluster in a second region after a real outage; the holding-page
+flip parks a healthy demo to save money. Both are manual `workflow_dispatch`
+jobs that end in a DNS-layer swap and a smoke test, and both keep the runbook
+in GitHub Actions so it never depends on the cluster it is pointing away from.
+
+### Framing: a cost hack that is also release engineering
+
+> Parking the demo to save money is, mechanically, a blue-green cutover behind
+> a stable load-balancer address. The public hostname never moves; I swap what
+> sits behind it between two "colours" — the live AKS cluster and a static
+> holding page — and the holding page is the safe default I fail back to. The
+> cutover is a *manual trigger over an automated, version-controlled process*:
+> a `workflow_dispatch` button runs the exact API call from the repo, every
+> flip lands in the Actions log, and the token is scoped and rotatable. So the
+> same money-saving switch also demonstrates blue-green deployment, fail-safe
+> defaults, GitOps cutover, and least-privilege automation. The constraint —
+> don't pay for idle compute — produced the design, which is how good release
+> engineering usually happens.
+
+**Roadmap note.** The holding page itself (recorded GIFs of the running app,
+deployment, DR, and monitoring, plus a walkthrough video) is deferred to a
+later phase: filming it requires a working AKS deployment to record. Until
+then, `dinesafeviz.com` 302-redirects to the repo via a Cloudflare redirect
+rule.
+
 ## Scheduled jobs and DR runbooks
 
 Planning notes for the backup-and-DR phase (post-v0.4). Captures where each
