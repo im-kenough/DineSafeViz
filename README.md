@@ -1,4 +1,4 @@
-gi# DineSafeViz
+# DineSafeViz
 
 DineSafeViz visualizes data from the
 [City of Toronto DineSafe open dataset](https://open.toronto.ca/dataset/dinesafe/),
