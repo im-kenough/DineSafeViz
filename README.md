@@ -1,4 +1,4 @@
-# DineSafeViz
+gi# DineSafeViz
 
 DineSafeViz visualizes data from the
 [City of Toronto DineSafe open dataset](https://open.toronto.ca/dataset/dinesafe/),
@@ -24,10 +24,11 @@ end-to-end Infrastructure as Code and container orchestration of a real,
 | Component | State |
 |---|---|
 | Inspection results | Done |
-| Analytics dashboard ([Grafana](https://grafana.com/)) | Done |
+| Inspection analytics dashboard ([Grafana](https://grafana.com/)) | Done |
+| AKS deployment | In design |
 | Daily data refresh | In progress |
 | Monitoring | Planned |
-| AKS deployment | In design |
+
 
 ![DineSafeViz home page](docs/img/root-readme/dsv-home-1.png)
 
