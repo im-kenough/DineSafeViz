@@ -8,7 +8,7 @@ opentelemetry-instrumentation==0.64b0
 opentelemetry-instrumentation-dbapi==0.64b0
 opentelemetry-instrumentation-flask==0.64b0
 opentelemetry-instrumentation-psycopg2==0.63b1
-opentelemetry-instrumentation-wsgi==0.63b1
+opentelemetry-instrumentation-wsgi==0.64b0
 opentelemetry-sdk==1.42.1
 opentelemetry-semantic-conventions==0.63b1
 opentelemetry-util-http==0.64b0
