@@ -9,47 +9,56 @@ They can be downloaded from the City of Toronto Open Data portal as csv files. T
 
 ## Current Data
 
-The "[current data](https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/b6b4f3fb-2e2c-47e7-931d-b87d22806948/resource/eda39233-4791-464e-98e6-094f51a01916/download/Dinesafe.csv)" dataset is updated daily by the City of Toronto and contains about 3 years of data.
+The "[current data](https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/b6b4f3fb-2e2c-47e7-931d-b87d22806948/resource/eda39233-4791-464e-98e6-094f51a01916/download/Dinesafe.csv)" dataset is updated daily by the City of Toronto. As of 2026-07-24 its rolling window starts 2023-11-10.
 
+> [!NOTE]
+> The City changed this feed's column names and content in 2026. `Action`
+> (enforcement activity) was dropped entirely — recent inspections have no
+> enforcement data. `estId`/`inspectionStatus` are Salesforce-style identifiers
+> replacing the old numeric `Establishment ID`. See `RECENT_COLUMN_MAP` in
+> `src/dsv-db/refresh.py` for the source of truth this table mirrors.
 
 <details>
-<summary>Sample data (8 rows)</summary>
+<summary>Sample data (3 rows, current schema)</summary>
 
-| _id | Establishment ID | Inspection ID | Establishment Name | Establishment Type | Establishment Address | Infraction Details | Inspection Observation | Inspection Date | Severity | Action | Outcome | Outcome Date | Amount Fined | Latitude | Longitude | unique_id |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 10752656 | None | # HASHTAG INDIA RESTAURANT | Food Take Out | 1871 O'CONNOR DR None M4A 1X1 | FAIL TO ENSURE EQUIPMENT SURFACE SANITIZED AS NECESSARY - SEC. 22 | One or more minor infractions were observed under the Food Premises Regulation during an inspection. | 2024-03-06 | M - Minor | Notice to Comply | None |  |  | 43.72199 | -79.30349 | 168f86274045194142c0e7c381ccb75d |
-| 2 | 001Vo000013QjzHIAS | None | #DESI | Food Take Out | 65 Front St W Unit-442 M5J 1E6 | FOOD PREMISE NOT MAINTAINED WITH CLEAN WALLS IN FOOD-HANDLING ROOM - SEC. 7(1)(G)   | No infractions were observed under the Food Premises Regulation during an inspection. | 2024-03-04 | M - Minor | Notice to Comply | None |  |  | 43.645275 | -79.380486 | d6b83968d597f037799eb07945d261f1 |
-| 3 | 10817087 | None | 000 BLUEPRINT CLUB | Food Take Out | 1 BLUE JAYS WAY None M5V 1J4 | None | No infractions were observed under the Food Premises Regulation during an inspection. | 2024-07-11 | None | None | None |  |  | 43.64168 | -79.39012 | 1207a0bbb785902f3df59027ade39708 |
-| 4 | 001Vo000013QnH0IAK | None | 000 CLOVER BANNER CLUB KITCHEN | Food Take Out | 1 Blue Jays Way None M5V 1J4 | None | No infractions were observed under the Food Premises Regulation during an inspection. | 2024-07-04 | None | None | None |  |  | 43.64168 | -79.39012 | 0800ecf1e1ba903a76ac7badb1d754a3 |
-| 5 | 001Vo000013Qhj7IAC | None | 000 MEZZ PRODUCTION KITCHEN (PK) | Commissary | 1 Blue Jays Way None M5V 1J4 | FOOD PREMISE NOT MAINTAINED WITH FOOD HANDLING ROOM IN SANITARY CONDITION - SEC. 7(1)(E)  | No infractions were observed under the Food Premises Regulation during an inspection. | 2024-04-11 | M - Minor | Notice to Comply | None |  |  | 43.64168 | -79.39012 | ee0f219eedadbb3580ace8aaff396397 |
-| 6 | 10817088 | None | 000 TD LOUNGE | Food Take Out | 1 BLUE JAYS WAY None M5V 1J4 | None | No infractions were observed under the Food Premises Regulation during an inspection. | 2024-07-04 | None | None | None |  |  | 43.64168 | -79.39012 | 699cf64aa42c1ee0e6fe5b767703ce81 |
-| 7 | 001Vo000013QnGiIAK | None | 000 THE WAREHOUSE (docks) | Commissary | 1 Blue Jays Way None M5V 1J4 | None | No infractions were observed under the Food Premises Regulation during an inspection. | 2024-08-09 | None | None | None |  |  | 43.64168 | -79.39012 | e605e36388c6fbe5176dd514ac5e5949 |
-| 8 | 001Vo000013QnGcIAK | None | 000F BLUEPRINT CLUB KITCHEN | Banquet Facility | 1 Blue Jays Way None M5V 1J4 | FAIL TO ENSURE EQUIPMENT SURFACE SANITIZED AS NECESSARY - SEC. 22 | One or more minor infractions were observed under the Food Premises Regulation during an inspection. | 2025-03-27 | M - Minor | Notice to Comply | None |  |  | 43.64168 | -79.39012 | 8bd58999ca6747cebd449e81a9198ac0 |
+| _id | unique_id | estId | oldEstId | estName | address | inspectionStatus | phone | inspectionDate | observation | typeDesc | deficiencyDesc | severity | OutcomeDate | OutcomeDesc | amountFined | latitude | longitude |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 168f86274045194142c0e7c381ccb75d | 001Vo000013QjdPIAS | 10752656 | HASHTAG INDIA RESTAURANT | 1871 O'Connor Dr None M4A 1X1 | Pass | 4167522786 | 2024-03-06 | One or more minor infractions were observed. | FAIL TO ENSURE EQUIPMENT SURFACE SANITIZED | 05. MAINTENANCE / SANITATION | M - Minor | | None | | 43.72199 | -79.30349 |
+| 2 | d6b83968d597f037799eb07945d261f1 | 001Vo000013QjzHIAS | | #DESI | 65 Front St W Unit-442 M5J 1E6 | Pass | | 2024-03-04 | No infractions were observed. | | | | | | | 43.645275 | -79.380486 |
+| 3 | 1207a0bbb785902f3df59027ade39708 | 10817087 | | 000 BLUEPRINT CLUB | 1 BLUE JAYS WAY None M5V 1J4 | Pass | | 2024-07-11 | No infractions were observed. | | | | | | | 43.64168 | -79.39012 |
 </details>
 
 ### Data Dictionary
 
-The columns are defined as follows:
+Raw CSV header names on the left (the City's naming, not ours); the unified
+`inspections` DB column each maps to on the right. `_id`, `oldEstId`, `phone`,
+and `observation` are parsed but discarded on import — see the note above
+`observation` in particular.
 
-| Column | Description |
-| --- | --- |
-| _id | Unique row identifier for Open Data database |
-| Establishment ID | Unique identifier for an establishment |
-| Inspection ID | Unique ID for an inspection |
-| Establishment Name | Business name of the establishment |
-| Establishment Type | Establishment type (for example, restaurant, mobile cart) |
-| Establishment Address | Municipal address of the establishment |
-| Infraction Details | Description of the infraction |
-| Inspection Observation | Details observed associated with the infraction |
-| Inspection Date | Calendar date the inspection was conducted |
-| Severity | Level of the infraction (S - Significant, M - Minor, C - Crucial) |
-| Action | Enforcement activity based on the infractions noted during a food safety inspection |
-| Outcome | The registered court decision resulting from the issuance of a ticket or summons for outstanding infractions to the Health Protection and Promotion Act |
-| Outcome Date | The date of the court outcome |
-| Amount Fined | Fine determined in the court outcome |
-| Latitude | Latitude of establishment |
-| Longitude | Longitude of establishment |
-| unique_id | Unique composite key |
+| CSV column | DB column | Notes |
+| --- | --- | --- |
+| _id | *(discarded)* | Open Data row identifier |
+| unique_id | unique_id | Composite key; NULL for historical rows |
+| estId | establishment_id | |
+| oldEstId | *(discarded)* | Legacy numeric establishment ID, superseded by `estId` |
+| estName | establishment_name | |
+| address | establishment_address | |
+| inspectionStatus | establishment_status | Pass / Conditional Pass |
+| phone | *(discarded)* | |
+| inspectionDate | inspection_date | |
+| observation | *(discarded)* | Generic sentence ("One or more minor infractions were observed…"); `deficiencyDesc` is used instead, see below |
+| typeDesc | infraction_details | Specific infraction cited (for example, "FAIL TO ENSURE EQUIPMENT SURFACE SANITIZED…") |
+| deficiencyDesc | inspection_observation | Infraction category (for example, "05. MAINTENANCE / SANITATION") — chosen over `observation` for consistency with the historical era's `Infraction Details` granularity |
+| severity | severity | S - Significant, M - Minor, C - Crucial |
+| OutcomeDate | outcome_date | |
+| OutcomeDesc | outcome | |
+| amountFined | amount_fined | |
+| latitude | latitude | |
+| longitude | longitude | |
+
+No current-data column maps to `establishment_type` or `action` — the feed
+doesn't carry them. Both are always NULL for recent rows; see
+[Unified schema](#unified-schema-inspections-table) below.
 
 
 ## Historical Data
@@ -58,13 +67,25 @@ The [historical dataset](https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset
 
 ## Historical data (2001-2015)
 
-The historical dataset lives in
-`src/dsv-db/2023-04-11 - Dinesafe Historical data/`. It contains one CSV
-per year (`dinesafe_hist_YYYY.csv`), covering 2001 through 2022. The
-files from 2001 to 2015 are documented here.
+In production, `src/dsv-db/refresh.py` downloads and extracts the
+historical ZIP directly (no checked-in copy). For local testing, an offline
+copy lives in `docs/ref/local-data/dinesafe-historical/` — see
+[how to run locally](../how-to/7-run-locally.md). Either way it contains one
+CSV per year (`dinesafe_hist_YYYY.csv`), covering 2001 through 2023 (the
+City added the 2023 file to the archive sometime before 2026-07-24; it
+previously stopped at 2022). The files from 2001 to 2015 are documented
+here.
 
-All years share the same 16-column schema. There is no schema drift
-across the historical files.
+All years share the same 16 column names. The 2023 file has two format
+differences from every earlier year, both handled by `refresh.py`:
+
+- **Dates are `MM/DD/YYYY`** (for example `01/03/2023`), not `YYYY-MM-DD`.
+  `normalize_date()` converts on ingest so every stored `inspection_date` is
+  ISO regardless of source file.
+- **Values aren't double-quoted** (2001-2022 quote every field).
+  `_read_csv_rows()` uses a real CSV parser either way, so this doesn't
+  require special handling — noted here only because it means "no schema
+  drift" is no longer literally true.
 
 ## Row counts (2001-2015)
 
@@ -86,7 +107,12 @@ across the historical files.
 | 2014 | 23,160 |
 | 2015 | 21,750 |
 
-Row counts include the header line.
+Row counts include the header line. The 2023 file (not itemized above, out
+of this table's 2001-2015 scope) has 37,836 rows in the raw file, but
+`refresh.py` drops rows on or after the recent CSV's earliest date before
+insert — see [Data gap](#data-gap-none-currently) below — so the actual
+number of 2023 rows loaded from this file varies with the recent feed's
+current rolling window.
 
 ## Historical columns
 
@@ -94,34 +120,37 @@ Row counts include the header line.
 | # | Column                     | Description |
 |---|----------------------------|-------------|
 | 1 | Rec #                      | Sequential row number within the file (not globally unique) |
-| 2 | Establishment ID           | Same as current dataset |
-| 3 | Inspection ID              | Same as current dataset |
-| 4 | Establishment Name         | Same as current dataset |
-| 5 | Establishment Type         | Same as current dataset |
-| 6 | Establishment Address      | Same as current dataset |
-| 7 | Latitude                   | Same as current dataset (position differs: col 7 here, col 15 in current) |
-| 8 | Longitude                  | Same as current dataset (position differs: col 8 here, col 16 in current) |
-| 9 | Establishment Status       | **Not in current dataset.** Values: `Pass`, `Conditional Pass` |
+| 2 | Establishment ID           | Present in current dataset (as `estId`) |
+| 3 | Inspection ID              | **Not in current dataset** — the feed dropped inspection-level IDs |
+| 4 | Establishment Name         | Present in current dataset (as `estName`) |
+| 5 | Establishment Type         | **Not in current dataset** — always NULL for recent rows |
+| 6 | Establishment Address      | Present in current dataset (as `address`) |
+| 7 | Latitude                   | Present in current dataset (position differs: col 7 here, col 15 in current) |
+| 8 | Longitude                  | Present in current dataset (position differs: col 8 here, col 16 in current) |
+| 9 | Establishment Status       | Present in current dataset (as `inspectionStatus`) |
 | 10| Min. Inspections Per Year  | **Not in current dataset.** Values: `1`, `2`, `3` |
-| 11| Infraction Details         | Same as current dataset |
-| 12| Inspection Date            | Same as current dataset. Format: `YYYY-MM-DD` |
-| 13| Severity                   | Same as current dataset |
-| 14| Action                     | Same as current dataset |
-| 15| Outcome                    | Same as current dataset |
-| 16| Amount Fined               | Same as current dataset |
+| 11| Infraction Details         | Present in current dataset (as `typeDesc`) |
+| 12| Inspection Date            | Present in current dataset (as `inspectionDate`). Format: `YYYY-MM-DD`, except the 2023 file — see above |
+| 13| Severity                   | Present in current dataset (as `severity`) |
+| 14| Action                     | **Not in current dataset** — dropped by the City in 2026; always NULL for recent rows |
+| 15| Outcome                    | Present in current dataset (as `OutcomeDesc`) |
+| 16| Amount Fined               | Present in current dataset (as `amountFined`) |
 ```
 
 ## Schema differences: historical vs. current
 
-| Aspect                       | Historical (2001-2015)           | Current                              |
+| Aspect                       | Historical                       | Current                              |
 |------------------------------|----------------------------------|--------------------------------------|
 | Row identifier               | `Rec #` (per-file counter)       | `_id` (Open Data DB key) + `unique_id` (composite hash) |
-| Establishment Status         | Present (`Pass` / `Conditional Pass`) | Absent                          |
+| Establishment Type           | Present                          | **Absent**                           |
+| Inspection ID                | Present                          | **Absent**                           |
+| Action                       | Present when there's an infraction | **Absent** (dropped by the City in 2026) |
+| Establishment Status         | Present (`Pass` / `Conditional Pass`) | Present (as `inspectionStatus`) |
 | Min. Inspections Per Year    | Present (`1` / `2` / `3`)        | Absent                               |
-| Inspection Observation       | Absent                           | Present                              |
+| Inspection Observation       | Absent                           | Present when there's an infraction   |
 | Outcome Date                 | Absent                           | Present                              |
 | Lat/Lon column position      | Columns 7-8                      | Columns 15-16                        |
-| All values double-quoted     | Yes                              | No                                   |
+| All values double-quoted     | Yes, except the 2023 file        | No                                   |
 
 ## Nullability patterns
 
@@ -248,62 +277,86 @@ When importing historical data into the current DB schema:
 
 - **Column mapping:** `Rec #` has no equivalent in the current schema.
   Generate `_id` and `unique_id` values during import.
-- **Missing in current schema:** `Establishment Status` and
-  `Min. Inspections Per Year` need either new columns or a separate
-  table to preserve them.
+- **Missing in current schema:** `Min. Inspections Per Year` needs either a
+  new column or a separate table to preserve it — it has no current-data
+  equivalent.
 - **Missing in historical data:** `Inspection Observation` and
   `Outcome Date` will be null for all historical rows.
-- **CSV quoting:** All historical values are double-quoted. Use a
-  proper CSV parser (not naive comma-splitting) because
+- **CSV quoting:** All historical values are double-quoted except the 2023
+  file. Use a proper CSV parser (not naive comma-splitting) because
   `Infraction Details` often contains commas.
+- **Date format:** the 2023 historical file uses `MM/DD/YYYY`; every other
+  year and the current dataset use `YYYY-MM-DD`. Normalize to one format
+  before comparing dates across sources — see `normalize_date()` in
+  `src/dsv-db/refresh.py`.
 
 # Database Schema
 
 ## Unified schema (inspections table)
 
-The Postgres `inspections` table merges both historical (2001–2022)
-and recent (2023–present) data into a single schema. Two columns from
-the historical dataset are preserved; columns absent in a given era
-are NULL.
+The Postgres `inspections` table merges both historical (2001–2023) and
+recent (2023–present, boundary described below) data into a single schema.
+Columns absent in a given era's source feed are NULL. Populated fractions
+below are as measured against the live dataset on 2026-07-24
+(498,004 rows: 390,835 historical, 107,169 recent).
 
-| # | Column                     | Type             | Historical (2001–2022) | Recent (2023–present) |
-|---|----------------------------|------------------|------------------------|-----------------------|
-| 1 | id                         | SERIAL (PK)      | auto-generated         | auto-generated        |
-| 2 | establishment_id           | TEXT             | populated              | populated             |
-| 3 | inspection_id              | TEXT             | populated              | populated             |
-| 4 | establishment_name         | TEXT             | populated              | populated             |
-| 5 | establishment_type         | TEXT             | populated              | populated             |
-| 6 | establishment_address      | TEXT             | populated              | populated             |
-| 7 | infraction_details         | TEXT             | populated              | populated             |
-| 8 | inspection_observation     | TEXT             | NULL                   | populated             |
-| 9 | inspection_date            | DATE             | populated              | populated             |
-| 10| severity                   | TEXT             | populated              | populated             |
-| 11| action                     | TEXT             | populated              | populated             |
-| 12| outcome                    | TEXT             | populated              | populated             |
-| 13| outcome_date               | TEXT             | NULL                   | populated             |
-| 14| amount_fined               | TEXT             | populated              | populated             |
-| 15| latitude                   | DOUBLE PRECISION | populated              | populated             |
-| 16| longitude                  | DOUBLE PRECISION | populated              | populated             |
-| 17| unique_id                  | TEXT             | NULL                   | populated             |
-| 18| establishment_status       | TEXT             | populated              | NULL                  |
-| 19| min_inspections_per_year   | TEXT             | populated              | NULL                  |
+| # | Column                     | Type             | Historical | Recent |
+|---|----------------------------|------------------|------------|--------|
+| 1 | id                         | SERIAL (PK)      | auto-generated | auto-generated |
+| 2 | establishment_id           | TEXT             | 100%       | 100%   |
+| 3 | inspection_id              | TEXT             | 100%       | **NULL always** — no equivalent in the current feed |
+| 4 | establishment_name         | TEXT             | 100%       | 100%   |
+| 5 | establishment_type         | TEXT             | 100%       | **NULL always** — no equivalent in the current feed |
+| 6 | establishment_address      | TEXT             | 100%       | 100%   |
+| 7 | infraction_details         | TEXT             | ~62% (clean inspections have none) | ~63% |
+| 8 | inspection_observation     | TEXT             | NULL always | ~63% |
+| 9 | inspection_date            | DATE             | 100%       | 100%   |
+| 10| severity                   | TEXT             | ~62%       | ~63%   |
+| 11| action                     | TEXT             | ~62%       | **NULL always** — the City dropped this field from the feed in 2026 |
+| 12| outcome                    | TEXT             | <1%        | <1%    |
+| 13| outcome_date               | TEXT             | NULL always | <1%  |
+| 14| amount_fined               | TEXT             | <1%        | <1%    |
+| 15| latitude                   | DOUBLE PRECISION | 100%       | 100%   |
+| 16| longitude                  | DOUBLE PRECISION | 100%       | 100%   |
+| 17| unique_id                  | TEXT             | NULL always | 100%  |
+| 18| establishment_status       | TEXT             | 100%       | 100%   |
+| 19| min_inspections_per_year   | TEXT             | 100%       | NULL always |
 
-## Data gap: Jan–Nov 2023
+## Data gap: none currently
 
-The historical archive (published 2023-04-11) covers through 2022-12-30.
-The recent CSV's rolling window currently starts at 2023-11-10. Neither
-source covers **2023-01-01 through 2023-11-09** (~11 months). This is an
-upstream Toronto Open Data limitation — the data was never published in
-either dataset.
+As of the archive available 2026-07-24, there is no gap: the historical
+files now run through **2023-11-09** and the recent feed's rolling window
+starts **2023-11-10**. This wasn't always true — the City added a 2023
+historical file to the archive sometime before 2026-07-24 (it previously
+stopped at 2022-12-30), which also closed a previously-documented ~11-month
+gap covering January through early November 2023.
+
+That same 2023 file's tail (through 2023-12-29) overlaps the recent feed's
+window (from 2023-11-10). `refresh.py`'s `seed()` handles this by dropping
+historical rows on or after the recent feed's earliest date before insert —
+without that, every inspection in the overlap would be double-counted (this
+was in fact a real bug in this pipeline until fixed on 2026-07-24; see
+[journal-97](journal/journal-97.md) for how it was found and fixed).
+
+Because the boundary is derived from the recent feed's *current* rolling
+window rather than hardcoded, it will keep tracking correctly if that
+window narrows or widens later — but if the City ever ships another
+historical file whose tail extends *past* the recent feed's start (rather
+than just up to it), or reopens a gap by narrowing the recent feed's
+window, that will need re-checking against live data, not assumed from this
+doc.
 
 ## Data ingestion
 
 Data loading is handled by `src/dsv-db/refresh.py`, not by `init.sql`.
 
 **Initial seed (empty table):**
-1. Downloads the historical ZIP (2001–2022 CSVs)
-2. Downloads the recent Dinesafe.csv (2023–present)
-3. Inserts both into the `inspections` table in a single transaction
+1. Downloads the recent Dinesafe.csv and computes the earliest
+   `inspection_date` in it (the overlap cutoff).
+2. Downloads the historical ZIP, normalizing every `inspection_date` to ISO
+   format on parse (handles the 2023 file's `MM/DD/YYYY`), and drops rows on
+   or after the cutoff from step 1.
+3. Inserts both into the `inspections` table in a single transaction.
 
 **Daily refresh (table has data):**
 1. Downloads the recent Dinesafe.csv
