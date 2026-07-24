@@ -5,10 +5,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from refresh import (
     normalize,
+    normalize_date,
     map_row,
     min_inspection_date,
     recent_source,
     historical_source,
+    exclude_on_or_after,
     _read_csv_rows,
     RECENT_CSV_URL,
     HISTORICAL_COLUMN_MAP,
@@ -185,6 +187,47 @@ class TestReadCsvRows:
         p.write_bytes((self.HEADER + "1,CAFÉ MONTRÉAL,2024-01-01\n").encode("cp1252"))
         rows = _read_csv_rows(str(p), HISTORICAL_COLUMN_MAP)
         assert rows[0]["establishment_name"] == "CAFÉ MONTRÉAL"
+
+
+class TestNormalizeDate:
+    # dinesafe_hist_2023.csv is the one historical file that uses MM/DD/YYYY
+    # instead of the ISO YYYY-MM-DD every other year (and the recent CSV) use.
+    def test_iso_date_unchanged(self):
+        assert normalize_date("2023-11-10") == "2023-11-10"
+
+    def test_us_slash_date_converted_to_iso(self):
+        assert normalize_date("01/03/2023") == "2023-01-03"
+
+    def test_us_slash_date_pads_single_digits(self):
+        assert normalize_date("1/3/2023") == "2023-01-03"
+
+    def test_none_unchanged(self):
+        assert normalize_date(None) is None
+
+
+class TestMapRowNormalizesDate:
+    def test_historical_mm_dd_yyyy_becomes_iso(self):
+        row = {"Inspection Date": "01/03/2023"}
+        result = map_row(row, HISTORICAL_COLUMN_MAP)
+        assert result["inspection_date"] == "2023-01-03"
+
+
+class TestExcludeOnOrAfter:
+    # The 2023 historical CSV and the recent CSV both cover 2023-11-10
+    # onward, so historical rows in that window must be dropped before
+    # insert or every inspection in the overlap gets double-counted.
+    def test_drops_rows_on_or_after_cutoff(self):
+        rows = [
+            {"inspection_date": "2023-11-09"},
+            {"inspection_date": "2023-11-10"},
+            {"inspection_date": "2023-12-29"},
+        ]
+        result = exclude_on_or_after(rows, "2023-11-10")
+        assert result == [{"inspection_date": "2023-11-09"}]
+
+    def test_keeps_none_dates(self):
+        rows = [{"inspection_date": None}, {"inspection_date": "2023-11-10"}]
+        assert exclude_on_or_after(rows, "2023-11-10") == [{"inspection_date": None}]
 
 
 class TestDataSourceSelection:

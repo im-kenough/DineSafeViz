@@ -103,9 +103,9 @@ services:
       - -c
       - |
         i=0; until curl -s http://dsv-analytics:3000/analytics/api/health | grep -q '"database": "ok"'; do sleep 2; i=$$(($$i+1)); [ $$i -ge 30 ] && echo "Analytics dashboard did not start in time" && exit 1; done
-        DASH_ID=$$(curl -s "http://$$DSV_ANALYTICS_ADMIN_USER:$$DSV_ANALYTICS_ADMIN_PASSWORD@dsv-analytics:3000/analytics/api/dashboards/uid/dinesafe" | grep -oE '"id":[0-9]+' | head -1 | grep -oE '[0-9]+')
-        [ -z "$$DASH_ID" ] && echo "Dashboard not found, skipping permissions grant" && exit 0
-        curl -sf -X POST "http://$$DSV_ANALYTICS_ADMIN_USER:$$DSV_ANALYTICS_ADMIN_PASSWORD@dsv-analytics:3000/analytics/api/dashboards/id/$$DASH_ID/permissions" -H "Content-Type: application/json" -d '{"items":[{"role":"Viewer","permission":1}]}'
+        STATUS=$$(curl -s -o /dev/null -w '%{http_code}' "http://$$DSV_ANALYTICS_ADMIN_USER:$$DSV_ANALYTICS_ADMIN_PASSWORD@dsv-analytics:3000/analytics/api/dashboards/uid/dinesafe")
+        [ "$$STATUS" != "200" ] && echo "Dashboard not found, skipping permissions grant" && exit 0
+        curl -sf -X POST "http://$$DSV_ANALYTICS_ADMIN_USER:$$DSV_ANALYTICS_ADMIN_PASSWORD@dsv-analytics:3000/analytics/api/dashboards/uid/dinesafe/permissions" -H "Content-Type: application/json" -d '{"items":[{"role":"Viewer","permission":1}]}'
     restart: "no"
 
 volumes:

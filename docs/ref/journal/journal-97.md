@@ -240,3 +240,171 @@ just starved of a valid password by the same one-shot-bootstrap-volume
 gotcha as the DB. Only remaining uncommitted change is `init.sql`'s
 `CURRENT_USER` fix from the earlier task, plus this journal entry.
 
+## Documentation audit: "did you update docs for the dataset changes?"
+
+User asked directly whether documentation was updated to reflect the schema
+work from earlier today (journal-96). Answer at the time: no. Audited
+`docs/ref/data.md` and `docs/ref/arch/arch-data.md` (the two files
+describing the CSV schema / DB schema / data gap) against the actual current
+`RECENT_COLUMN_MAP`/`HISTORICAL_COLUMN_MAP` in `refresh.py` and, critically,
+against the live DB — both were stale in multiple ways predating today, not
+just missing today's changes:
+
+- `establishment_status` documented as "historical only, NULL for current" —
+  wrong; `inspectionStatus → establishment_status` has been mapped for
+  recent rows all along (predates today). Verified: 107,169/107,169 recent
+  rows have it populated.
+- Recent CSV documented as 17 columns lacking `oldEstId`/`phone`/`observation`/
+  `severity`, still showing `Action` populated for recent rows — reflects
+  the pre-journal-96 schema.
+- "Data gap: Jan–Nov 2023" documented as an unfixable upstream limitation —
+  **no longer true** (see below).
+
+### Bug found during the audit (not just a docs gap): double-counted 2023-11-10 to 2023-12-29
+
+Toronto's historical archive now ships a `dinesafe_hist_2023.csv` (wasn't
+present when the gap was originally documented) covering all of 2023. Its
+tail (2023-11-10 through 2023-12-29) overlaps the recent CSV's rolling
+window (starts 2023-11-10). `refresh.py`'s `seed()` loaded both sources
+wholesale with no dedup, so every inspection in that ~7-week window was
+inserted twice. Verified by pulling one establishment's rows directly: the
+same 14 infractions appeared twice, once from each source, differing only
+in `action` (populated historical-side, always NULL recent-side — consistent
+per-source behavior, confirming genuine duplication not coincidence). Scale:
+4,791 historical + 4,283 recent rows for what should be one ~7-week window —
+roughly 1% of the 502,795-row table, concentrated entirely in that span
+(would visibly distort the Grafana "Inspections Over Time" trend panel).
+
+User chose: fix the dedup logic first, then write docs against the corrected
+dataset (not document a known bug, not skip it).
+
+### Fix attempt #1 — wrong on the first pass, caught before shipping
+
+TDD per project convention. Added `exclude_on_or_after(rows, cutoff)` (pure,
+tested) and wired it into `seed()`: fetch recent rows first, derive
+`cutoff = min_inspection_date(recent_rows)`, pass it through
+`download_and_load_historical` → `_insert_historical_csv` to drop historical
+rows on/after cutoff before insert. Unit tests passed (4/4 new + 29 existing).
+
+**Rebuilt the image, re-seeded, and the fix was a no-op** — `dinesafe_hist_2023.csv`
+still loaded all 37,836 rows, DB max historical date still 2023-12-29.
+Root cause: `dinesafe_hist_2023.csv` uses **`MM/DD/YYYY`** dates
+(`01/03/2023`), while every other historical file (2001–2022) and the recent
+CSV use ISO `YYYY-MM-DD`. `exclude_on_or_after`'s plain string comparison
+made `'01/03/2023' < '2023-11-10'` always `True` (leading `'0'`/`'1'` sorts
+before `'2'` lexicographically) regardless of actual date — filtered nothing,
+for the one file where it mattered. Confirmed directly:
+```python
+_read_csv_rows('.../dinesafe_hist_2023.csv', HISTORICAL_COLUMN_MAP)[0]['inspection_date']
+# '01/03/2023'
+```
+My first unit test used ISO strings on both sides of the comparison, so it
+didn't catch the format mismatch — passed against a fixture, not against
+real data. Caught by re-verifying against the actual CSV files before
+declaring done, per verification-before-completion practice.
+
+### Fix attempt #2 — root cause: normalize date format at parse time
+
+Added `normalize_date(value)` (MM/DD/YYYY → ISO, ISO passed through, None
+passed through) and wired it into `map_row()` so every row's
+`inspection_date` is canonical ISO the moment it's parsed — fixes the
+comparison at its source rather than teaching every consumer (the new
+filter, `min_inspection_date`, `refresh()`'s cutoff) about multiple formats.
+TDD: 4 new tests (`TestNormalizeDate`, `TestMapRowNormalizesDate`), watched
+fail (ImportError), implemented, 34/34 pass.
+
+**Verified against real files before rebuilding:**
+```
+hist 2023 rows before filter: 37836
+hist 2023 rows after filter: 33045   # exactly the 4,791-row overlap dropped
+max date after filter: 2023-11-09    # one day before recent CSV's cutoff
+```
+Rebuilt `dsv-init-db`, recreated `dsv-db-data`, re-seeded:
+- Historical: `2001-01-03` → `2023-11-09`, 390,835 rows.
+- Recent: `2023-11-10` → `2026-07-22`, 107,169 rows.
+- No gap, no overlap. Duplicate-check query (same establishment/date/count>20
+  in the old overlap window) returns **zero rows**.
+- Every 2023 month still has data (2,294–3,829 rows/month) — the "data gap"
+  really is closed, just not via double-counting anymore.
+- Total: **498,004** rows (down from the double-counted 502,795).
+
+### Bonus: hit the analytics-permissions bug again, for a real reason this time
+
+Recreating `dsv-db-data` re-triggered `dsv-init-analytics`, which exited 22
+again. Unlike earlier today, `dsv-analytics-data` hadn't been touched and
+credentials checked out fine (`/api/user` 200, genuine admin). Manually
+replicated the script's dashboard-lookup step authenticated correctly this
+time and found the *first* `"id":` match in the JSON was the dashboard's own
+top-level id — now `45379590766592`, not a small sequential integer. This
+Grafana instance (feature toggles include `kubernetesPlaylists`,
+`kubernetesDashboards`-adjacent toggles per its startup log) appears to
+assign dashboards large, unstable numeric ids that change across
+restarts/reprovisions, while `uid: "dinesafe"` stays stable. The legacy
+`/api/dashboards/id/:id/permissions` endpoint 404s once the id drifts.
+Confirmed the fix: `/api/dashboards/uid/dinesafe/permissions` (GET showed the
+Viewer permission was already set from an earlier successful run; POST
+returned `{"message":"Dashboard permissions updated"}`) works regardless of
+the unstable id.
+
+Rewrote `docker-compose.yml`'s `dsv-init-analytics` entrypoint: dropped the
+regex-based `DASH_ID` extraction entirely, replaced the id-based existence
+check + POST with a direct `HEAD`-style status check + POST against the
+uid-based endpoint. Net simplification (one fewer curl call, no JSON
+scraping) as well as a fix. Verified stable across two full
+`docker compose down` / `up -d` cycles — both `dsv-init-db` and
+`dsv-init-analytics` exit 0 each time, data counts unchanged between runs.
+
+### State after this task
+
+`src/dsv-db/init.sql` (`CURRENT_USER` fix) was committed independently by
+the user mid-session as `1e0d5eb "fix: db role mismatch"`, along with a
+separate `cb1d735 "bump app versions and pin them #175"` commit
+(`docker-compose.yml` image pins, new `docs/ref/images.md`,
+`src/dsv-app/Dockerfile`) — both outside this conversation. Noted so I
+don't describe either as uncommitted. Still uncommitted from this session:
+`src/dsv-db/refresh.py` (dedup + date-normalization fix),
+`src/dsv-db/tests/test_refresh.py` (+7 tests), `docker-compose.yml`
+(analytics-permissions endpoint fix). Full test suite: 34/34 passing.
+
+## Documentation update (completes the original ask)
+
+Rewrote `docs/ref/data.md` and `docs/ref/arch/arch-data.md` against the
+verified-correct dataset and current `refresh.py` ground truth (cross-checked
+every claim against either the code's column maps or live `COUNT()`/`GROUP BY`
+queries against the running DB, not assumption):
+
+- Current-data dictionary/sample rewritten around the real 18-column
+  `RECENT_COLUMN_MAP` (raw CSV headers, not the old invented "pretty name"
+  labels that had drifted from the actual feed).
+- Fixed several *pre-existing* (not just today's) inaccuracies, confirmed
+  by direct per-column `COUNT()` against all 498,004 live rows:
+  `establishment_status` is populated for **both** eras, not
+  historical-only as previously documented; `inspection_id` and
+  `establishment_type` are historical-only (**not** "both eras" as
+  previously documented) — the current feed has never carried either.
+- `action`: was documented as "both eras"; now correctly historical-only
+  (the City dropped it from the feed in 2026, per journal-96).
+- "Data gap: Jan–Nov 2023" section replaced with "Data gap: none
+  currently" — explains the 2023 historical file that closed it, the
+  overlap it introduced, and links to this journal for how the resulting
+  duplicate-counting bug was found and fixed. Explicitly flagged as
+  time-of-writing (2026-07-24), not a permanent guarantee.
+- Documented the 2023 historical file's format quirks (`MM/DD/YYYY` dates,
+  unquoted) since "no schema drift across historical files" was no longer
+  true.
+- Fixed stale infra claims found along the way: `postgres:17.9` /
+  `grafana 11.6` hardcoded in arch-data.md (actual: pinned in
+  `docker-compose.yml`, tracked in the user's new `docs/ref/images.md` —
+  pointed there instead of hardcoding a version that will drift again); a
+  dead path reference (`src/dsv-db/2023-04-11 - Dinesafe Historical
+  data/`, doesn't exist — production downloads live, local testing uses
+  `docs/ref/local-data/`).
+- Added a note to the Grafana analytics section: the enforcement/
+  establishment-type panels only have data through 2023-11-09 and will look
+  increasingly sparse as current-era (post-2023-11-10) inspections
+  accumulate, since both fields are permanently NULL for that era.
+
+Confirmed `old-ignore/` and `superpowers/specs|plans/` still reference the
+old versions/schema — left untouched, those are archived/point-in-time by
+design, not living docs.
+

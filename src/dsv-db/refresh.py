@@ -118,9 +118,27 @@ def normalize(value):
     return value
 
 
+def normalize_date(value):
+    """Return an inspection_date string as ISO YYYY-MM-DD.
+
+    Every DineSafe CSV uses YYYY-MM-DD except dinesafe_hist_2023.csv, which
+    uses MM/DD/YYYY. Converting to one format keeps string comparisons
+    (cutoffs, sorting) correct regardless of source file.
+    """
+    if value is None or "/" not in value:
+        return value
+    month, day, year = value.split("/")
+    return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+
+
 def min_inspection_date(rows):
     """Return the earliest inspection_date string from mapped rows."""
     return min(r["inspection_date"] for r in rows if r["inspection_date"] is not None)
+
+
+def exclude_on_or_after(rows, cutoff):
+    """Return rows whose inspection_date is before cutoff (None dates are kept)."""
+    return [r for r in rows if r["inspection_date"] is None or r["inspection_date"] < cutoff]
 
 
 def map_row(row, column_map):
@@ -128,6 +146,7 @@ def map_row(row, column_map):
     mapped = {col: None for col in INSPECTIONS_COLUMNS}
     for csv_col, db_col in column_map.items():
         mapped[db_col] = normalize(row.get(csv_col))
+    mapped["inspection_date"] = normalize_date(mapped["inspection_date"])
     return mapped
 
 
@@ -211,22 +230,33 @@ def _read_csv_rows(csv_path, column_map):
     return [map_row(r, column_map) for r in reader]
 
 
-def _insert_historical_csv(conn, csv_path, name):
-    """Parse one historical CSV file and bulk-insert its rows."""
+def _insert_historical_csv(conn, csv_path, name, cutoff):
+    """Parse one historical CSV file and bulk-insert its rows.
+
+    Drops rows on or after cutoff: newer historical archives now extend into
+    the recent CSV's date window (for example a 2023 historical file
+    alongside a recent feed that also starts in 2023), and inserting both
+    would double-count the overlapping inspections.
+    """
     rows = _read_csv_rows(csv_path, HISTORICAL_COLUMN_MAP)
+    rows = exclude_on_or_after(rows, cutoff)
     bulk_insert(conn, rows)
     print(f"  Loaded {name}: {len(rows)} rows")
 
 
-def download_and_load_historical(conn):
-    """Load all historical CSVs from the local directory or the live ZIP."""
+def download_and_load_historical(conn, cutoff):
+    """Load all historical CSVs from the local directory or the live ZIP.
+
+    cutoff is the earliest inspection_date in the recent CSV; historical
+    rows on or after it are skipped to avoid double-counting.
+    """
     local_dir = historical_source(DSV_LOCAL_DATA_DIR)
     if local_dir:
         print(f"Reading historical data from {local_dir} ...")
         for name in sorted(os.listdir(local_dir)):
             if not name.endswith(".csv"):
                 continue
-            _insert_historical_csv(conn, os.path.join(local_dir, name), name)
+            _insert_historical_csv(conn, os.path.join(local_dir, name), name, cutoff)
         return
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -239,7 +269,7 @@ def download_and_load_historical(conn):
             for name in sorted(zf.namelist()):
                 if not name.endswith(".csv"):
                     continue
-                _insert_historical_csv(conn, os.path.join(tmpdir, name), name)
+                _insert_historical_csv(conn, os.path.join(tmpdir, name), name, cutoff)
 
 
 def _read_recent_csv(csv_path):
@@ -261,17 +291,16 @@ def _fetch_recent_rows():
         return _read_recent_csv(tmp_path)
 
 
-def download_and_load_recent(conn):
-    """Download the recent Dinesafe CSV and insert all rows."""
-    rows = _fetch_recent_rows()
-    bulk_insert(conn, rows)
-    print(f"  Loaded recent CSV: {len(rows)} rows")
-
-
 def seed(conn):
-    """Full seed: load historical data then recent data. Commits once."""
-    download_and_load_historical(conn)
-    download_and_load_recent(conn)
+    """Full seed: load recent data, then historical data excluding the
+    recent CSV's date window, so overlapping inspections aren't
+    double-counted. Commits once.
+    """
+    recent_rows = _fetch_recent_rows()
+    cutoff = min_inspection_date(recent_rows)
+    download_and_load_historical(conn, cutoff)
+    bulk_insert(conn, recent_rows)
+    print(f"  Loaded recent CSV: {len(recent_rows)} rows")
     conn.commit()
     print("Seed complete.")
 
