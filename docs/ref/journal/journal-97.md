@@ -408,3 +408,106 @@ Confirmed `old-ignore/` and `superpowers/specs|plans/` still reference the
 old versions/schema — left untouched, those are archived/point-in-time by
 design, not living docs.
 
+## Grafana embed shows full left mega-menu + right icon column
+
+User report: after the Grafana version bump (13.1, via the user's own
+`cb1d735` commit), the embedded dashboard at `/dashboard` shows Grafana's
+own left nav (Home/Starred/Dashboards/Explore/.../Administration) and a
+right-side icon column (export/list/collapse), both expanded. Wants them
+collapsed by default. Screenshot:
+`/home/sam/Pictures/Screenshots/Screenshot from 2026-07-24 14-09-34.png`.
+
+### Root cause
+
+`src/dsv-app/templates/dashboard.html` already embeds the dashboard with
+`?kiosk=tv` specifically to suppress Grafana's chrome — this used to fully
+hide it. Set up a local Playwright env (`python3 -m venv` +
+`playwright install chromium`, no `--with-deps`, since `apt`/`sudo` aren't
+available in this sandbox — worked fine without system deps) and tested
+`kiosk=tv` vs bare `kiosk` vs `kiosk=1` directly against the live Grafana
+13.1 instance:
+- `kiosk=tv`: **broken** — still shows the full mega-menu and top bar
+  (breadcrumbs, search, sign in, edit). This is what's currently deployed.
+- bare `kiosk` / `kiosk=1`: fully hides all chrome (nav, top bar), leaving
+  just the panels and a "Powered by Grafana" footer — the actual desired
+  behavior, and what the page evidently relied on before this Grafana
+  version.
+
+`kiosk=tv` no longer produces the fully-chromeless kiosk view in Grafana
+13.1 — a real behavior change from whatever version this was last verified
+against (11.6, per the arch-data.md claim fixed earlier this session).
+
+### Fix
+
+`src/dsv-app/templates/dashboard.html`: iframe `src` query param changed
+from `?kiosk=tv` to `?kiosk`.
+
+### Verification blocked by an unrelated, pre-existing bug
+
+`docker compose build dsv-app` failed — real dependency conflict in
+`src/dsv-app/requirements.txt`, unrelated to this fix:
+```
+opentelemetry-instrumentation-dbapi 0.64b0 depends on opentelemetry-instrumentation==0.64b0
+(requirements.txt line 7 pins opentelemetry-instrumentation==0.65b0)
+```
+Lines 8 and 11 (`-dbapi`, `-wsgi`) are still pinned at `0.64b0` while
+everything else was bumped to `0.65b0` — same class of issue fixed once
+already today in journal-96 (a consistent 1.43.0/0.64b0 set), drifted again
+since, likely via one-package-at-a-time dependabot PRs. **Not fixed** — out
+of scope for a nav-collapse request, flagged to the user instead. User has
+`src/dsv-app/Dockerfile` open in their IDE; may already be mid-fix on this.
+
+Verified the actual fix a different way instead: `docker cp`'d the updated
+`dashboard.html` into the already-running `dsv-dsv-app-1` container
+(templates aren't code, no rebuild needed for this check) and restarted it.
+Loaded `http://localhost:8080/dashboard` end-to-end through nginx + Flask
++ the iframe with Playwright: confirmed iframe `src` is now
+`/analytics/d/dinesafe/dinesafe-inspections?kiosk`, and the rendered page
+shows no Grafana nav/top bar — clean embed, matches what was wanted.
+
+Not committed. `src/dsv-app/requirements.txt` conflict still blocks a real
+rebuild of this image.
+
+### Requirements.txt conflict — fixed at user's request
+
+User hit the same build failure trying to rebuild themselves and asked for
+it to be fixed. Root cause confirmed via PyPI JSON API
+(`pypi.org/pypi/<pkg>/json`): `opentelemetry-instrumentation-dbapi` and
+`opentelemetry-instrumentation-wsgi` were still pinned at `0.64b0` in
+`requirements.txt` while every sibling instrumentation package had already
+been bumped to `0.65b0` — an incomplete bump (dependabot does one package
+per PR; some landed, these two didn't), not a real incompatibility: `0.65b0`
+releases exist for both on PyPI.
+
+Dry-ran the fix in a clean `python:3.14.6-slim-trixie` container before
+touching the file (same discipline as journal-96's earlier otel fix):
+bumping just those two surfaced a second, previously-latent mismatch —
+`opentelemetry-sdk==1.44.0` requires `opentelemetry-api==1.44.0` exactly,
+but `requirements.txt` had `opentelemetry-api==1.43.0`. Bumped both api and
+the two stragglers; dry-run resolved and installed cleanly (exit 0).
+
+Applied to `src/dsv-app/requirements.txt`:
+- `opentelemetry-api`: `1.43.0` → `1.44.0`
+- `opentelemetry-instrumentation-dbapi`: `0.64b0` → `0.65b0`
+- `opentelemetry-instrumentation-wsgi`: `0.64b0` → `0.65b0`
+
+`docker compose build dsv-app` now succeeds for real (not just the dry-run
+container). Full stack brought up clean (`docker compose up -d`):
+`dsv-init-db` and `dsv-init-analytics` both exit 0, all services healthy.
+Re-verified the dashboard fix against the **actual rebuilt image** (not the
+earlier `docker cp` hot-patch) with Playwright, 5s settle time: iframe loads
+with real data (11,410 total inspections, charts populated), no Grafana
+nav/top bar. Screenshot:
+`/tmp/claude-1000/.../scratchpad/dashboard_final.png` (session scratchpad,
+not committed).
+
+### State at end of session
+
+Uncommitted: `src/dsv-app/templates/dashboard.html` (kiosk fix),
+`src/dsv-app/requirements.txt` (otel version fix), `src/dsv-db/refresh.py`
++ `tests/test_refresh.py` (dedup/date-normalization fix from earlier),
+`docker-compose.yml` (analytics-permissions endpoint fix), `docs/ref/data.md`
++ `docs/ref/arch/arch-data.md` (documentation rewrite). All verified working
+against a live, fully-rebuilt stack. Not committed — user has not asked for
+a commit yet this session.
+
