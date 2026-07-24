@@ -54,6 +54,11 @@ services:
       DSV_DB_NAME: ${DSV_DB_NAME}
       DSV_DB_USER: ${DSV_DB_USER}
       DSV_DB_PASSWORD: ${DSV_DB_PASSWORD}
+      # Set DSV_LOCAL_DATA_DIR=/data in .env to seed from the offline copy
+      # mounted below instead of downloading from the Toronto Open Data portal.
+      DSV_LOCAL_DATA_DIR: ${DSV_LOCAL_DATA_DIR:-}
+    volumes:
+      - ./docs/ref/local-data:/data:ro
     depends_on:
       dsv-db:
         condition: service_healthy
