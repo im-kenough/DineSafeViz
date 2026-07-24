@@ -37,6 +37,11 @@ DSV_DB_NAME = os.environ.get("DSV_DB_NAME", "dinesafe")
 DSV_DB_USER = os.environ.get("DSV_DB_USER", "dinesafe")
 DSV_DB_PASSWORD = os.environ.get("DSV_DB_PASSWORD", "dinesafe")
 
+# When set, seed from local CSVs under this directory instead of downloading
+# from the Toronto Open Data portal. Used for offline/reproducible local
+# testing. Unset (the default) preserves the live-download behavior.
+DSV_LOCAL_DATA_DIR = os.environ.get("DSV_LOCAL_DATA_DIR", "").strip()
+
 # Column order for COPY into the inspections table (excludes serial `id`)
 INSPECTIONS_COLUMNS = [
     "establishment_id",
@@ -80,7 +85,9 @@ HISTORICAL_COLUMN_MAP = {
 }
 
 # Maps recent CSV headers → unified inspections column names.
-# "_id" is intentionally absent (discarded on import).
+# "_id", "oldEstId", "phone", and "observation" are intentionally absent
+# (discarded on import). The recent feed no longer carries an "actionDesc"
+# column, so `action` stays NULL for recent rows.
 RECENT_COLUMN_MAP = {
     "estId": "establishment_id",
     "estName": "establishment_name",
@@ -89,7 +96,7 @@ RECENT_COLUMN_MAP = {
     "deficiencyDesc": "inspection_observation",
     "inspectionDate": "inspection_date",
     "inspectionStatus": "establishment_status",
-    "actionDesc": "action",
+    "severity": "severity",
     "OutcomeDesc": "outcome",
     "OutcomeDate": "outcome_date",
     "amountFined": "amount_fined",
@@ -111,9 +118,27 @@ def normalize(value):
     return value
 
 
+def normalize_date(value):
+    """Return an inspection_date string as ISO YYYY-MM-DD.
+
+    Every DineSafe CSV uses YYYY-MM-DD except dinesafe_hist_2023.csv, which
+    uses MM/DD/YYYY. Converting to one format keeps string comparisons
+    (cutoffs, sorting) correct regardless of source file.
+    """
+    if value is None or "/" not in value:
+        return value
+    month, day, year = value.split("/")
+    return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+
+
 def min_inspection_date(rows):
     """Return the earliest inspection_date string from mapped rows."""
     return min(r["inspection_date"] for r in rows if r["inspection_date"] is not None)
+
+
+def exclude_on_or_after(rows, cutoff):
+    """Return rows whose inspection_date is before cutoff (None dates are kept)."""
+    return [r for r in rows if r["inspection_date"] is None or r["inspection_date"] < cutoff]
 
 
 def map_row(row, column_map):
@@ -121,7 +146,22 @@ def map_row(row, column_map):
     mapped = {col: None for col in INSPECTIONS_COLUMNS}
     for csv_col, db_col in column_map.items():
         mapped[db_col] = normalize(row.get(csv_col))
+    mapped["inspection_date"] = normalize_date(mapped["inspection_date"])
     return mapped
+
+
+def recent_source(local_dir):
+    """Return the recent CSV source: a local file path if local_dir is set, else the live URL."""
+    if local_dir:
+        return os.path.join(local_dir, "Dinesafe.csv")
+    return RECENT_CSV_URL
+
+
+def historical_source(local_dir):
+    """Return the local historical CSV directory if local_dir is set, else None (use the live ZIP)."""
+    if local_dir:
+        return os.path.join(local_dir, "dinesafe-historical")
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -174,8 +214,51 @@ def bulk_insert(conn, rows):
 # ---------------------------------------------------------------------------
 
 
-def download_and_load_historical(conn):
-    """Download the historical ZIP and insert all CSVs (2001-2022)."""
+def _read_csv_rows(csv_path, column_map):
+    """Read a DineSafe CSV into mapped rows, tolerating either UTF-8 or Windows-1252.
+
+    DineSafe exports mix encodings across files (older years are UTF-8 with a BOM,
+    newer files are Windows-1252), so decode UTF-8 first and fall back to cp1252.
+    """
+    with open(csv_path, "rb") as f:
+        raw = f.read()
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = raw.decode("cp1252")
+    reader = csv.DictReader(io.StringIO(text))
+    return [map_row(r, column_map) for r in reader]
+
+
+def _insert_historical_csv(conn, csv_path, name, cutoff):
+    """Parse one historical CSV file and bulk-insert its rows.
+
+    Drops rows on or after cutoff: newer historical archives now extend into
+    the recent CSV's date window (for example a 2023 historical file
+    alongside a recent feed that also starts in 2023), and inserting both
+    would double-count the overlapping inspections.
+    """
+    rows = _read_csv_rows(csv_path, HISTORICAL_COLUMN_MAP)
+    rows = exclude_on_or_after(rows, cutoff)
+    bulk_insert(conn, rows)
+    print(f"  Loaded {name}: {len(rows)} rows")
+
+
+def download_and_load_historical(conn, cutoff):
+    """Load all historical CSVs from the local directory or the live ZIP.
+
+    cutoff is the earliest inspection_date in the recent CSV; historical
+    rows on or after it are skipped to avoid double-counting.
+    """
+    local_dir = historical_source(DSV_LOCAL_DATA_DIR)
+    if local_dir:
+        print(f"Reading historical data from {local_dir} ...")
+        for name in sorted(os.listdir(local_dir)):
+            if not name.endswith(".csv"):
+                continue
+            _insert_historical_csv(conn, os.path.join(local_dir, name), name, cutoff)
+        return
+
     with tempfile.TemporaryDirectory() as tmpdir:
         zip_path = os.path.join(tmpdir, "historical.zip")
         print(f"Downloading historical data from {HISTORICAL_ZIP_URL} ...")
@@ -186,34 +269,38 @@ def download_and_load_historical(conn):
             for name in sorted(zf.namelist()):
                 if not name.endswith(".csv"):
                     continue
-                csv_path = os.path.join(tmpdir, name)
-                with open(csv_path, newline="", encoding="utf-8-sig") as f:
-                    rows = [map_row(r, HISTORICAL_COLUMN_MAP) for r in csv.DictReader(f)]
-                bulk_insert(conn, rows)
-                print(f"  Loaded {name}: {len(rows)} rows")
+                _insert_historical_csv(conn, os.path.join(tmpdir, name), name, cutoff)
+
+
+def _read_recent_csv(csv_path):
+    """Parse the recent Dinesafe CSV file into mapped rows."""
+    return _read_csv_rows(csv_path, RECENT_COLUMN_MAP)
 
 
 def _fetch_recent_rows():
-    """Download the recent Dinesafe CSV and return parsed rows."""
+    """Return parsed recent rows from the local file or a live download."""
+    source = recent_source(DSV_LOCAL_DATA_DIR)
+    if DSV_LOCAL_DATA_DIR:
+        print(f"Reading recent data from {source} ...")
+        return _read_recent_csv(source)
+
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = os.path.join(tmpdir, "recent.csv")
-        print(f"Downloading recent data from {RECENT_CSV_URL} ...")
-        urlretrieve(RECENT_CSV_URL, tmp_path)
-        with open(tmp_path, newline="", encoding="utf-8-sig") as f:
-            return [map_row(r, RECENT_COLUMN_MAP) for r in csv.DictReader(f)]
-
-
-def download_and_load_recent(conn):
-    """Download the recent Dinesafe CSV and insert all rows."""
-    rows = _fetch_recent_rows()
-    bulk_insert(conn, rows)
-    print(f"  Loaded recent CSV: {len(rows)} rows")
+        print(f"Downloading recent data from {source} ...")
+        urlretrieve(source, tmp_path)
+        return _read_recent_csv(tmp_path)
 
 
 def seed(conn):
-    """Full seed: load historical data then recent data. Commits once."""
-    download_and_load_historical(conn)
-    download_and_load_recent(conn)
+    """Full seed: load recent data, then historical data excluding the
+    recent CSV's date window, so overlapping inspections aren't
+    double-counted. Commits once.
+    """
+    recent_rows = _fetch_recent_rows()
+    cutoff = min_inspection_date(recent_rows)
+    download_and_load_historical(conn, cutoff)
+    bulk_insert(conn, recent_rows)
+    print(f"  Loaded recent CSV: {len(recent_rows)} rows")
     conn.commit()
     print("Seed complete.")
 
