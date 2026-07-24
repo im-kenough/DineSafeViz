@@ -144,3 +144,99 @@ surgical-changes rule; flagging here for future reference.
 **Not yet done:** neither fix is committed. `init.sql`'s `CURRENT_USER` change
 and this journal entry are the only uncommitted changes right now.
 
+## `dsv-init-analytics` exit(22) — investigated per user request
+
+### Reproduction
+
+Stack had been `docker compose down`'d (by user or externally) between the
+prior task and this one — no containers running, volumes intact. Brought it
+back up (`docker compose up -d`) to reproduce: `dsv-init-analytics-1`
+exited(22) again, no log output, same as originally observed.
+
+### First hypothesis (WRONG — corrected after further verification)
+
+Manually replicated the job's curl calls one at a time against the live
+`dsv-analytics` service on the `dsv_default` network (`docker run --rm
+--network dsv_default curlimages/curl:latest ...`):
+- Health check: OK.
+- Dashboard lookup (`GET .../dashboards/uid/dinesafe` with `admin:changeme`
+  basic auth): **200**, found dashboard id `1`.
+- Permissions grant (`POST .../dashboards/id/1/permissions`): **403**
+  `"Permissions needed: dashboards.permissions:write"`. `curl -sf` turns any
+  4xx into exit 22 with the body suppressed — matches the silent exit(22).
+
+Initial (incorrect) read: assumed Grafana 11.2's default RBAC deprecates the
+legacy id-based permissions endpoint for classic admin auth. Tried the
+RBAC-era Resource Permissions API (`/api/access-control/dashboards/uid/...`)
+as a replacement — got **404**, that surface isn't exposed the way I expected
+either.
+
+**Caught the error before committing to it:** checked `/api/access-control/user/permissions`
+for the `admin` user directly — it came back with only `dashboards:read`
+scoped to the `dinesafe` dashboard, i.e. **Viewer-level permissions**, not an
+authenticated Admin's. And `/api/user` (which has no anonymous fallback)
+returned a flat `401 Unauthorized`. That contradicted the RBAC theory —
+if `admin:changeme` were truly authenticating, `/api/user` should have
+succeeded.
+
+### Actual root cause (verified via Grafana's own auth log)
+
+`docker logs dsv-dsv-analytics-1 | grep -i auth`:
+```
+logger=authn.service msg="Failed to authenticate request" client=auth.client.basic error="[password-auth.failed] invalid password"
+```
+**Same bug class as the DB fix earlier this session** — `GF_SECURITY_ADMIN_PASSWORD`
+(from `.env`'s `DSV_ANALYTICS_ADMIN_PASSWORD`) is bootstrap-only, applied only
+on first init of an empty Grafana volume. `dsv-analytics-data` had never been
+recreated (only `dsv-db-data` was, earlier), so its admin password no longer
+matched `.env`. Wrong credentials silently fall back to the anonymous-Viewer
+identity on read-tolerant endpoints (explaining the misleading 403 on the
+permissions POST — a Viewer legitimately lacks `dashboards.permissions:write`),
+while `/api/user` correctly hard-401s since it has no anonymous fallback. The
+legacy permissions endpoint itself was never actually broken.
+
+**Verification before concluding:** recreated `dsv_dsv-analytics-data`
+(`docker compose down` → `docker volume rm dsv_dsv-analytics-data` → `up -d`),
+then re-ran the **original, unmodified** `dsv-init-analytics` entrypoint
+against the fresh volume — it succeeded (`{"message":"Dashboard permissions
+updated"}`, exit 0) with no code changes. Confirms the RBAC/endpoint
+rewrite would have been solving a problem that didn't exist; reverted that
+plan.
+
+### Aside surfaced during this fix, resolved in the same pass
+
+Recreating `dsv-analytics-data` triggered a second `dsv-init-db` run (table
+now non-empty from the earlier reseed → `refresh()` incremental path instead
+of `seed()`). It failed at `get_connection()`:
+```
+FATAL: password authentication failed for user "dsv-db-user"
+```
+Verified directly (network auth from a throwaway container): the `dsv-db-data`
+volume's real password was still `changeme`, while `.env`'s current
+`DSV_DB_PASSWORD` was `testing-strong-password1-DSV_DB_PASSWORD` — i.e. `.env`
+was edited (by the user, presumably hardening off the placeholder) sometime
+between the earlier clean reseed and now, after the volume had already
+bootstrapped with the old value. User confirmed the change was intentional
+and chose to recreate `dsv-db-data` again.
+
+This also explained a transient row-count drop I'd noticed (502,795 → 498,004)
+across the two down/up cycles used to reproduce the analytics bug — each
+re-triggers `refresh()`'s delete+reinsert of the recent-date window; one of
+those runs likely raced the credential drift. Not a bug in `refresh()` itself:
+after the clean re-seed the count returned to exactly **502,795** (matches
+the source CSVs bit-for-bit), so this was an artifact of testing, not a real
+data-integrity issue.
+
+### Final verified state
+
+`docker compose down` → `docker volume rm dsv_dsv-db-data` → `up -d`:
+- `dsv-init-db-1` exited(0): full reseed, `502,795` rows, `2001-01-03` →
+  `2026-07-22`.
+- `dsv-init-analytics-1` exited(0): `{"message":"Dashboard permissions updated"}`.
+- `dsv-db-1`, `dsv-app-1` healthy; `dsv-analytics-1`, `dsv-nginx-1` up.
+
+No code changes needed for the analytics job — it was never actually broken,
+just starved of a valid password by the same one-shot-bootstrap-volume
+gotcha as the DB. Only remaining uncommitted change is `init.sql`'s
+`CURRENT_USER` fix from the earlier task, plus this journal entry.
+
