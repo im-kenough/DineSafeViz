@@ -1,4 +1,0 @@
-- 2026-06-22 16:51 Standardized DR environment names to "prod-dr" and "stg-dr" in `docs/ref/sys-analysis-design/use-cases.md`.
-- Replaced "DR-Stg", "dr-stg", "staging DR" with "stg-dr".
-- Replaced "DR-Prod", "dr-prod", "production DR", and "production AKS DR" with "prod-dr".
-- Updated Use Cases 01, 02, 08, and 09 to reflect this consistent naming scheme.

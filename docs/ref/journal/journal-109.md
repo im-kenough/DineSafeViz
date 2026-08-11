@@ -1,2 +1,0 @@
-- 2026-06-22 15:43
-- Reformatted `use-cases.md` to improve raw text readability. Replaced nested bullet points and heavy bolding with headers (`###`), natural spacing, and flat lists.
