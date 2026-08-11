@@ -1,65 +1,88 @@
-# Architecture Documents
+# Architecture documents
 
-Architectual documents for DineSafeViz
+Architecture documents for DineSafeViz.
 
-Provide a table of contents linking to each architectueral doc.
+## Table of contents
+
+- [Application architecture](arch-app.md)
+- [Data architecture](arch-data.md)
+- [Infrastructure as code architecture](arch-iac.md)
+- [Network architecture](arch-net.md)
+- [IT security architecture](arch-security.md)
+- [CI/CD architecture](arch-ci-cd.md)
+- [Disaster recovery and resiliency](arch-dr.md)
+- [Monitoring architecture](arch-monitoring.md)
+- [Testing architecture](arch-testing.md)
+- [Architecture reading checklist](arch-checklist.md)
 
 ---
 
-# Tech Stack
+# Tech stack
 
-Phases of the [DevOps lifecycle](https://www.ibm.com/think/topics/devops-lifecycle)
+The following sections map the tools to the phases of the
+[DevOps lifecycle](https://www.ibm.com/think/topics/devops-lifecycle).
 
-# Plan
+## Plan
 
-Define requirements, create roadmaps, and organize tasks
+Define requirements, create roadmaps, and organize tasks.
 
-- [Github Issues](https://github.com/im-kenough/DineSafeViz/issues): identify issues, gathering feedback
-- [Github Projects](https://github.com/users/im-kenough/projects/6): Backlog management, sprint planning, user story creation.
+- [GitHub Issues](https://github.com/im-kenough/DineSafeViz/issues): identify
+  issues and gather feedback.
+- [GitHub Projects](https://github.com/users/im-kenough/projects/6): backlog
+  management, sprint planning, and user story creation.
 
-# Code
+## Code
 
-Create working source code
+Create working source code.
 
-- IDE: VSCode
-  - insert list of useful extensions & linting tools
-  - Developed with assistance of Agentic coding: Claude Code, Codex, Gemini CLI
-    - Spend limits are enforced
-- Software versioning: git
-- Source COde Management: [github](https://github.com/im-kenough/DineSafeViz). Talk about branching strategy.
+- IDE: VS Code.
+  - TODO: list the useful extensions and linting tools.
+  - Developed with the assistance of agentic coding: Claude Code, Codex, and
+    Gemini CLI. Spend limits are enforced.
+- Software versioning: git.
+- Source code management:
+  [GitHub](https://github.com/im-kenough/DineSafeViz). TODO: describe the
+  branching strategy.
 
-# Build
-Compile, validate and package source code into deployable artifacts.
+## Build
 
-- Building locally using docker desktop
-  - automated scripts are used to seed the database and build the app
+Compile, validate, and package the source code into deployable artifacts.
 
-# Test
-Validate code behaves as expected
+- Build locally using Docker Desktop.
+  - Automated scripts seed the database and build the app.
 
-- Testing: pytest for unit tests
+## Test
 
-# Release
-Final quality and security checks. Coordianting how to move into staging and production environments
+Validate that the code behaves as expected.
 
-- Github actions
-    - [SBOM generation](https://docs.aws.amazon.com/wellarchitected/latest/devops-guidance/dl.scm.10-generate-a-comprehensive-software-inventory-for-each-build.html) for releases: Comming Soon(™️)
+- Testing: pytest for unit tests.
 
+## Release
 
-# Deploy
-Delivering code automatically to the target environment
+Run the final quality and security checks. Coordinate how to move into the
+staging and production environments.
 
-- Configuration Management: Comming Soon(™️)
-- Infrastructure as Code: Comming Soon(™️)
-- Release drafter: publish a deployable release
+- GitHub Actions.
+  - [SBOM generation](https://docs.aws.amazon.com/wellarchitected/latest/devops-guidance/dl.scm.10-generate-a-comprehensive-software-inventory-for-each-build.html)
+    for releases: coming soon.
 
-# Operate
-Keeping live system stable, performance, secure and available
+## Deploy
 
-- App deployed to a linux VM in self hosted proxmox environment
+Deliver the code automatically to the target environment.
 
-# Monitor
-Observe Applications & infrastrucutre in production to detect issues
+- Configuration management: coming soon.
+- Infrastructure as code: coming soon.
+- Release Drafter: publish a deployable release.
 
-- Monitor VM & app in grafana: Comming Soon(™️)
-- Centralized logging: Comming Soon(™️)
+## Operate
+
+Keep the live system stable, performant, secure, and available.
+
+- App deployed to a Linux VM in a self-hosted Proxmox environment.
+
+## Monitor
+
+Observe the application and infrastructure in production to detect issues.
+
+- Monitor the VM and app in Grafana: coming soon.
+- Centralized logging: coming soon.

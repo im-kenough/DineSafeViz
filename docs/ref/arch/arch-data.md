@@ -10,13 +10,13 @@ service consumes it.
 
 The web app and analytics services read from a PostgreSQL 17
 database (`dinesafe`). The `dsv-db` container runs the stock
-`postgres:17.9` image and creates the schema on first boot via
+`postgres:17.0` image and creates the schema on first boot via
 `src/dsv-db/init.sql`.
 
 A one-shot init container (`dsv-init-db`) seeds the database on first
 deploy. On subsequent runs it refreshes the recent data window
-instead. In the future, a scheduled GitHub Action will automate the
-daily refresh.
+instead. A planned scheduled GitHub Action will automate the daily
+refresh.
 
 #### Datasource
 
@@ -132,7 +132,7 @@ via the `index.html` Jinja2 template.
 Key files:
 
 - `src/dsv-app/app.py` — Flask routes, database queries, date/quarter
-  logic, severity sorting, and the Grafana reverse proxy.
+  logic, and severity sorting. nginx handles the Grafana reverse proxy.
 - `src/dsv-app/templates/base.html` — shared layout with year/quarter
   navigation.
 - `src/dsv-app/templates/index.html` — the inspection results table,
@@ -148,10 +148,10 @@ Outcome, Outcome Date, and Amount Fined.
 
 ### DineSafeViz Analytics
 
-The analytics dashboard is a Grafana 11.6 instance (`dsv-analytics`)
+The analytics dashboard is a Grafana 11.2.0 instance (`dsv-analytics`)
 that reads directly from the PostgreSQL database and renders
-visualizations. It's embedded in the Flask app at `/analytics/` via a
-reverse proxy and is also accessible directly at `localhost:3000`.
+visualizations. nginx reverse-proxies it at `/analytics/` on host port
+8080, and it is also accessible directly at `localhost:3000`.
 
 The dashboard ("DineSafe Inspections Metrics") contains panels
 organized into sections:

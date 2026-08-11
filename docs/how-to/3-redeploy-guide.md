@@ -1,39 +1,37 @@
-# Redeploy Guide
+# Redeploy the application
 
-This document provides instructions on how to redeploy the application to existing infrastructure.
+This guide shows you how to redeploy the application to existing
+infrastructure. Choose the case that matches your goal.
 
-There are several redeployment use cases
+## Redeploy the latest code and keep the data
 
-## Case 1
-
-Scenario: 
-  - You want to:
-    - Redeploy the latest code changes to the running instance.
-    - Keep existing docker volumes
+To redeploy the latest code to the running instance and keep the existing
+Docker volumes, run the following command.
 
 ```bash
 make redeploy-app-keep-data
 ```
-- destroys app, keeps docker volumes
-- reclones repo, templates .env, docker compose up
 
-## Case 2
+This command destroys the app but keeps the Docker volumes. It then reclones
+the repository, templates the `.env` file, and runs `docker compose up`.
 
-Scenario: 
-  - You want to:
-    - Redeploy the latest code changes to the running instance.
-    - Delete existing docker volumes to trigger a fresh initialization
+## Redeploy the latest code and reset the data
+
+To redeploy the latest code to the running instance and delete the existing
+Docker volumes, run the following command. Deleting the volumes triggers a
+fresh initialization.
 
 ```bash
 make redeploy-app
 ```
-## Case 3
 
-Scenario: 
-  - You want to:
-    - Redeploy the latest code changes to a brand new instance
+## Redeploy to a new instance
+
+To redeploy the latest code to a new instance, run the following command.
 
 ```bash
 make down && make up
 ```
-This will delete the app and VM, then provision another VM and deploy the app.
+
+This command deletes the app and the VM. It then provisions another VM and
+deploys the app.

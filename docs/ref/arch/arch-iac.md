@@ -1,61 +1,64 @@
-# Infrastructure as Code Architecture
+# Infrastructure as code architecture
 
-This document describes the Infrastructure as Code (IaC) strategy for
-DineSafeViz. It explains how infrastructure is provisioned, configured, and
-deployed using a layered approach.
+This document describes the infrastructure as code (IaC) strategy for
+DineSafeViz. It explains how a layered approach provisions, configures, and
+deploys the infrastructure.
 
-## Architecture Overview
+## Architecture overview
 
-Dinesafeviz runs the "dsv-app" image, a ubuntu image on a Proxmox hosted VM.
+DineSafeViz runs the `dsv-app` image, an Ubuntu image on a Proxmox-hosted VM.
 
-Terraform uses the Proxmox provider to provision a Proxmox VM object. Next Terraform runs the DineSafeViz ubuntu VM image. Finally, Ansible clones the app code and deploys the Docker Compose stack.
+Terraform uses the Proxmox provider to provision a Proxmox VM object. Next,
+Terraform runs the DineSafeViz Ubuntu VM image. Finally, Ansible clones the app
+code and deploys the Docker Compose stack.
 
-# Image Pipeline
+## Image pipeline
 
-THe DineSafeViz image is created through multiple steps.
+The DineSafeViz image is created through multiple steps.
 
-1. A Ubuntu 24.04 Server image is prepared for cloud-init configuration
-2. A base ubuntu image with basic hardening is created. This serves as common image to be re-used for other VM servers in the proxmox environment. Applies:
-     - Minimal hardened Ubuntu 24.04 server.
-     - **Security**: UFW firewall, fail2ban, disabled root/password auth.
-     - **Common Packages**: `curl`, `git`, `jq`, `htop`, `unattended-upgrades`.
-     - **System**: NTP, Timezone (America/Toronto), DNS configuration.
-3. Using `ubuntu-base`, `ubuntu-docker` is created which installs ubuntu and other required apps. This is another common resource that can be re-used for other. Applies:
+1. An Ubuntu 24.04 Server image is prepared for cloud-init configuration.
+2. A base Ubuntu image with basic hardening is created. This image serves as a
+   common image that other VM servers in the Proxmox environment reuse. It
+   applies the following:
+   - Minimal hardened Ubuntu 24.04 server.
+   - **Security:** UFW firewall, fail2ban, disabled root and password auth.
+   - **Common packages:** `curl`, `git`, `jq`, `htop`, `unattended-upgrades`.
+   - **System:** NTP, timezone (America/Toronto), and DNS configuration.
+3. Using `ubuntu-base`, the pipeline creates `ubuntu-docker`, which installs
+   Docker and other required apps. This image is another common resource that
+   other VMs reuse. It applies the following:
    - Official Docker CE repository setup.
    - Log rotation and daemon optimizations.
    - Firewall rules for Docker services.
-
-4. Finally, the `ubuntu-docker` image is customized to create the `dvs-app` image. Applies:
+4. Finally, the pipeline customizes the `ubuntu-docker` image to create the
+   `dsv-app` image. It applies the following:
    - Hostname and static IP assignment.
    - GitHub App private keys for repository access.
    - Application directory structure.
 
+## Variable and secret management
 
+Two locations within the `infra/ansible/` directory centralize the
+configuration.
 
-## Variable and Secret Management
+### Variable storage
 
-Configuration is centralized in two locations within the `infra/ansible/`
-directory.
+- **Non-sensitive variables:** Stored in `infra/ansible/group_vars/all.yml`.
+  This file includes VM specifications (CPU, RAM), network settings, and image
+  IDs.
+- **Secrets:** Stored in `infra/ansible/vault/secrets.yml`. Ansible Vault
+  encrypts this file, which contains API tokens, private keys, and passwords.
 
-### Variable Storage
+### Variable bridging
 
-- **Non-sensitive variables**: Stored in `infra/ansible/group_vars/all.yml`. This
-  includes VM specifications (CPU, RAM), network settings, and image IDs.
-- **Secrets**: Stored in `infra/ansible/vault/secrets.yml`. This file is
-  encrypted with Ansible Vault and contains API tokens, private keys, and
-  passwords.
-
-### Variable Bridging
-
-Because Terraform and Packer cannot natively read Ansible Vault files, a Python
-bridge script (`infra/scripts/render-vars.py`) merges these sources into the
-required formats at runtime.
+Terraform and Packer cannot read Ansible Vault files directly. A Python bridge
+script (`infra/scripts/render-vars.py`) merges these sources into the required
+formats at runtime.
 
 ## Operations
 
-Make is used as a wrapper for Terraform and Ansible orchestration.
-
-All infrastructure operations are managed through the `infra/` directory.
+Make wraps the Terraform and Ansible orchestration. All infrastructure
+operations run through the `infra/` directory.
 
 | Command | Description |
 | :--- | :--- |
@@ -65,9 +68,8 @@ All infrastructure operations are managed through the `infra/` directory.
 | `make up` | Full end-to-end: provision VM and deploy app. |
 | `make down` | Full teardown: destroy app and VM. |
 
-## Next Steps
+## Related documents
 
-- Review the [Secrets Management](secrets-mgt.md) guide for details on Vault
-  usage.
-- See the [Operations Guide](../../ops/index.md) for troubleshooting and
-  maintenance procedures.
+- For secrets management, see [security architecture](arch-security.md).
+- For deployment and troubleshooting, see
+  [deploy the application](../../how-to/1-install/6-deploy.md).

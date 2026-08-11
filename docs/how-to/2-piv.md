@@ -1,41 +1,52 @@
-# Post implementation verification
+# Verify a deployment
 
-SSH into the app VM and run these commands after each deployment to confirm the stack is healthy.
-All checks must pass before marking the release complete.
+This guide shows you how to confirm that the DineSafeViz stack runs correctly
+after a deployment. Run these checks after each deployment. Every check must
+pass before you mark the release complete.
 
-### Start the stack
+To run the checks, first connect to the app VM with SSH.
+
+## Start the stack
 
 ```sh
 docker compose up --build -d
 ```
 
-### Verify the app is up (expect: 200)
+## Verify that the app responds
+
+Run the following command. The expected result is `200`.
 
 ```sh
-curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/
 ```
 
-### Verify the analytics proxy works (expect: 200)
+## Verify that the analytics proxy responds
+
+Run the following command. The expected result is `200`.
 
 ```sh
-curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/analytics/api/health
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/analytics/api/health
 ```
 
-### Verify all app routes (expect: 200 for each)
+## Verify the app routes
+
+Run the following commands. The expected result is `200` for each route.
 
 ```sh
-curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/inspections
-curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/dashboard
-curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/info
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/inspections
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/dashboard
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/info
 ```
 
-### Verify home page navigation links (expect: two matches)
+## Verify the home page navigation links
+
+Run the following command. The expected result is two matches.
 
 ```sh
-curl -s http://localhost:5000/ | grep -o 'href="/inspections"\|href="/dashboard"'
+curl -s http://localhost:8080/ | grep -o 'href="/inspections"\|href="/dashboard"'
 ```
 
-### Tear down
+## Tear down the stack
 
 ```sh
 docker compose down

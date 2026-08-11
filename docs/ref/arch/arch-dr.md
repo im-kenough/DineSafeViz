@@ -1,15 +1,15 @@
-# Disaster Recovery & Resiliency
+# Disaster recovery and resiliency
 
 ## Scenario
 
-### City of Toronto Open Data Portal is unavailable
+### City of Toronto Open Data portal is unavailable
 
-TO do: https://github.com/im-kenough/DineSafeViz/issues/62
+TODO: https://github.com/im-kenough/DineSafeViz/issues/62
 
 
-### AKS Backup and Recovery
+### AKS backup and recovery
 
-To do: https://learn.microsoft.com/en-us/azure/architecture/operator-guides/aks/aks-backup-and-recovery
+TODO: https://learn.microsoft.com/en-us/azure/architecture/operator-guides/aks/aks-backup-and-recovery
 
 ## Cost-aware availability: the holding-page cutover
 

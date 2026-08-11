@@ -1,6 +1,6 @@
-# Known Issues — Infrastructure Build Toolchain
+# Known issues: infrastructure build toolchain
 
-Documented behavioral quirks in the IAC build toolchain (Packer, Ansible,
+Documented behavioral quirks in the IaC build toolchain (Packer, Ansible,
 Proxmox) that are not bugs to fix but constraints to work around. Each entry
 explains the symptom, root cause, and the applied mitigation.
 
@@ -37,6 +37,7 @@ directly to `ansible-playbook`, which then manages its own SSH connection
 the build VMs on `10.0.20.0/24`.
 
 **Constraint:** `use_proxy = false` requires the Packer host to have direct
-network reachability to the build VM. If the build environment changes (e.g.,
-Packer running in a CI runner with no direct VM access), the proxy limitation
-would need a different workaround (e.g., `sftp_command` override or a bastion).
+network reachability to the build VM. If the build environment changes (for
+example, Packer running in a CI runner with no direct VM access), the proxy
+limitation would need a different workaround (for example, an `sftp_command`
+override or a bastion).

@@ -4,7 +4,7 @@ This document describes the security architecture of DineSafeViz,
 covering secrets management, VM hardening, network controls, service
 accounts, and repository-level safeguards.
 
-## Design Principles
+## Design principles
 
 1. **Single source of truth:** All secrets live in one Ansible Vault
    file (`infra/ansible/vault/secrets.yml`), encrypted at rest.
@@ -22,14 +22,14 @@ accounts, and repository-level safeguards.
 
 Ansible Vault is the single store for all credentials. The Makefile orchestrates a decrypt-render-cleanup pipeline so plaintext secrets exist only in memory or in short-lived files that are deleted immediately after use.
 
-Consult this document for the [secrets rotation instructions](docs/how-to/6-rotate-secrets.md)
+For rotation steps, see [rotate secrets](../../how-to/6-rotate-secrets.md).
 
 ### Secrets and variable locations
 
 | File | Contents | In git? |
 |------|----------|---------|
-| `infra/ansible/vault/secrets.yml` | All IAC and application secrets. Encrypted with Ansible Vault. | Yes (encrypted) |
-| `infra/ansible/group_vars/all.yml` | Contains all IAC and app configuration variables | Yes (plaintext) |
+| `infra/ansible/vault/secrets.yml` | All IaC and application secrets. Encrypted with Ansible Vault. | Yes (encrypted) |
+| `infra/ansible/group_vars/all.yml` | Contains all IaC and app configuration variables | Yes (plaintext) |
 | `infra/terraform/terraform.tfvars` | Rendered from vault during deployment | No (gitignored) |
 | `infra/packer/variables.pkrvars.hcl` | Rendered from vault during deployment  | No (gitignored) |
 | `.env` (on VM at deploy time) | Templated from vault during deployment | No (never in repo) |
@@ -91,7 +91,7 @@ permissions:
   VM.PowerMgmt, Datastore.AllocateSpace, Datastore.Audit, SDN.Use
 
 Neither account has full administrator access. If a token is
-compromised, the blast radius is limited to VM operations — no access
+compromised, the affected area is limited to VM operations — no access
 to storage content, networking configuration, or other Proxmox
 nodes.
 
@@ -125,7 +125,7 @@ The PostgreSQL instance isn't exposed outside the Docker network.
 
 ## VM hardening
 
-The app VM runs a Ubuntu OS with basic hardening.
+The app VM runs an Ubuntu OS with basic hardening.
 
 VM hardening is applied at image build time via the Ansible `base`
 role (`infra/ansible/roles/base/`). Every VM cloned from the base
@@ -154,7 +154,7 @@ following ports are explicitly opened:
 | Port | Protocol | Service |
 |------|----------|---------|
 | 22 | TCP | SSH |
-| 5000 | TCP | Flask web app |
+| 8080 | TCP | nginx reverse proxy (web app and analytics) |
 | 3000 | TCP | Grafana (admin access) |
 
 ### Intrusion prevention (fail2ban)
@@ -217,9 +217,10 @@ images.
 ### Network isolation
 
 The Docker Compose stack uses an internal bridge network. Only ports
-5000 (Flask) and 3000 (Grafana) are published to the host. PostgreSQL
-is only accessible from other containers on the internal network and
-isn't exposed to the host or the broader network.
+8080 (nginx) and 3000 (Grafana) are published to the host. The Flask
+app (`dsv-app`) listens on internal port 8000 and is not published.
+PostgreSQL is only accessible from other containers on the internal
+network and isn't exposed to the host or the broader network.
 
 ### Log management
 

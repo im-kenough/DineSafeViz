@@ -1,12 +1,20 @@
-## Setup Workstation - v0.4.0
+# Set up the workstation (v0.4.0)
 
-On the workstation that will be issuing IAC commands, install the following software:
+On the workstation that issues the infrastructure as code (IaC) commands,
+install the following software:
 
-- azure cli, terraform, helm, helmfile, kubelogin ansible, python 3 w/ pyYAML
+- Azure CLI
+- Terraform
+- Helm
+- Helmfile
+- kubelogin
+- Ansible
+- Python 3 with PyYAML
 
-### Install apps on workstation
+## Install the applications
 
-#### Install Azure CLI
+### Install the Azure CLI
+
 ```bash
 # Install packages
 sudo apt-get update
@@ -34,7 +42,8 @@ sudo apt-get install -y azure-cli
 az version
 ```
 
-#### Install Terraform
+### Install Terraform
+
 ```bash
 sudo apt-get update && sudo apt-get install -y gnupg software-properties-common
 
@@ -54,19 +63,20 @@ sudo apt-get install -y terraform
 terraform -v
 ```
 
-#### Install Ansible
+### Install Ansible
+
 ```bash
 sudo apt install -y ansible
 ansible --version
 ```
 
-#### Install pyyaml
+### Install PyYAML
 
 ```bash
 pip3 install pyyaml
 ```
 
-#### Install kubectl
+### Install kubectl
 
 ```bash
 # Update the apt package index and install packages needed to use the Kubernetes apt repository
@@ -92,13 +102,19 @@ sudo apt-get install -y kubectl
 kubectl version --client
 ```
 
-#### Install Helm
+### Install Helm
 
-Charts: A Helm chart is a collection of files that describe a related set of Kubernetes resources. It includes templates, which are used to generate Kubernetes manifests, and values, which are used to customize the templates.
+Helm uses three main concepts:
 
-Releases: When you install a Helm chart, Helm creates a release. A release is an instance of a chart running in a Kubernetes cluster. You can have multiple releases of the same chart in a cluster.
+- **Charts** are collections of files that describe a related set of Kubernetes
+  resources. A chart includes templates, which generate Kubernetes manifests,
+  and values, which customize the templates.
+- **Releases** are instances of a chart that run in a Kubernetes cluster. A
+  cluster can hold multiple releases of the same chart.
+- **Repositories** are locations where you find and download charts. Public
+  repositories such as Artifact Hub exist, and you can create your own private
+  repositories.
 
-Repositories: Helm repositories are locations where you can find and download Helm charts. There are public repositories like Artifact Hub, and you can also create your own private repositories.
 ```bash
 HELM_BUILDKITE_APT_KEY_ID="DDF78C3E6EBB2D2CC223C95C62BA89D07698DBC6"
 
@@ -118,22 +134,22 @@ sudo apt-get install -y helm
 helm version
 ```
 
-#### Install [Helmfile](https://github.com/helmfile/helmfile#installation)
+### Install Helmfile
 
-Declaratively deploy your Kubernetes manifests, Kustomize configs, and Charts as Helm releases.
+Helmfile lets you deploy your Kubernetes manifests, Kustomize configs, and
+charts as Helm releases declaratively. For more information, see the
+[Helmfile installation guide](https://github.com/helmfile/helmfile#installation).
 
-install the `helm-diff` plugin, run:
+First, install the `helm-diff` plugin.
 
 ```bash
 helm plugin install https://github.com/databus23/helm-diff
 ```
 
-## Install helmfile binary
+Next, download, extract, and install the latest `helmfile` binary for Linux
+Mint.
 
-Follow these steps to download, extract, and install the latest `helmfile`
-binary for Linux Mint.
-
-1.  Identify the latest version and download the compressed archive.
+1.  Identify the latest version, and then download the compressed archive.
 
     ```bash
     LATEST_VERSION=$(curl -s https://api.github.com/repos/helmfile/helmfile/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
@@ -150,30 +166,27 @@ binary for Linux Mint.
     tar -xvf "helmfile_${VERSION_NUM}_${OS}_${ARCH}.tar.gz" helmfile
     ```
 
-3.  Make the binary executable and move it to your system PATH.
+3.  Make the binary executable, and then move it to your system PATH.
 
     ```bash
     chmod +x helmfile
     sudo mv helmfile /usr/local/bin/helmfile
     ```
 
-4.  Optional: Clean up the downloaded archive.
+4.  Optional: remove the downloaded archive.
 
     ```bash
     rm "helmfile_${VERSION_NUM}_${OS}_${ARCH}.tar.gz"
     ```
 
-## Verify the installation
+To confirm that `helmfile` is installed and available from your terminal, check
+its version.
 
-Confirm that `helmfile` is installed and accessible from your terminal.
+```bash
+helmfile version
+```
 
-1.  Check the version of `helmfile`.
-
-    ```bash
-    helmfile version
-    ```
-
-#### Install kubelogin
+### Install kubelogin
 
 ```bash
 sudo az aks install-cli

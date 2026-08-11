@@ -43,8 +43,8 @@ since the last tag:
 The resolver picks the **highest priority bump present**, not cumulative bumps.
 Five `feature` PRs still result in a single minor bump.
 
-If the inferred version is wrong (e.g. you want `v0.2.0` but the draft says
-`v0.1.1`), override it on the draft before pushing the tag — see
+If the inferred version is wrong (for example, you want `v0.2.0` but the draft
+says `v0.1.1`), override it on the draft before pushing the tag — see
 [3.2 Overriding the version](#32-overriding-the-version).
 
 ### 2.1 PR labels
@@ -89,9 +89,9 @@ Dependabot PRs are labeled automatically via `.github/dependabot.yml`.
    open the draft. Verify:
    - The release notes look correct.
    - The **Tag** field (top of the page) matches the version you intend to
-     publish. If not, edit it to match (e.g., `v0.3.0`). The publish workflow
-     matches on this tag name — if it doesn't match your git tag exactly, the
-     workflow will fail.
+     publish. If not, edit it to match (for example, `v0.3.0`). The publish
+     workflow matches on this tag name. If it doesn't match your git tag
+     exactly, the workflow fails.
 
 4. **Create an annotated tag.** Use the same version shown on the draft:
 
@@ -105,7 +105,7 @@ Dependabot PRs are labeled automatically via `.github/dependabot.yml`.
    git push origin v0.3.0
    ```
 
-6. **Verify the release.** The `release.yml` workflow will publish the draft.
+6. **Verify the release.** The `release.yml` workflow publishes the draft.
    Confirm the release appears on the
    [Releases page](https://github.com/im-kenough/DineSafeViz/releases) with
    the correct notes.
@@ -118,10 +118,10 @@ bump, override it manually:
 
 1. Open the draft release on the
    [Releases page](https://github.com/im-kenough/DineSafeViz/releases).
-2. Click the **Tag** dropdown at the top of the draft edit page.
-3. Clear the existing tag (e.g. `v0.1.1`) and type the desired tag
-   (e.g. `v0.2.0`). Select **Create new tag on publish** if prompted.
-4. Update the **Release title** to match (e.g. `v0.2.0`).
+2. Click the **Tag** menu at the top of the draft edit page.
+3. Clear the existing tag (for example, `v0.1.1`) and type the tag you want
+   (for example, `v0.2.0`). If prompted, select **Create new tag on publish**.
+4. Update the **Release title** to match (for example, `v0.2.0`).
 5. In the release body, find the "Full Changelog" link at the bottom and
    update the tag in the URL to match:
    ```
@@ -143,7 +143,7 @@ The git tag you push in the next step must match this tag name exactly.
 Release Drafter maintains a **single draft release** at a time. Each push to
 `main` triggers a full rebuild — it re-queries all PRs merged since the last
 published tag, re-categorizes them, and regenerates the body from scratch. The
-draft grows as more PRs merge; it is not appending incrementally.
+draft grows when more PRs merge. It does not append incrementally.
 
 ### 4.2 Release Drafter vs GitHub's native release notes
 

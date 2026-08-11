@@ -4,7 +4,7 @@
 
 If `/dashboard` renders the page shell but the embedded Grafana view stays
 blank, the browser is usually blocking the iframe. Firefox can show a message
-such as "localhost:5000 will not allow Firefox to display the page if another
+such as "localhost:8080 will not allow Firefox to display the page if another
 site has embedded it." Chrome commonly shows a refused-to-connect message in
 the frame.
 
@@ -15,35 +15,33 @@ must allow embedding.
 ### Fix
 
 Set `GF_SECURITY_ALLOW_EMBEDDING: "true"` in the `dsv-analytics` service in
-`docker-compose.yml`, then recreate the containers so Grafana picks up the new
-setting.
+`docker-compose.yml`. Then recreate the containers so that Grafana picks up the
+new setting.
 
 ```bash
 docker compose up -d --build
 ```
 
-After the containers restart, open `http://localhost:5000/dashboard` again in a
+After the containers restart, open `http://localhost:8080/dashboard` again in a
 browser tab.
 
+### Dashboard shell loads but shows no data
 
-## Dashboard doesn't load in firefox
+An ad blocker or content blocker can block the requests that load data from
+PostgreSQL, even though the dashboard shell renders. Observed behavior with
+uBlock Origin and other blockers enabled:
 
-I have ublock origin and all kinds of ad blockers turn on firefox, it it doesn't load data from postgres, but the dashboard shows up.
+- Firefox normal mode: does not load the data
+- Firefox private mode: loads
+- Chrome normal mode: loads
+- Chrome incognito mode: loads
 
-firefox normal mode: doesn't load
-firefox private mode: loads
-chrome normal mode: loads
-chrome incognito mode: loads
+If the dashboard shell renders but no data appears, disable your ad blocker for
+the site, or open the page in a private or incognito window.
 
+## Services fail to start
 
-
-----
-
-
-
-### Services fail to start
-
-Check the logs for each service to identify the issue:
+Check the logs for each service to identify the issue.
 
 ```bash
 docker compose logs dsv-db
@@ -52,58 +50,68 @@ docker compose logs dsv-analytics
 ```
 
 Common issues:
-- **Port conflicts:** If port 5000 or 3000 is already in use, stop the conflicting service or edit `docker-compose.yml` to use different ports.
-- **Insufficient disk space:** Ensure your system has at least 5 GB of free disk space.
-- **Database initialization timeout:** If the database takes longer than expected to initialize, check the `dsv-init-db` logs.
 
-### Database won't initialize
+- **Port conflicts:** If port 8080 or 3000 is already in use, stop the
+  conflicting service or edit `docker-compose.yml` to use different ports.
+- **Insufficient disk space:** Make sure that your system has at least 5 GB of
+  free disk space.
+- **Database initialization timeout:** If the database takes longer than
+  expected to initialize, check the `dsv-init-db` logs.
 
-If the PostgreSQL database fails to load the CSV data:
+## Database does not initialize
+
+If the PostgreSQL database fails to load the CSV data, run the following
+commands.
 
 ```bash
 docker compose down -v
 docker compose up -d
 ```
 
-This command removes the existing database volume and restarts from scratch. The `-v` flag removes named volumes.
+This command removes the existing database volume and restarts from scratch.
+The `-v` flag removes named volumes.
 
-### Can't connect to the database
+## Cannot connect to the database
 
-Verify the database is healthy:
+Verify that the database is running.
 
 ```bash
 docker compose ps dsv-db
 ```
 
-The `dsv-db` service should show "Up (healthy)". If it shows "(unhealthy)" or "Exited," check the logs:
+The `dsv-db` service should show "Up (healthy)". If it shows "(unhealthy)" or
+"Exited", check the logs.
 
 ```bash
 docker compose logs dsv-db
 ```
 
-### Analytics dashboard not loading
+## Analytics dashboard does not load
 
-The Grafana dashboard may take 30 seconds to fully initialize. Wait a moment and refresh your browser. If it still doesn't load, check:
+The Grafana dashboard might take 30 seconds to initialize. Wait a moment, and
+then refresh your browser. If it still does not load, check the logs.
 
 ```bash
 docker compose logs dsv-analytics
 docker compose logs dsv-init-analytics
 ```
 
-### Port already in use
+## Port already in use
 
-If you see an error like "Bind for 0.0.0.0:5000 failed," another process is using that port. You can either:
+If you see an error such as "Bind for 0.0.0.0:8080 failed," another process is
+using that port. You have two options.
 
-1. Stop the conflicting process
-2. Change the port in `docker-compose.yml`:
+1. Stop the conflicting process.
+2. Change the port in `docker-compose.yml`.
 
 ```bash
 nano docker-compose.yml
 ```
 
-Find the `ports` section for the `dsv-app` service and change `5000:5000` to `8000:5000` (or another available port).
+Find the `ports` section for the `dsv-nginx` service, and then change `8080:80`
+to another host port, such as `8081:80`.
 
-Then restart:
+Then restart the stack.
 
 ```bash
 docker compose up -d

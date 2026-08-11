@@ -1,15 +1,16 @@
-# Setup application
+# Set up the application
 
-### Create the Ansible vault
+## Create the Ansible Vault
 
-From the repo root:
+From the repository root, run the following commands.
 
 ```bash
 cd infra/ansible
 ansible-vault create vault/secrets.yml
 ```
 
-When the editor opens, enter all secrets (use the real values from Steps 1-2):
+When the editor opens, enter all the secrets. Use the real values from steps 1
+and 2.
 
 ```yaml
 # Proxmox Configuration

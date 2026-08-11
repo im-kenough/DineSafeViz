@@ -66,13 +66,6 @@ A pytest `client` fixture creates a Flask test client with
   classes, archive section, footer content
 - Dropdown and nav consistency across all pages (home, dashboard, info)
 
-### Analytics proxy (`src/dsv-app/tests/test_proxy.py`)
-
-- GET and POST requests forwarded to the upstream analytics service
-- Query string passthrough
-- Upstream status codes relayed to the client (including 404)
-- Content-Type headers forwarded correctly
-
 ### Home page rendering (`src/dsv-app/tests/test_home.py`)
 
 - `test_home_route_renders_stats` — verifies the home route renders

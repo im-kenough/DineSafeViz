@@ -1,95 +1,96 @@
-# Secret rotation process
+# Rotate secrets
 
-This document provides instructions on how to rotate secrets (change the password).
+This guide shows you how to rotate the secrets that DineSafeViz uses. To rotate
+a secret, you change its value.
 
-## Application
+## Application secrets
 
 ### DSV_DB_PASSWORD
 
-- use `ansible-vault edit` to decrypt secrets.yaml
-- create a new value for DSV_DB_PASSWORD
-
+1. Run `ansible-vault edit` to decrypt the `secrets.yml` file.
+2. Set a new value for `DSV_DB_PASSWORD`.
 
 ### DSV_ANALYTICS_ADMIN_PASSWORD
 
-- use `ansible-vault edit` to decrypt secrets.yaml
-- create a new value for DSV_ANALYTICS_ADMIN_PASSWORD
+1. Run `ansible-vault edit` to decrypt the `secrets.yml` file.
+2. Set a new value for `DSV_ANALYTICS_ADMIN_PASSWORD`.
 
-## Infrastructure as Code
+## Infrastructure secrets
 
-### Ansible vault - secrets.yaml
+### Ansible Vault password
 
-In the root of the repo, type in:
+From the root of the repository, run the following command.
+
 ```bash
 ansible-vault rekey infra/ansible/vault/secrets.yml
 ```
-Enter the old password, and then the new one
 
-### Proxmox - IAC ssh key
+Enter the old password, and then enter the new password.
 
-On your workstation, create an ssh key
+### Proxmox IaC SSH key
+
+On your workstation, create an SSH key.
 
 ```bash
 ssh-keygen -t ed25519 -C "iac" -f ~/.ssh/iac
 ```
 
-### Proxmox - Terraform API token
+### Proxmox Terraform API token
 
-- Login to Proxmox
-- delete the service account
-- recreate the service account, re-apply the role to the account
+1. Log in to Proxmox.
+2. Delete the service account.
+3. Recreate the service account, and then reapply the role to the account.
 
-### Proxmox - Packer API token
+### Proxmox Packer API token
 
-- Login to Proxmox
-- delete the service account
-- recreate the service account, re-apply the role to the account
+1. Log in to Proxmox.
+2. Delete the service account.
+3. Recreate the service account, and then reapply the role to the account.
 
-### Github repo - deploy keys
+### GitHub deploy keys
 
-#### Re-create deploy keys
+#### Recreate the deploy keys
 
-We'll create a pair of ssh keys for the deployment VM to clone down the repo
+Create a pair of SSH keys for the deployment VM to clone the repository.
 
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/dsv-deploy-key-RO -C "DineSafeViz deploy key Read Only" -N ''
 ```
 
-Cat out the public key, you'll paste this in to the Deploy Keys section later.
+Display the public key. You paste this value into the **Deploy keys** section
+in the next step.
+
 ```bash
 cat ~/.ssh/dsv-deploy-key-RO.pub
 ```
 
-#### Replace deploy keys
+#### Replace the deploy keys
 
-In the repo, 
+In the repository, follow these steps.
 
-- click on Settings > Deploy Keys > Add deploy key
-- title = dsv-deploy-key-RO
-- key = the public key
-- allow write access = unchecked
+1. Go to **Settings** > **Deploy keys** > **Add deploy key**.
+2. In **Title**, enter `dsv-deploy-key-RO`.
+3. In **Key**, enter the public key.
+4. Clear **Allow write access**.
+5. Click **Add key**.
 
-Click Add Key
+## Appendix: Ansible Vault operations
 
-## Appendix
-
-### Ansible Vault Operations
-
-#### View secrets
+### View the secrets
 
 ```bash
 cd infra/ansible
 ansible-vault view vault/secrets.yml --ask-vault-pass
 ```
 
-#### Edit secrets
+### Edit the secrets
 
 ```bash
 cd infra/ansible
 ansible-vault edit vault/secrets.yml --ask-vault-pass
 ```
 
-#### Change vault password
+### Change the Vault password
 
 ```bash
 cd infra/ansible

@@ -1,66 +1,86 @@
-# Monitoring Architecture - Coming Soon (TM)
+# Monitoring architecture (coming soon)
 
-The goal of the monitoring service will be to 1. Inform users of the app status 2. Provide telemetry for systems administrators to monitor and respond to issues
+The monitoring service has two goals:
 
-The monitoring service is a dockerized stack that resides in a VM made up of:
+1. Inform users of the app status.
+2. Provide telemetry so that systems administrators can monitor and respond to
+   issues.
+
+The monitoring service is a dockerized stack that resides in a VM. It consists
+of the following:
+
 - Grafana: metrics aggregation
-- Some kind of APM tool: app monitoring
-- Graylog: centeralized logging
-- Uptime Kuma: informs user of service status
-- Prometheus, InfluxDB: time series data storage and aggregation
-- Alert Manager: rules for alerting
-- Discord: alerts are sent to a private discord channel
+- An APM tool: app monitoring
+- Graylog: centralized logging
+- Uptime Kuma: informs users of the service status
+- Prometheus and InfluxDB: time series data storage and aggregation
+- Alertmanager: rules for alerting
+- Discord: alerts are sent to a private Discord channel
 
-Draw a diagram of the monitoring tools.
+TODO: draw a diagram of the monitoring tools.
 
-## Status Dashboard
+## Status dashboard
 
-A status dashboard (uptime kuma) is user facing. It shows the health of 1. the web app 2. the DSV analytics dashboard
+A user-facing status dashboard (Uptime Kuma) shows the health of the following:
+
+1. The web app
+2. The DSV analytics dashboard
 
 ## Application
 
-Monitor the health of:
+Monitor the health of the following:
 
-- the webapp
-- db
-- dsv metrics
+- The web app
+- The database
+- DSV metrics
 
 ### Metrics
 
-Define metrics to monitor on. Create health check endpoints. 4 Golden Signals? Create a grafana dashboard for it
+TODO: define the metrics to monitor. Create health check endpoints. Consider
+the four golden signals. Create a Grafana dashboard for them.
 
 ## Infrastructure
 
-- monitor vm health
-
+- Monitor VM health.
 
 ## Monitoring tools
 
 ### Grafana
 
+TODO
 
-### Something for APM
+### APM tool
+
+TODO
 
 ### Graylog
 
-Performs centralized logging for the DineSaveViz application and its supporting infrastructure.
-
-Logs are streamed and recorded to X.
+Graylog performs centralized logging for the DineSafeViz application and its
+supporting infrastructure. TODO: document where the logs are streamed and
+recorded.
 
 ### Uptime Kuma
 
+TODO
+
 ### InfluxDB
+
+TODO
 
 ### Prometheus
 
-Node exporter agents are installed on all VMs and docker compose stacks to collect metrics for grafana
+Node exporter agents are installed on all VMs and Docker Compose stacks to
+collect metrics for Grafana.
 
 ## Alerting tools
 
-Alert Manager rules define thresholds and send alerts to a private Discord channel
+Alertmanager rules define thresholds and send alerts to a private Discord
+channel.
 
-## Alert Manager
+### Alertmanager
 
-## Discord
+TODO
 
-Discord channel info
+### Discord
+
+TODO: document the Discord channel.

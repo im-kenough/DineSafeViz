@@ -1,19 +1,16 @@
-# Network Architecture
+# Network architecture
 
 ## DNS
 
-domain: dinesafeviz.com
-registrar: namecheap
-dns provider: cloudflare
+- **Domain:** dinesafeviz.com
+- **Registrar:** Namecheap
+- **DNS provider:** Cloudflare
 
-Created cloudflare redirect rule
-- redirect the following:
-  - dinesafeviz.com
-  - www.dinesafeviz.com
-  - to:
-    - https://github.com/im-kenough/DineSafeViz
+A Cloudflare redirect rule redirects `dinesafeviz.com` and
+`www.dinesafeviz.com` to `https://github.com/im-kenough/DineSafeViz`.
+Cloudflare handles the HTTP-to-HTTPS redirect automatically.
 
-CLoudflare automatically handles http-https redirect
+The following output shows the current DNS records.
 
 ```text
 dinesafeviz.com.        282     IN      A       172.64.80.1
@@ -57,15 +54,17 @@ Received 37 bytes from 127.0.0.53#53 in 272 ms
 Received 37 bytes from 127.0.0.53#53 in 272 ms
 ```
 
-## IP Address Management (IPAM)
+## IP address management (IPAM)
 
 ### Application
-Include a network diagram of just the VM and docker compose stack
+
+TODO: include a network diagram of the VM and the Docker Compose stack.
+
 - App VM
 
 ### Infrastructure
 
-Add a network diagram showing the IP information for proxmox host, image layers, app VM
+TODO: add a network diagram that shows the IP information for the Proxmox host,
+the image layers, and the app VM.
 
-The Proxmox host is x.x.x.x
-
+The Proxmox host is x.x.x.x.

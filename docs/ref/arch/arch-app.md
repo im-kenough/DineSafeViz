@@ -119,9 +119,10 @@ directly.
 
 Inspections are grouped by date and sorted by establishment status within each
 day (Closed > Conditional Pass > Pass; unknown statuses sort last). Year and
-quarter navigation covers 2001 to the present. The navigation uses a dropdown
-with flyout menus — the four most recent years are shown directly, older years
-are nested under an "Archive" section. Note: 2023 navigation only shows Q4,
+quarter navigation covers 2001 to the present. The navigation uses a menu
+with flyout submenus — the four most recent years are shown directly, older
+years are nested under an "Archive" section. Note: 2023 navigation only shows
+Q4,
 because the recent CSV starts from Q4 2023 and historical data ends in 2022.
 
 ### Home page caching
