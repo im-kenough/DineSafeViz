@@ -34,22 +34,41 @@ For rotation steps, see [rotate secrets](../../how-to/6-rotate-secrets.md).
 | `infra/packer/variables.pkrvars.hcl` | Rendered from vault during deployment  | No (gitignored) |
 | `.env` (on VM at deploy time) | Templated from vault during deployment | No (never in repo) |
 
-### Vault contents
+### Secret inventory (Ansible Vault)
 
-The Ansible Vault encrypted file (`infra/ansible/vault/secrets.yml`) contains secrets for IaC and the app.
+The Ansible Vault encrypted file (`infra/ansible/vault/secrets.yml`) contains
+every secret for IaC and the app. This is the complete list, keyed by the exact
+name that the code consumes.
 
-| Key | Description | Used by |
-|-----|-------------|---------|
-| `vault_proxmox_api_token_id` | Terraform Proxmox API token ID | Terraform |
-| `vault_proxmox_api_token_secret` | Terraform Proxmox API token secret | Terraform |
-| `vault_packer_api_token_id` | Packer Proxmox API token ID | Packer |
-| `vault_packer_api_token_secret` | Packer Proxmox API token secret | Packer |
-| `vault_db_user` | PostgreSQL username | Ansible deploy (.env) |
-| `vault_db_password` | PostgreSQL password | Ansible deploy (.env) |
-| `vault_db_name` | PostgreSQL database name | Ansible deploy (.env) |
-| `vault_analytics_admin_user` | Grafana admin username | Ansible deploy (.env) |
-| `vault_analytics_admin_password` | Grafana admin password | Ansible deploy (.env) |
-| `vault_github_deploy_keys` | GitHub deploy key (private key) | Packer dsv-app build |
+| Vault key | What it is used for | Consumed by |
+|-----------|---------------------|-------------|
+| `vault_proxmox_api_token_secret` | Authenticates Terraform to the Proxmox API for VM provisioning. | `render-vars.py terraform` → `terraform.tfvars` |
+| `vault_packer_api_token_secret` | Authenticates Packer to the Proxmox API for image builds. | `render-vars.py packer` → `variables.pkrvars.hcl` |
+| `vault_db_password` | Password for the PostgreSQL superuser role (`dinesafe`) that creates the schema and ingests data. | `env.j2` → `DSV_DB_PASSWORD` |
+| `vault_db_app_password` | Password for the SELECT-only PostgreSQL role (`dinesafe_app`); optional, defaults to `dinesafe_app`. | `env.j2` → `DSV_DB_APP_PASSWORD` |
+| `vault_analytics_admin_password` | Password for the Grafana admin user (`admin`). | `env.j2` → `DSV_ANALYTICS_ADMIN_PASSWORD` |
+| `vault_github_deploy_keys` | Private half of the read-only GitHub deploy key that clones the repo onto the VM. | `render-vars.py packer` and the Packer `dsv-app` build |
+
+> [!NOTE]
+> The Proxmox token IDs, database usernames, and database name are identifiers,
+> not secrets. They live in plaintext in `group_vars/all.yml` (see the next
+> section), not in the vault.
+
+### Non-secret identifiers (group_vars/all.yml)
+
+These name accounts and resources but hold no secret value, so they live in
+plaintext `infra/ansible/group_vars/all.yml`.
+
+| Identifier | Value | What it is used for |
+|------------|-------|---------------------|
+| `proxmox_api_terraform_token_id` | `svc-terraform@pve!terraform` | Names the Proxmox API token that Terraform authenticates with. |
+| `proxmox_api_packer_token_id` | `svc-packer@pve!packer` | Names the Proxmox API token that Packer authenticates with. |
+| `app_analytics_db_user` | `dinesafe` | PostgreSQL superuser and database owner role name. |
+| `app_analytics_db_app_user` | `dinesafe_app` | SELECT-only PostgreSQL role name used by the app and Grafana. |
+| `app_analytics_db_name` | `dinesafe` | Application database name. |
+| `app_analytics_admin_user` | `admin` | Grafana admin username. |
+| `service_account` / `packer_ssh_username` | `adm-ubuntu` | Linux account on the VM for Ansible, app management, and Packer builds. |
+| `template_iac_public_key` | `ssh-ed25519 … iac` | Public IaC SSH key baked into every template for provisioning access. |
 
 
 ---
@@ -61,9 +80,11 @@ function.
 
 ### VM automation
 
-| Account | Purpose | Auth method |
-|---------|---------|-------------|
-| `adm-ubuntu` | Ansible and app management on the VM | SSH key (passwordless sudo) |
+| Account or key | What it is used for | Auth method |
+|----------------|---------------------|-------------|
+| `adm-ubuntu` | Linux account for Ansible automation and app management on the build and app VMs. | SSH key, passwordless sudo |
+| `root@pve` | Proxmox host root, used manually during template creation for `pveum` and `qm` commands. | SSH (manual) |
+| `iac` SSH key (`~/.ssh/iac`) | Workstation key for all IaC SSH access to the build and app VMs; its public half is baked into every template. | ed25519 key pair |
 
 The `adm-ubuntu` account is created by the `base` role. It has
 passwordless sudo (required for Ansible automation) and SSH key-only
@@ -111,17 +132,52 @@ identity file and sets `IdentitiesOnly yes` to prevent key leakage.
 
 ### Application credentials
 
-| Credential | Purpose | Scope |
-|------------|---------|-------|
-| `vault_db_user` / `vault_db_password` | PostgreSQL access | Docker internal network only |
-| `vault_analytics_admin_user` / `vault_analytics_admin_password` | Grafana admin | Grafana web UI |
+| Credential | What it is used for | Scope |
+|------------|---------------------|-------|
+| `vault_db_password` | Superuser password for the `dinesafe` role. | Docker internal network only |
+| `vault_db_app_password` | Password for the SELECT-only `dinesafe_app` role. | Docker internal network only |
+| `vault_analytics_admin_password` | Grafana admin password for the `admin` user. | Grafana web UI |
 
 These are injected into the `.env` file on the VM at deploy time
 (mode `0600`) and consumed by Docker Compose as environment variables.
 The PostgreSQL instance isn't exposed outside the Docker network.
 
+### PostgreSQL roles
+
+Defined in `src/dsv-db/init.sql`.
+
+| Role | What it is used for |
+|------|---------------------|
+| `dinesafe` | Bootstrap superuser (`POSTGRES_USER`) that creates the schema and runs data ingestion through `dsv-init-db`. |
+| `dinesafe_app` | SELECT-only role that the Flask app and Grafana use to read inspection data. |
+| `dinesafe_migrator` | DDL-capable role defined for future schema migrations; not yet used at runtime. |
+
+### Grafana identities
+
+| Identity | What it is used for |
+|----------|---------------------|
+| `admin` | Grafana administrator account (username from `app_analytics_admin_user`, password from `vault_analytics_admin_password`). |
+| Anonymous viewer | Anonymous access is enabled with the Viewer org role so the embedded dashboard renders without a login. |
+
 ---
 
+
+## Planned identities (v0.4.0 AKS)
+
+The AKS rearchitecture introduces Azure managed identities and a Key Vault
+secret. The [Azure component inventory](../azure-component-inventory.md) is the
+authoritative list. This table summarizes the prod identities. The staging
+environment mirrors them with `-stg-` names.
+
+| Identity | What it is used for |
+|----------|---------------------|
+| `id-gha-dsv-shared-eus2` | GitHub Actions identity (OIDC) for the image-build and shared-infrastructure workflows. |
+| `id-gha-dsv-prod-eus2` | GitHub Actions identity (OIDC) for the prod Terraform and app-deploy workflows. |
+| `id-aks-controlplane-prod-eus2` | AKS control-plane identity that pulls images from ACR and manages the VNet. |
+| `id-aks-cnpg-prod-eus2` | Workload Identity for CloudNativePG to write WAL files and backups to Azure Blob. |
+| `id-aks-certmgr-prod-eus2` | Workload Identity for the cert-manager DNS-01 solver on the Azure DNS zone. |
+| `id-aks-kvcsi-prod-eus2` | Workload Identity for the Key Vault CSI driver to read secrets. |
+| `analytics-admin-password` (Key Vault secret) | Grafana admin credential stored in Azure Key Vault. |
 
 ## VM hardening
 

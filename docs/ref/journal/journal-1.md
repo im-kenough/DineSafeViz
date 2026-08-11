@@ -210,3 +210,41 @@ Docs:
 
 Verified: no `5000` references remain in code or docs (grep clean, excluding the journal's own
 history log and an unrelated `app.py` metrics histogram bucket). Port standardization complete.
+
+### 2026-08-11 — Centralize secrets, service accounts, usernames in arch-security.md
+
+Audited whole repo (docker-compose.yml, init.sql, group_vars/all.yml, example-secrets.yml,
+roles/deploy/templates/env.j2, render-vars.py, packer/*.hcl, terraform/variables.tf) to build
+the authoritative identity inventory. Rewrote arch-security.md to be the single source with a
+1-sentence "what it is used for" per item.
+
+Authoritative facts (from code, not prior docs):
+- Vault holds ONLY 6 secrets: vault_proxmox_api_token_secret, vault_packer_api_token_secret,
+  vault_db_password, vault_db_app_password (optional), vault_analytics_admin_password,
+  vault_github_deploy_keys.
+- Token IDs (svc-*@pve!*), DB usernames (dinesafe, dinesafe_app), DB name, and Grafana admin
+  username are NON-SECRET config in group_vars/all.yml — not vault keys.
+- Service accounts/identities: adm-ubuntu (VM + Packer build), root@pve (manual), iac SSH key,
+  svc-terraform@pve, svc-packer@pve, GitHub deploy key.
+- PostgreSQL roles (init.sql): dinesafe (superuser), dinesafe_app (SELECT), dinesafe_migrator
+  (DDL, unused). Grafana: admin + anonymous Viewer.
+
+arch-security.md changes:
+- Replaced the wrong "Vault contents" table (which listed token IDs, db_user, db_name,
+  analytics_admin_user as vault keys — they aren't) with a corrected 6-secret table + a new
+  "Non-secret identifiers (group_vars)" table.
+- Corrected "Application credentials" (was `vault_db_user`/`vault_analytics_admin_user` — not
+  keys) and added "PostgreSQL roles" and "Grafana identities" tables.
+- Expanded "VM automation" to add root@pve and the iac SSH key.
+- Added "Planned identities (v0.4.0 AKS)" summarizing the Azure MIs + KV secret, pointing to
+  azure-component-inventory.md as authoritative (avoids duplicating the 40-resource table).
+
+FLAGGED (real inconsistencies found, NOT auto-fixed — need author decision):
+1. `infra/ansible/vault/example-secrets.yml` defines `vault_app_analytics_db_password`, but
+   `env.j2` consumes `vault_db_password` and `vault_db_app_password`. Following the example
+   vault yields an EMPTY superuser password → broken deploy. The example is out of sync with
+   the deploy template.
+2. `docs/how-to/1-install/4-setup-app.md`'s vault YAML lists keys the code never reads
+   (`vault_proxmox_node`, `vault_*_api_token_id`, `vault_db_user`, `vault_db_name`,
+   `vault_analytics_admin_user`) and omits `vault_db_app_password`. Harmless-but-misleading.
+Both should be reconciled to the 6-key list now in arch-security.md.
