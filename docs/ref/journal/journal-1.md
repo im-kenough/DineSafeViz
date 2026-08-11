@@ -248,3 +248,32 @@ FLAGGED (real inconsistencies found, NOT auto-fixed — need author decision):
    (`vault_proxmox_node`, `vault_*_api_token_id`, `vault_db_user`, `vault_db_name`,
    `vault_analytics_admin_user`) and omits `vault_db_app_password`. Harmless-but-misleading.
 Both should be reconciled to the 6-key list now in arch-security.md.
+
+### 2026-08-11 — Fix vault key mismatch (bug) + reconcile code and docs
+
+User approved fixing the bug and will regenerate secret values. Canonical contract = what the
+consumers read: `render-vars.py` (proxmox/packer token secrets, deploy key) and
+`roles/deploy/templates/env.j2` (db + grafana passwords). The 6 canonical vault keys:
+vault_proxmox_api_token_secret, vault_packer_api_token_secret, vault_db_password,
+vault_db_app_password, vault_analytics_admin_password, vault_github_deploy_keys.
+
+Changes:
+- `infra/ansible/vault/example-secrets.yml`: rewrote with all 6 keys, header block explaining
+  the secret/non-secret split and the consumers, per-key comments, `REPLACE_WITH_*`
+  placeholders, and OPENSSH deploy-key format. Renamed the orphan
+  `vault_app_analytics_db_password` → `vault_db_password`; added the missing
+  `vault_db_app_password`.
+- `docs/how-to/1-install/4-setup-app.md`: vault YAML reduced to the 6 keys (removed non-secret
+  keys that belong in group_vars); RSA → OPENSSH deploy-key header; added a note + link to
+  arch-security.md.
+- `docs/how-to/6-rotate-secrets.md`: was telling users to set `DSV_DB_PASSWORD` (the .env var
+  name) in the vault; corrected to the vault keys `vault_db_password`, `vault_db_app_password`,
+  `vault_analytics_admin_password`.
+- `docs/ref/arch/arch-security.md`: added a pointer to example-secrets.yml.
+
+Verified: `vault_app_analytics_db_password` no longer appears anywhere except this journal's
+history. All 8 code/doc files reference the canonical 6 keys.
+
+ACTION FOR USER: recreate/edit the real encrypted `infra/ansible/vault/secrets.yml` so it uses
+`vault_db_password` (and `vault_db_app_password`) — if it currently holds
+`vault_app_analytics_db_password`, deploys were already rendering an empty DSV_DB_PASSWORD.

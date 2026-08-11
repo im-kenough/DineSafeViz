@@ -38,7 +38,8 @@ For rotation steps, see [rotate secrets](../../how-to/6-rotate-secrets.md).
 
 The Ansible Vault encrypted file (`infra/ansible/vault/secrets.yml`) contains
 every secret for IaC and the app. This is the complete list, keyed by the exact
-name that the code consumes.
+name that the code consumes. The
+`infra/ansible/vault/example-secrets.yml` template documents the same keys.
 
 | Vault key | What it is used for | Consumed by |
 |-----------|---------------------|-------------|

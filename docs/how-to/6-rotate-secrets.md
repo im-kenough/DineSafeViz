@@ -5,15 +5,24 @@ a secret, you change its value.
 
 ## Application secrets
 
-### DSV_DB_PASSWORD
+The application passwords live in the Ansible Vault as `vault_*` keys. Ansible
+renders them into the `.env` file on the VM at deploy time. For the full
+inventory, see [security architecture](../ref/arch/arch-security.md).
 
-1. Run `ansible-vault edit` to decrypt the `secrets.yml` file.
-2. Set a new value for `DSV_DB_PASSWORD`.
+### PostgreSQL superuser password
 
-### DSV_ANALYTICS_ADMIN_PASSWORD
+1. Run `ansible-vault edit` to open the `secrets.yml` file.
+2. Set a new value for `vault_db_password`.
 
-1. Run `ansible-vault edit` to decrypt the `secrets.yml` file.
-2. Set a new value for `DSV_ANALYTICS_ADMIN_PASSWORD`.
+### PostgreSQL app-role password
+
+1. Run `ansible-vault edit` to open the `secrets.yml` file.
+2. Set a new value for `vault_db_app_password`.
+
+### Grafana admin password
+
+1. Run `ansible-vault edit` to open the `secrets.yml` file.
+2. Set a new value for `vault_analytics_admin_password`.
 
 ## Infrastructure secrets
 
