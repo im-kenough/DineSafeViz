@@ -2,14 +2,14 @@
 
 ## Data sources
 
-The DineSafe dataset comes in two parts: current data and historical data.
+The DineSafe dataset has two parts: current data and historical data.
 
-You can download both from the City of Toronto Open Data portal as CSV files.
-An API is also available.
+The City of Toronto Open Data portal offers both as CSV files. The portal
+also provides an API.
 
 ## Current data
 
-The "[current data](https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/b6b4f3fb-2e2c-47e7-931d-b87d22806948/resource/eda39233-4791-464e-98e6-094f51a01916/download/Dinesafe.csv)" dataset is updated daily by the City of Toronto and contains about 3 years of data.
+The City of Toronto updates the "[current data](https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/b6b4f3fb-2e2c-47e7-931d-b87d22806948/resource/eda39233-4791-464e-98e6-094f51a01916/download/Dinesafe.csv)" dataset daily. It contains about 3 years of data.
 
 
 <details>
@@ -29,7 +29,7 @@ The "[current data](https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/b6b4
 
 ### Data dictionary
 
-The columns are defined as follows:
+The following table defines each column.
 
 | Column | Description |
 | --- | --- |
@@ -56,12 +56,12 @@ The columns are defined as follows:
 
 The [historical dataset](https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/b6b4f3fb-2e2c-47e7-931d-b87d22806948/resource/c0a5f6b0-534a-47c3-867d-d4b5cc84a656/download/Dinesafe%20Historical%20Data.zip) contains data going back to 2001.
 
-The `src/dsv-db/refresh.py` script downloads the historical ZIP archive
-at runtime and extracts one CSV per year, covering 2001 through 2022. The
-files from 2001 to 2015 are documented here.
+The `src/dsv-db/refresh.py` script downloads the historical ZIP archive at
+runtime and extracts one CSV per year, covering 2001 through 2022. This
+document covers the files from 2001 to 2015.
 
-All years share the same 16-column schema. There is no schema drift
-across the historical files.
+All years share the same 16-column schema, with no schema drift across the
+historical files.
 
 ## Row counts (2001-2015)
 
@@ -123,11 +123,11 @@ Row counts include the header line.
 ## Nullability patterns
 
 Roughly 34-40% of rows across all years have empty `Infraction Details`,
-`Severity`, and `Action` — these represent clean inspections with no
-infractions. The three fields are always empty together.
+`Severity`, and `Action`. These represent clean inspections with no
+infractions, and the three fields are always empty together.
 
-`Outcome` and `Amount Fined` are populated on fewer than 2% of rows
-(only when enforcement reached court).
+`Outcome` and `Amount Fined` are populated on fewer than 2% of rows,
+only when enforcement reached court.
 
 ## Enum values (2001-2015)
 
@@ -241,7 +241,8 @@ infractions. The three fields are always empty together.
 
 ## Import considerations
 
-When importing historical data into the current DB schema:
+These constraints apply when you import historical data into the current
+DB schema:
 
 - **Column mapping:** `Rec #` has no equivalent in the current schema.
   Generate `_id` and `unique_id` values during import.
@@ -249,19 +250,18 @@ When importing historical data into the current DB schema:
   `Min. Inspections Per Year` need either new columns or a separate
   table to preserve them.
 - **Missing in historical data:** `Inspection Observation` and
-  `Outcome Date` will be null for all historical rows.
+  `Outcome Date` are null for all historical rows.
 - **CSV quoting:** All historical values are double-quoted. Use a
-  proper CSV parser (not naive comma-splitting) because
+  proper CSV parser, not naive comma-splitting, because
   `Infraction Details` often contains commas.
 
 ## Database schema
 
 ### Unified schema (inspections table)
 
-The Postgres `inspections` table merges both historical (2001–2022)
-and recent (2023–present) data into a single schema. Two columns from
-the historical dataset are preserved; columns absent in a given era
-are NULL.
+The Postgres `inspections` table merges both historical (2001–2022) and
+recent (2023–present) data into a single schema. It preserves two columns
+from the historical dataset, and columns absent in a given era are NULL.
 
 | # | Column                     | Type             | Historical (2001–2022) | Recent (2023–present) |
 |---|----------------------------|------------------|------------------------|-----------------------|
@@ -289,13 +289,12 @@ are NULL.
 
 The historical archive (published 2023-04-11) covers through 2022-12-30.
 The recent CSV's rolling window currently starts at 2023-11-10. Neither
-source covers **2023-01-01 through 2023-11-09** (~11 months). This is an
-upstream Toronto Open Data limitation — the data was never published in
-either dataset.
+source covers **2023-01-01 through 2023-11-09** (~11 months) because Toronto
+Open Data never published this range in either dataset.
 
 ## Data ingestion
 
-Data loading is handled by `src/dsv-db/refresh.py`, not by `init.sql`.
+The `src/dsv-db/refresh.py` script handles data loading, not `init.sql`.
 
 **Initial seed (empty table):**
 1. Downloads the historical ZIP (2001–2022 CSVs)

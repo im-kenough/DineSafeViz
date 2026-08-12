@@ -1,4 +1,9 @@
-# Azure Component Inventory — DineSafeViz
+# Azure component inventory — DineSafeViz
+
+> [!NOTE]
+> **Target state (v0.4.0, in progress).** This document describes the planned
+> Azure/AKS architecture, not the currently deployed Proxmox environment. For
+> the live deployment, see the [Proxmox install guide](../how-to/1-install/README.md).
 
 Reference for architecture discussions. Covers region independence, subscription
 model diagrams, and the full component list for a single prod deployment.
@@ -7,9 +12,9 @@ model diagrams, and the full component list for a single prod deployment.
 
 ## Region independence
 
-"Global" means the service is not tied to a single Azure region — availability
-and DNS resolution are not affected by any one region's health. "Regional" means
-the service is deployed to and fails with a specific Azure region.
+A "global" service is not tied to a single Azure region, so availability and
+DNS resolution are not affected by any one region's health. A "regional"
+service is deployed to, and fails with, a specific Azure region.
 
 | Service | Classification | Notes |
 |---|---|---|
@@ -25,10 +30,11 @@ the service is deployed to and fails with a specific Azure region.
 | Azure Load Balancer (auto) | **Regional** | Created automatically by AKS when a Kubernetes `Service` of type `LoadBalancer` is created. |
 | Managed Disks (PVCs) | **Regional** | Provisioned in the same zone as the pod that mounts them. |
 
-**Practical implication for this project:** Everything except DNS is regional. If
-East US 2 has an outage, the whole deployment is down. Phase 2 DR (West US 2
-cluster) addresses this. For Phase 1, the choice of region is cosmetic — pick
-the one with the right services at the right price.
+**Practical implication for this project:** Everything except DNS is regional.
+If East US 2 has an outage, the whole deployment is down. Phase 2 disaster
+recovery (DR), with a West US 2 cluster, addresses this. For Phase 1, the
+choice of region is cosmetic, so pick the one with the right services at the
+right price.
 
 ---
 
@@ -214,7 +220,7 @@ These are the cluster-level resources.
 
 ### Tier 3 — auto-provisioned by AKS (the node resource group)
 
-AKS creates a second resource group (`MC_rg-dsv-prod-eus2_aks-dsv-prod-eus2_eastus2`) and manages everything inside it. **You do not write Terraform for these.** You may need to reference them in runbooks.
+AKS creates a second resource group (`MC_rg-dsv-prod-eus2_aks-dsv-prod-eus2_eastus2`) and manages everything inside it. **You do not write Terraform for these.** Runbooks may need to reference them.
 
 | Component | Notes |
 |---|---|
@@ -226,7 +232,7 @@ AKS creates a second resource group (`MC_rg-dsv-prod-eus2_aks-dsv-prod-eus2_east
 | Network interfaces (NICs) | One NIC per node, attached to `snet-dsv-aksnodes-prod-eus2` |
 | Azure Load Balancer | Created when NGINX ingress Service of type `LoadBalancer` is applied |
 
-The AKS control plane itself (the API server, etcd, scheduler) is **fully managed by Microsoft** and does not appear in your subscription at all. You are not billed for it separately — the AKS cluster resource (`aks-dsv-prod-eus2`) has no hourly control plane charge.
+Microsoft **fully manages** the AKS control plane itself (the API server, etcd, scheduler), and it does not appear in your subscription at all. You don't pay a separate charge for it. The AKS cluster resource (`aks-dsv-prod-eus2`) has no hourly control plane charge.
 
 ### Tier 4 — provisioned by Helm / Helmfile (inside the cluster)
 
