@@ -3,7 +3,8 @@
 DineSafeViz visualizes data from DineSafe, Toronto Public Health's food
 safety and inspection program.
 
-It's a selfhosted containerized webapp that publishes and visualizes 26+ years of inspection results.
+It's a self-hosted containerized web app that publishes and visualizes 26+ years
+of inspection results.
 
 ![DineSafeViz home page](docs/img/root-readme/dsv-home-1.png)
 
@@ -22,76 +23,93 @@ across over 26 years of data.
 
 ![DSV Analytics dashboard](docs/img/root-readme/dsv-dash-1.png)
 
-### Selfhosted
+### Self-hosted
 
-Small foot print. Deploys to a selfhosted Ubuntu VM in a Proxmox environment.
+Small footprint. Deploys to a self-hosted Ubuntu VM in a Proxmox environment.
 
-### Infrastructure as Code
+### Infrastructure as code
 
-Uses [Infrastructure as Code](docs/ref/arch/arch-iac.md) to automate VM provision and app deployment
+Uses [infrastructure as code](docs/explanation/4-infrastructure-as-code.md) to automate VM
+provisioning and app deployment.
 
 ## Architecture
 
-The DineSafeViz application is a Dockerized webapp with a database backend. It visualizes historic data and updates the dataset daily. 
+The DineSafeViz application is a dockerized web app with a database backend. It
+visualizes historic data and updates the dataset daily.
 
 ![DineSafeViz Application - Simple](docs/img/root-readme/dsv-app-simple.png)
 
 > [!NOTE]
-> Data update feature Coming Soon (™️)
+> Data update feature: coming soon.
 
-See the
-[architecture reference](docs/ref/arch/arch-app.md) and
-[DevOps reference](docs/ref/arch/README.MD) for details.
+For details, see the
+[architecture reference](docs/explanation/2-application-architecture.md) and the
+[DevOps reference](docs/explanation/README.md).
 
-### Application Architecture
+### Application architecture
 
-The DineSafeViz app has [three main services](docker-compose.yml) and two supporting services:
+The DineSafeViz app has [three main services](docker-compose.yml), one edge
+service, and two supporting services.
 
 #### Main services
-1. dsv-app: the user facing webapp to view inspection data and metrics dashboard
-2. dsv-db: stores the City of Toronto DineSafe dataset; a PostgreSQL database 
-3. dsv-analytics: a custom metrics dashboard that visualises DineSafe data; Grafana based.
+
+1. dsv-app: the Flask web app that serves inspection data and the metrics
+   dashboard. It listens on internal port 8000.
+2. dsv-db: a PostgreSQL database that stores the City of Toronto DineSafe
+   dataset.
+3. dsv-analytics: a Grafana-based metrics dashboard that visualizes DineSafe
+   data.
+
+#### Edge service
+
+- dsv-nginx: the reverse proxy and entry point on host port 8080. It routes
+  requests to `dsv-app` and proxies `/analytics/` to `dsv-analytics`.
 
 #### Supporting services
 
-These are one off services used for initial setup of fresh deployment in a VM.
+These are one-off services for the initial setup of a fresh deployment in a VM.
 
-1. dsv-init-db: seeds the DB on first run, refreshes recent data on subsequent runs.
-2. dsv-init-analytics: seeds the initial Grafana based app dashboard
+1. dsv-init-db: seeds the database on first run, and refreshes recent data on
+   later runs.
+2. dsv-init-analytics: seeds the initial Grafana dashboard.
 
 ![Architecture overview diagram](docs/img/root-readme/arch-over.drawio.png)
 
-### [Infrastructure as Code](docs/ref/arch/arch-iac.md)
+### [Infrastructure as code](docs/explanation/4-infrastructure-as-code.md)
 
-Terraform, Packer and Ansible are used for Infrastructure as Code tools to automatically:
-- provision an app VM
-- maintain an app image
-- deploy, teardown and redeploy an application
+Terraform, Packer, and Ansible are the infrastructure as code tools that
+automatically:
 
-### [Information security](docs/ref/arch/arch-security.md)
+- Provision an app VM.
+- Maintain an app image.
+- Deploy, tear down, and redeploy an application.
 
-The app's docker-compose configuration are retrieved from a .env file. Secrets are stored in [secrets.yml](DineSafeViz/infra/ansible/vault/secrets.yml) and are injected to the .env file during deployment via IAC.
+### [Information security](docs/explanation/6-security-architecture.md)
 
-### [Monitoring](docs/ref/arch/arch-monitoring.md) - Coming Soon (™️)
+The app's Docker Compose configuration is retrieved from a `.env` file. Secrets
+are stored in
+[secrets.yml](infra/ansible/vault/secrets.yml) and are injected into the `.env`
+file during deployment via IaC.
 
-Grafana dashboards monitors: the VM health, webapp metrics, db metrics
-docs/ref/arch/arch-monitoring.md
+### [Monitoring](docs/explanation/9-monitoring-architecture.md) (coming soon)
 
+Grafana dashboards monitor the VM health, web app metrics, and database
+metrics.
 
-## Getting Started
+## Getting started
 
-- **[Install Guide](docs/how-to/1-install/README.md):** Instructions for installing the application and provisioning the infrastructure from scratch
-- **[Redeploy Guide](docs/how-to/3-redeploy-guide.md):** Instructions to redeploy the app to existing infrastructure
-
+- **[Install guide](docs/how-to/1-install/README.md):** instructions for
+  installing the application and provisioning the infrastructure from scratch.
+- **[Redeploy guide](docs/how-to/4-redeploy.md):** instructions to
+  redeploy the app to existing infrastructure.
 
 ## Roadmap
 
-[Project Roadmap](https://github.com/users/im-kenough/projects/11)
-
+See the [project roadmap](https://github.com/users/im-kenough/projects/11).
 
 ## Evolution
 
 Watch how DineSafeViz evolved over time:
 
-- v x.y.z - Dockerized app on self hosted VM. Orchestrated with IAC.
-- v x.y.z - Dockerized app on local computer.
+- v x.y.z: dockerized app on a self-hosted VM, orchestrated with IaC.
+- v x.y.z: dockerized app on a local computer.
