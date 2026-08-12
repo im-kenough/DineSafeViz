@@ -1,5 +1,10 @@
 # Disaster recovery and resiliency
 
+> [!NOTE]
+> **Target state (v0.4.0, in progress).** This document describes the planned
+> Azure/AKS architecture, not the currently deployed Proxmox environment. For
+> the live deployment, see the [Proxmox install guide](../how-to/1-install/README.md).
+
 ## Scenario
 
 ### City of Toronto Open Data portal is unavailable
@@ -20,10 +25,10 @@ filming, DR drills — and to serve a static **holding page** from
 and, later, a recorded walkthrough, so the project stays presentable while the
 cluster is parked.
 
-This is the same cutover muscle as the regional DR runbook below (a manual
-`workflow_dispatch` plus a DNS-layer swap), applied to a cheaper and more
-frequent event: intentionally parking a *healthy* demo to stop paying for idle
-compute.
+This is the same cutover muscle as the regional DR runbook described later
+(a manual `workflow_dispatch` plus a DNS-layer swap), applied to a cheaper
+and more frequent event: intentionally parking a *healthy* demo to stop
+paying for idle compute.
 
 ### Options considered
 
@@ -48,7 +53,7 @@ compute.
 - A GitHub Actions `workflow_dispatch` job performs the flip with **one scoped
   Cloudflare API call** (a token that may edit DNS/origin rules on this one
   zone and nothing else, stored as a repo secret). The Cloudflare portal is
-  setup-only; there is no console login in the day-to-day.
+  setup-only, with no console login in the day-to-day.
 - The **holding page is the fail-safe default.** A failed or half-finished
   deploy leaves `dinesafeviz.com` on the holding page, never on a 502.
 
@@ -59,22 +64,23 @@ compute.
 - **Park:** flip the origin to the holding page *first* → *then*
   `terraform destroy` / scale to zero.
 
-In that order the public hostname is never pointed at a cluster that is not
-ready, and never left pointed at a cluster being torn down.
+This order ensures the public hostname never points at a cluster that isn't
+ready, and it never stays pointed at a cluster being torn down.
 
 ### Relationship to the regional DR cutover
 
-Same pattern, different trigger and blast radius. The DR cutover (below)
-rebuilds a cluster in a second region after a real outage; the holding-page
-flip parks a healthy demo to save money. Both are manual `workflow_dispatch`
-jobs that end in a DNS-layer swap and a smoke test, and both keep the runbook
-in GitHub Actions so it never depends on the cluster it is pointing away from.
+Same pattern, different trigger and blast radius. The DR cutover described
+later rebuilds a cluster in a second region after a real outage, while the
+holding-page flip parks a healthy demo to save money. Both are manual
+`workflow_dispatch` jobs that end in a DNS-layer swap and a smoke test, and
+both keep the runbook in GitHub Actions so it never depends on the cluster
+it is pointing away from.
 
 ### Framing: a cost hack that is also release engineering
 
 > Parking the demo to save money is, mechanically, a blue-green cutover behind
-> a stable load-balancer address. The public hostname never moves; I swap what
-> sits behind it between two "colours" — the live AKS cluster and a static
+> a stable load-balancer address. The public hostname never moves, and I swap
+> what sits behind it between two "colours" — the live AKS cluster and a static
 > holding page — and the holding page is the safe default I fail back to. The
 > cutover is a *manual trigger over an automated, version-controlled process*:
 > a `workflow_dispatch` button runs the exact API call from the repo, every
@@ -85,10 +91,10 @@ in GitHub Actions so it never depends on the cluster it is pointing away from.
 > engineering usually happens.
 
 **Roadmap note.** The holding page itself (recorded GIFs of the running app,
-deployment, DR, and monitoring, plus a walkthrough video) is deferred to a
-later phase: filming it requires a working AKS deployment to record. Until
-then, `dinesafeviz.com` 302-redirects to the repo via a Cloudflare redirect
-rule.
+deployment, DR, and monitoring, plus a walkthrough video) waits for a later
+phase, because filming it requires a working AKS deployment to record. Until
+then, `dinesafeviz.com` 302-redirects to the repo through a Cloudflare
+redirect rule.
 
 ## Scheduled jobs and DR runbooks
 
@@ -160,8 +166,10 @@ Uniformity and audit trail make GHA-everywhere tempting. It falls down on:
   runner inside the cluster (re-introduces the in-cluster compute it was
   trying to avoid).
 - **Free-tier minute limits.** GitHub Actions includes 2,000 free
-  minutes/month on private repos; unlimited on public repos. Three nightly
-  jobs is well within budget; flag this if the job count grows.
-- **Coupling DR to GitHub uptime.** Low-probability but real. Acceptable
-  for this project; in a regulated environment the cutover runbook would
-  also be runnable manually from `az` CLI on a workstation as a fallback.
+  minutes/month on private repos, and unlimited minutes on public repos.
+  Three nightly jobs stay well within budget, so flag this if the job
+  count grows.
+- **Coupling DR to GitHub uptime.** Low-probability but real. This is
+  acceptable for this project. In a regulated environment, the cutover
+  runbook would also need to run manually from `az` CLI on a
+  workstation as a fallback.

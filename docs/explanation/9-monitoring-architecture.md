@@ -69,8 +69,8 @@ TODO
 
 ### Prometheus
 
-Node exporter agents are installed on all VMs and Docker Compose stacks to
-collect metrics for Grafana.
+Node exporter agents run on all VMs and Docker Compose stacks to collect
+metrics for Grafana.
 
 ## Alerting tools
 

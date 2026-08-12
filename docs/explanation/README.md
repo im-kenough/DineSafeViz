@@ -1,19 +1,18 @@
-# Architecture documents
+# Explanation
 
-Architecture documents for DineSafeViz.
+Understanding-oriented discussion of how DineSafeViz is designed and why.
 
-## Table of contents
-
-- [Application architecture](arch-app.md)
-- [Data architecture](arch-data.md)
-- [Infrastructure as code architecture](arch-iac.md)
-- [Network architecture](arch-net.md)
-- [IT security architecture](arch-security.md)
-- [CI/CD architecture](arch-ci-cd.md)
-- [Disaster recovery and resiliency](arch-dr.md)
-- [Monitoring architecture](arch-monitoring.md)
-- [Testing architecture](arch-testing.md)
-- [Architecture reading checklist](arch-checklist.md)
+1. [Use cases](1-use-cases.md)
+2. [Application architecture](2-application-architecture.md)
+3. [Data architecture](3-data-architecture.md)
+4. [Infrastructure as code](4-infrastructure-as-code.md)
+5. [Network architecture](5-network-architecture.md)
+6. [Security architecture](6-security-architecture.md)
+7. [CI/CD architecture](7-ci-cd-architecture.md)
+8. [Disaster recovery and resiliency](8-disaster-recovery.md)
+9. [Monitoring architecture](9-monitoring-architecture.md)
+10. [Testing architecture](10-testing-architecture.md)
+11. [Development process](11-development-process.md)
 
 ---
 

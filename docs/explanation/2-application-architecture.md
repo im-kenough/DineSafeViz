@@ -14,14 +14,14 @@ dsv-app — the Flask app under gunicorn. Renders templates, handles /healthz, /
 **Tier 3 — Data**
 dsv-db (PostgreSQL 17) is the single source of truth. Both dsv-app and dsv-analytics (Grafana) read from it via the SELECT-only dinesafe_app role.
 
-The two one-shot containers (dsv-init-db, dsv-init-analytics) are bootstrap/migration tooling, not their own tier — they exist to bring the data tier and the Grafana tenant into a known state at start.
-
-
+The two one-shot containers (dsv-init-db, dsv-init-analytics) are
+bootstrap/migration tooling, not their own tier. They exist to bring the
+data tier and the Grafana tenant into a known state at start.
 
 It covers the Docker Compose services, the Flask web app, the analytics
-dashboard, and how they fit together. For data-layer details see
-[data architecture](arch-data.md). For infrastructure and deployment
-see [IaC architecture](arch-iac.md).
+dashboard, and how they fit together. For data-layer details, see
+[data architecture](3-data-architecture.md). For infrastructure and
+deployment, see [IaC architecture](4-infrastructure-as-code.md).
 
 DineSafeViz runs as a Docker Compose stack on a single VM. The stack
 contains six primary services (three long-running, two one-shot, one
@@ -89,7 +89,7 @@ graph LR
   access — distinct from the read-only `dinesafe_app` role used by the app
   and analytics, and the `dinesafe_migrator` role defined in `init.sql` for
   future schema migration use. See [data architecture — data
-  ingestion](arch-data.md#data-ingestion) for details.
+  ingestion](3-data-architecture.md#data-ingestion) for details.
 
 - **`dsv-init-analytics`** — `curlimages/curl:latest`. Waits for
   Grafana to become healthy, then grants Viewer-role access to the
@@ -111,19 +111,18 @@ operational endpoints.
 | `GET /readyz` | Readiness probe — returns `200 ok` or `503 db unreachable` based on a `SELECT 1` against `dsv-db` |
 | `GET /metrics` | Prometheus metrics (via `prometheus-flask-exporter`) |
 
-The analytics reverse proxy previously handled at `/analytics/<path>`
-has been removed from the Flask app. nginx handles that routing
-directly.
+The Flask app no longer handles the analytics reverse proxy at
+`/analytics/<path>`. nginx handles that routing directly.
 
 ### Inspection browsing
 
-Inspections are grouped by date and sorted by establishment status within each
-day (Closed > Conditional Pass > Pass; unknown statuses sort last). Year and
-quarter navigation covers 2001 to the present. The navigation uses a menu
-with flyout submenus — the four most recent years are shown directly, older
-years are nested under an "Archive" section. Note: 2023 navigation only shows
-Q4,
-because the recent CSV starts from Q4 2023 and historical data ends in 2022.
+The app groups inspections by date and sorts them by establishment status
+within each day (Closed > Conditional Pass > Pass, with unknown statuses
+sorting last). Year and quarter navigation covers 2001 to the present. The
+navigation uses a menu with flyout submenus. It shows the four most recent
+years directly and nests older years under an "Archive" section. The 2023
+navigation only shows Q4, because the recent CSV starts from Q4 2023 and
+historical data ends in 2022.
 
 ### Home page caching
 
@@ -133,15 +132,14 @@ TTL to avoid repeated queries on a dataset that changes infrequently.
 
 ### Observability
 
-The app emits structured JSON logs via `python-json-logger`. Every
-request is logged at INFO level with `request_id` (UUIDv4),
-`route`, `method`, `status`, `duration_ms`, and `remote_addr`. The
-same `request_id` is echoed back in the `X-Request-ID` response
-header.
+The app emits structured JSON logs through `python-json-logger`. It logs
+every request at INFO level with `request_id` (UUIDv4), `route`, `method`,
+`status`, `duration_ms`, and `remote_addr`. It echoes the same `request_id`
+back in the `X-Request-ID` response header.
 
-Prometheus metrics are exposed at `/metrics` via `prometheus-flask-exporter`.
+`prometheus-flask-exporter` exposes Prometheus metrics at `/metrics`.
 nginx blocks this endpoint externally (returns 404), so scraping must happen
-from within the Docker network. Four custom metrics are defined:
+from within the Docker network. The app defines four custom metrics.
 
 | Metric | Type | Description |
 |---|---|---|
@@ -150,19 +148,18 @@ from within the Docker network. Four custom metrics are defined:
 | `dsv_stats_cache_misses_total` | Counter | Home stats cache misses |
 | `dsv_inspection_query_rows` | Histogram | Rows returned per `/inspections` request |
 
-OpenTelemetry SDK traces are emitted to the console via
-`ConsoleSpanExporter` (local dev only). `FlaskInstrumentor` and
-`Psycopg2Instrumentor` are active. The service name defaults to
-`unknown_service` until `OTEL_SERVICE_NAME` is configured.
+The `ConsoleSpanExporter` emits OpenTelemetry SDK traces to the console
+(local dev only). `FlaskInstrumentor` and `Psycopg2Instrumentor` are
+active. The service name defaults to `unknown_service` until you
+configure `OTEL_SERVICE_NAME`.
 
 ## Analytics dashboard
 
 The Grafana dashboard ("DineSafe Inspections Metrics") reads directly
-from the PostgreSQL database and renders visualizations. It's
-provisioned from files at startup — no manual Grafana UI setup is
-needed.
+from the PostgreSQL database and renders visualizations. Grafana
+provisions it from files at startup, so it needs no manual UI setup.
 
-Dashboard panels are organized into sections:
+The dashboard panels fall into sections:
 
 - **Inspection overview:** total inspections, pass/conditional
   pass/closed counts and percentages
@@ -176,8 +173,8 @@ Dashboard panels are organized into sections:
 ## Data model
 
 One table: `inspections` (19 columns). See
-[data architecture](arch-data.md) for the full schema, data sources,
-and ingestion logic.
+[data architecture](3-data-architecture.md) for the full schema, data
+sources, and ingestion logic.
 
 ## File layout
 
@@ -226,10 +223,11 @@ DineSafeViz/
 
 ## Configuration
 
-All services are configured via environment variables, typically set
-in a `.env` file on the deployment target. The `.env` is templated
-from Ansible Vault at deploy time — see
-[security architecture](arch-security.md) for secrets management.
+All services are configured through environment variables, typically set
+in a `.env` file on the deployment target. Ansible Vault templates the
+`.env` file at deploy time. See
+[security architecture](6-security-architecture.md) for secrets
+management.
 
 | Variable | Used by | Default | Description |
 |---|---|---|---|
@@ -246,15 +244,15 @@ from Ansible Vault at deploy time — see
 
 ## Related documents
 
-- [Data architecture](arch-data.md) — data sources, schema, ingestion,
-  and refresh logic
-- [IaC architecture](arch-iac.md) — image pipeline, VM provisioning,
-  and app deployment
-- [Security architecture](arch-security.md) — secrets management, VM
-  hardening, container security
-- [Testing architecture](arch-testing.md) — unit tests, functional
-  tests, and gaps
-- [CI/CD architecture](arch-ci-cd.md) — release automation and
-  dependency management
-- [Monitoring architecture](arch-monitoring.md) — planned observability
-  stack
+- [Data architecture](3-data-architecture.md) — data sources, schema,
+  ingestion, and refresh logic
+- [IaC architecture](4-infrastructure-as-code.md) — image pipeline, VM
+  provisioning, and app deployment
+- [Security architecture](6-security-architecture.md) — secrets
+  management, VM hardening, container security
+- [Testing architecture](10-testing-architecture.md) — unit tests,
+  functional tests, and gaps
+- [CI/CD architecture](7-ci-cd-architecture.md) — release automation
+  and dependency management
+- [Monitoring architecture](9-monitoring-architecture.md) — planned
+  observability stack

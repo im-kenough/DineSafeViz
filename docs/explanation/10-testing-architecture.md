@@ -44,9 +44,9 @@ Tests for the database refresh script's data transformation logic:
 
 ## Functional tests (route/view)
 
-These tests exercise Flask routes through the built-in test client. The
-database is mocked, so they validate request handling, template rendering,
-and response content — not database integration.
+These tests exercise Flask routes through the built-in test client. They
+mock the database, so they validate request handling, template rendering,
+and response content, not database integration.
 
 ### Shared fixture (`src/dsv-app/tests/conftest.py`)
 
@@ -78,8 +78,8 @@ A pytest `client` fixture creates a Flask test client with
 
 ## Manual smoke tests (post-implementation verification)
 
-Documented in [the PIV runbook](../../how-to/2-piv.md), these are manual
-curl-based checks run after each deployment:
+Documented in [the PIV runbook](../how-to/3-verify-a-deployment.md), these
+are manual curl-based checks run after each deployment:
 
 - Stack startup (`docker compose up --build -d`)
 - HTTP 200 from the home page, analytics health endpoint, and all app
@@ -101,8 +101,8 @@ sense but provide runtime health verification:
 
 ## Dependency scanning
 
-Dependabot is configured (`.github/dependabot.yml`) to open weekly PRs
-for outdated versions across four ecosystems:
+Dependabot (`.github/dependabot.yml`) opens weekly PRs for outdated
+versions across four ecosystems:
 
 - Python packages (`src/dsv-app`)
 - Docker base images (`src/dsv-app`, `src/dsv-db`)
@@ -124,7 +124,7 @@ cd src/dsv-db && python -m pytest tests/
 
 ## Gaps
 
-The following areas have no automated testing today. These are listed as
+The following areas have no automated testing today. This list represents
 candidates for future work, not immediate action items.
 
 | Gap | Category | Notes |

@@ -14,12 +14,12 @@ code and deploys the Docker Compose stack.
 
 ## Image pipeline
 
-The DineSafeViz image is created through multiple steps.
+The pipeline builds the DineSafeViz image through multiple steps.
 
-1. An Ubuntu 24.04 Server image is prepared for cloud-init configuration.
-2. A base Ubuntu image with basic hardening is created. This image serves as a
-   common image that other VM servers in the Proxmox environment reuse. It
-   applies the following:
+1. Packer prepares an Ubuntu 24.04 Server image for cloud-init configuration.
+2. Packer creates a base Ubuntu image with basic hardening. This image serves
+   as a common image that other VM servers in the Proxmox environment reuse.
+   It applies the following:
    - Minimal hardened Ubuntu 24.04 server.
    - **Security:** UFW firewall, fail2ban, disabled root and password auth.
    - **Common packages:** `curl`, `git`, `jq`, `htop`, `unattended-upgrades`.
@@ -70,6 +70,7 @@ operations run through the `infra/` directory.
 
 ## Related documents
 
-- For secrets management, see [security architecture](arch-security.md).
+- For secrets management, see
+  [security architecture](6-security-architecture.md).
 - For deployment and troubleshooting, see
-  [deploy the application](../../how-to/1-install/6-deploy.md).
+  [deploy the application](../how-to/1-install/6-deploy.md).

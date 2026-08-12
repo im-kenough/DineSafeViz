@@ -20,9 +20,12 @@ accounts, and repository-level safeguards.
 
 ## Secrets management
 
-Ansible Vault is the single store for all credentials. The Makefile orchestrates a decrypt-render-cleanup pipeline so plaintext secrets exist only in memory or in short-lived files that are deleted immediately after use.
+Ansible Vault is the single store for all credentials. The Makefile
+orchestrates a decrypt-render-cleanup pipeline, so plaintext secrets
+exist only in memory or in short-lived files. The pipeline deletes
+those files immediately after use.
 
-For rotation steps, see [rotate secrets](../../how-to/6-rotate-secrets.md).
+For rotation steps, see [rotate secrets](../how-to/7-rotate-secrets.md).
 
 ### Secrets and variable locations
 
@@ -87,10 +90,9 @@ function.
 | `root@pve` | Proxmox host root, used manually during template creation for `pveum` and `qm` commands. | SSH (manual) |
 | `iac` SSH key (`~/.ssh/iac`) | Workstation key for all IaC SSH access to the build and app VMs; its public half is baked into every template. | ed25519 key pair |
 
-The `adm-ubuntu` account is created by the `base` role. It has
-passwordless sudo (required for Ansible automation) and SSH key-only
-access. The authorized keys are copied from the build user during
-Packer image creation.
+The `base` role creates the `adm-ubuntu` account. It has passwordless
+sudo (required for Ansible automation) and SSH key-only access. Packer
+image creation copies the authorized keys from the build user.
 
 ### Proxmox API
 
@@ -113,8 +115,8 @@ permissions:
   VM.PowerMgmt, Datastore.AllocateSpace, Datastore.Audit, SDN.Use
 
 Neither account has full administrator access. If a token is
-compromised, the affected area is limited to VM operations — no access
-to storage content, networking configuration, or other Proxmox
+compromised, the compromise stays limited to VM operations, with no
+access to storage content, networking configuration, or other Proxmox
 nodes.
 
 ### GitHub access
@@ -123,12 +125,12 @@ nodes.
 |------------|---------|---------|
 | `vault_github_deploy_keys` | Clone the repo to the VM via SSH | Packer dsv-app build, Ansible deploy |
 
-A read-only GitHub deploy key (ed25519) is used instead of a personal
-access token. Deploy keys are scoped to a single repository and cannot
-push, manage settings, or access other repos. The private key is
-installed to `/home/adm-ubuntu/.ssh/deploy-key` (mode `0600`) during
-the Packer dsv-app build. The SSH config on the VM
-(`infra/ansible/roles/dsv-app/templates/ssh_config.j2`) pins the
+The project uses a read-only GitHub deploy key (ed25519) instead of a
+personal access token. Deploy keys are scoped to a single repository
+and cannot push, manage settings, or access other repos. The Packer
+dsv-app build installs the private key to
+`/home/adm-ubuntu/.ssh/deploy-key` (mode `0600`). The SSH config on the
+VM (`infra/ansible/roles/dsv-app/templates/ssh_config.j2`) pins the
 identity file and sets `IdentitiesOnly yes` to prevent key leakage.
 
 ### Application credentials
@@ -139,8 +141,8 @@ identity file and sets `IdentitiesOnly yes` to prevent key leakage.
 | `vault_db_app_password` | Password for the SELECT-only `dinesafe_app` role. | Docker internal network only |
 | `vault_analytics_admin_password` | Grafana admin password for the `admin` user. | Grafana web UI |
 
-These are injected into the `.env` file on the VM at deploy time
-(mode `0600`) and consumed by Docker Compose as environment variables.
+Deploy time injects these into the `.env` file on the VM (mode
+`0600`), and Docker Compose consumes them as environment variables.
 The PostgreSQL instance isn't exposed outside the Docker network.
 
 ### PostgreSQL roles
@@ -166,8 +168,8 @@ Defined in `src/dsv-db/init.sql`.
 ## Planned identities (v0.4.0 AKS)
 
 The AKS rearchitecture introduces Azure managed identities and a Key Vault
-secret. The [Azure component inventory](../azure-component-inventory.md) is the
-authoritative list. This table summarizes the prod identities. The staging
+secret. The [Azure component inventory](../reference/2-azure-component-inventory.md)
+is the authoritative list. This table summarizes the prod identities. The staging
 environment mirrors them with `-stg-` names.
 
 | Identity | What it is used for |
@@ -184,13 +186,13 @@ environment mirrors them with `-stg-` names.
 
 The app VM runs an Ubuntu OS with basic hardening.
 
-VM hardening is applied at image build time via the Ansible `base`
-role (`infra/ansible/roles/base/`). Every VM cloned from the base
-template inherits these controls automatically.
+The Ansible `base` role (`infra/ansible/roles/base/`) applies VM
+hardening at image build time. Every VM cloned from the base template
+inherits these controls automatically.
 
 ### SSH hardening
 
-A hardened `sshd_config` is deployed
+The base role deploys a hardened `sshd_config`
 (`infra/ansible/roles/base/templates/sshd_config.j2`):
 
 | Setting | Value | Purpose |
@@ -205,8 +207,8 @@ A hardened `sshd_config` is deployed
 
 ### Firewall (UFW)
 
-UFW is configured with a default-deny-incoming policy. Only the
-following ports are explicitly opened:
+The base role configures UFW with a default-deny-incoming policy and
+explicitly opens only the following ports:
 
 | Port | Protocol | Service |
 |------|----------|---------|
@@ -227,8 +229,8 @@ fail2ban monitors `/var/log/auth.log` for SSH brute-force attempts
 
 ### Automatic security patching
 
-`unattended-upgrades` is enabled to apply security patches daily.
-The configuration updates package lists daily, runs unattended
+The base role enables `unattended-upgrades` to apply security patches
+daily. The configuration updates package lists daily, runs unattended
 upgrades daily, and autocleans the apt cache weekly.
 
 ---
@@ -239,8 +241,8 @@ Security measures implemented in the GitHub repository.
 
 ### Dependabot
 
-Dependabot (`.github/dependabot.yml`) is enabled with weekly scans
-across four ecosystems:
+Dependabot (`.github/dependabot.yml`) runs weekly scans across four
+ecosystems:
 
 | Ecosystem | Directory | What it covers |
 |-----------|-----------|----------------|
@@ -273,17 +275,16 @@ images.
 
 ### Network isolation
 
-The Docker Compose stack uses an internal bridge network. Only ports
-8080 (nginx) and 3000 (Grafana) are published to the host. The Flask
-app (`dsv-app`) listens on internal port 8000 and is not published.
-PostgreSQL is only accessible from other containers on the internal
-network and isn't exposed to the host or the broader network.
+The Docker Compose stack uses an internal bridge network. It publishes
+only ports 8080 (nginx) and 3000 (Grafana) to the host. The Flask app
+(`dsv-app`) listens on internal port 8000 and isn't published. Other
+containers reach PostgreSQL only through the internal network, which
+isn't exposed to the host or the broader network.
 
 ### Log management
 
-Docker daemon logging is configured via
-`infra/ansible/roles/docker/templates/daemon.json.j2` to prevent
-unbounded disk usage:
+`infra/ansible/roles/docker/templates/daemon.json.j2` configures
+Docker daemon logging to prevent unbounded disk usage:
 
 - Max log size: `10m` per container
 - Max log files: `3` per container

@@ -16,9 +16,9 @@ automated checks. Identified gaps:
   suites run in CI.
 - **No linting or static analysis** — no pre-commit hooks or
   workflow-based linters.
-- **No container image registry** — images are built locally on the
-  deployment target via `docker compose build`; they aren't pushed to a
-  registry.
+- **No container image registry** — `docker compose build` builds
+  images locally on the deployment target, and the pipeline doesn't
+  push them to a registry.
 
 ## Dependency management (Dependabot)
 
@@ -78,8 +78,8 @@ When a maintainer pushes a version tag (for example, `git tag v0.3.0
 
 ### Label-to-section mapping
 
-PR labels control both the changelog section and the semver bump. The
-full mapping is defined in `.github/release-drafter.yml`:
+PR labels control both the changelog section and the semver bump.
+`.github/release-drafter.yml` defines the full mapping:
 
 | Section heading          | Labels                                          |
 |--------------------------|--------------------------------------------------|
@@ -95,10 +95,10 @@ full mapping is defined in `.github/release-drafter.yml`:
 
 ## Deployment
 
-Deployment is handled outside of GitHub Actions, via the IaC toolchain
-in `infra/`. The `infra/Makefile` orchestrates Packer image baking,
+The IaC toolchain in `infra/` handles deployment outside of GitHub
+Actions. The `infra/Makefile` orchestrates Packer image baking,
 Terraform VM provisioning, and Ansible-based app deployment. See
-[IaC architecture](arch-iac.md) for details.
+[IaC architecture](4-infrastructure-as-code.md) for details.
 
-There is no continuous deployment — releases are deployed manually
-using `make deploy-app` (or `make up` for a full-stack provision).
+There is no continuous deployment. You deploy releases manually using
+`make deploy-app` (or `make up` for a full-stack provision).

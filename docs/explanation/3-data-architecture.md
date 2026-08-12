@@ -35,15 +35,16 @@ It arrives in two parts:
 > (~11 months). This is an upstream data quality issue — the data was
 > never published in either dataset on the Toronto Open Data portal.
 
-See [data mapping](../data.md) for column definitions, sample rows,
-and schema differences between the two datasets.
+See [data mapping](../reference/1-data-mapping.md) for column
+definitions, sample rows, and schema differences between the two
+datasets.
 
 #### Historical data columns
 
-The historical CSVs share a 16-column schema. `Rec #` is discarded on
-import. Two columns (`Establishment Status`, `Min. Inspections Per
-Year`) exist only in historical data and are preserved as nullable
-columns in the unified schema.
+The historical CSVs share a 16-column schema. Import discards `Rec #`.
+Two columns (`Establishment Status`, `Min. Inspections Per
+Year`) exist only in historical data. The unified schema preserves them
+as nullable columns.
 
 | Column                    | Example value                   |
 |---------------------------|---------------------------------|
@@ -66,8 +67,8 @@ columns in the unified schema.
 
 #### Current data columns
 
-The current CSV has 17 columns. `_id` is the Open Data row identifier
-and is discarded on import. Two columns (`Inspection Observation`,
+The current CSV has 17 columns. `_id` is the Open Data row identifier,
+and import discards it. Two columns (`Inspection Observation`,
 `Outcome Date`) exist only in current data.
 
 | Column                 | Example value                                         |
@@ -180,9 +181,9 @@ Key files:
 
 ### Data ingestion
 
-Data fetching and loading is handled by `src/dsv-db/refresh.py`. The
-script detects whether the `inspections` table is empty and runs
-either a full seed or a daily refresh.
+`src/dsv-db/refresh.py` fetches and loads the data. The script detects
+whether the `inspections` table is empty and runs either a full seed or
+a daily refresh.
 
 **Initial seed (empty table):**
 
@@ -210,17 +211,16 @@ as a one-shot service on startup (`restart: "no"`).
 
 #### Data sanitization
 
-The following data sanitization is performed before loading into the
+`refresh.py` sanitizes the data as follows before loading it into the
 database:
 
-- **Null normalization:** The string `"None"` and empty strings are
-  converted to Python `None` (SQL `NULL`) by the `normalize()`
-  function.
-- **COPY-safe escaping:** Tabs (`\t`), carriage returns (`\r`), and
-  newlines (`\n`) within data values are replaced with spaces to
+- **Null normalization:** The `normalize()` function converts the
+  string `"None"` and empty strings to Python `None` (SQL `NULL`).
+- **COPY-safe escaping:** `refresh.py` replaces tabs (`\t`), carriage
+  returns (`\r`), and newlines (`\n`) within data values with spaces to
   prevent PostgreSQL `COPY` format errors.
-- **NULL marker:** `None` values are written as `\N` (the PostgreSQL
-  `COPY` null marker) in the tab-separated buffer.
+- **NULL marker:** `refresh.py` writes `None` values as `\N` (the
+  PostgreSQL `COPY` null marker) in the tab-separated buffer.
 
 Future sanitization work:
 
