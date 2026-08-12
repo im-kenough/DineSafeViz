@@ -39,7 +39,7 @@ uBlock Origin and other blockers enabled:
 ### Fix
 
 If the dashboard shell renders but no data appears, disable your ad blocker
-for the site, or open the page in a private or incognito window.
+for the site. Alternatively, open the page in a private or incognito window.
 
 ## Services fail to start
 
@@ -80,8 +80,6 @@ This command removes the existing database volume and restarts from scratch.
 The `-v` flag removes named volumes.
 
 ## Cannot connect to the database
-
-The `dsv-db` service might not be healthy.
 
 ### Fix
 
@@ -168,7 +166,7 @@ message.
 
 All three Packer templates set `use_proxy = false` on the ansible
 provisioner. This causes Packer to pass the real VM IP address and an
-ephemeral SSH key directly to `ansible-playbook`, which then manages its own
+ephemeral SSH key directly to `ansible-playbook`. Ansible then manages its own
 SSH connection, including SFTP. This works because the Packer host has direct
 LAN access to the build VMs on `10.0.20.0/24`.
 

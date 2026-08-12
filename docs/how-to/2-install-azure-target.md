@@ -1,4 +1,4 @@
-# Set up the workstation (v0.4.0)
+# Set up the workstation (Azure, target state)
 
 > [!NOTE]
 > **Target state (v0.4.0, in progress).** This document describes the planned
