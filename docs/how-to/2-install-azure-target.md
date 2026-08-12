@@ -1,5 +1,10 @@
 # Set up the workstation (v0.4.0)
 
+> [!NOTE]
+> **Target state (v0.4.0, in progress).** This document describes the planned
+> Azure/AKS architecture, not the currently deployed Proxmox environment. For
+> the live deployment, see the [Proxmox install guide](1-install/README.md).
+
 On the workstation that issues the infrastructure as code (IaC) commands,
 install the following software:
 
@@ -196,38 +201,35 @@ kubectl version --client
 kubelogin --version
 ```
 
----
+## Create the SSH key
 
-# Old
-
-### Create SSH key
-
-Create ssh key on your workstation that will be used for all IAC operations.
+Create an SSH key on your workstation. You use this key for all IaC operations.
 
 ```bash
 ssh-keygen -t ed25519 -C "iac" -f ~/.ssh/iac
 ```
 
-### Create deploy keys
+## Create the deploy keys
 
-We'll create a pair of ssh keys for the deployment VM to clone down the repo
+Create a pair of SSH keys for the deployment VM to clone the repository.
 
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/dsv-deploy-key-RO -C "DineSafeViz deploy key Read Only" -N ''
 ```
 
-Cat out the public key, you'll paste this in to the Deploy Keys section later.
+Display the public key. You paste this value into the **Deploy keys** section
+in the next step.
+
 ```bash
 cat ~/.ssh/dsv-deploy-key-RO.pub
 ```
 
-### Setup deploy keys
+## Set up the deploy keys
 
-In the repo, 
+In the repository, follow these steps.
 
-- click on Settings > Deploy Keys > Add deploy key
-- title = dsv-deploy-key-RO
-- key = the public key
-- allow write access = unchecked
-
-Click Add Key
+1. Go to **Settings** > **Deploy keys** > **Add deploy key**.
+2. In **Title**, enter `dsv-deploy-key-RO`.
+3. In **Key**, enter the public key.
+4. Clear **Allow write access**.
+5. Click **Add key**.
