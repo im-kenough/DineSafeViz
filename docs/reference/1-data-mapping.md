@@ -126,7 +126,7 @@ Roughly 34-40% of rows across all years have empty `Infraction Details`,
 `Severity`, and `Action`. These represent clean inspections with no
 infractions, and the three fields are always empty together.
 
-`Outcome` and `Amount Fined` are populated on fewer than 2% of rows,
+`Outcome` and `Amount Fined` have values in fewer than 2% of rows,
 only when enforcement reached court.
 
 ## Enum values (2001-2015)
@@ -251,7 +251,7 @@ DB schema:
   table to preserve them.
 - **Missing in historical data:** `Inspection Observation` and
   `Outcome Date` are null for all historical rows.
-- **CSV quoting:** All historical values are double-quoted. Use a
+- **CSV quoting:** The historical files double-quote all values. Use a
   proper CSV parser, not naive comma-splitting, because
   `Infraction Details` often contains commas.
 

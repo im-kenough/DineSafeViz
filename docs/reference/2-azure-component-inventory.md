@@ -12,9 +12,10 @@ model diagrams, and the full component list for a single prod deployment.
 
 ## Region independence
 
-A "global" service is not tied to a single Azure region, so availability and
-DNS resolution are not affected by any one region's health. A "regional"
-service is deployed to, and fails with, a specific Azure region.
+A "global" service is not tied to a single Azure region, so no single
+region's health affects availability or DNS resolution. Azure deploys a
+"regional" service to a specific region, and that service fails with that
+region.
 
 | Service | Classification | Notes |
 |---|---|---|
@@ -236,7 +237,7 @@ Microsoft **fully manages** the AKS control plane itself (the API server, etcd, 
 
 ### Tier 4 — provisioned by Helm / Helmfile (inside the cluster)
 
-These are Kubernetes-layer resources, not Azure resources. They run as pods inside the cluster. Some of them trigger Azure API calls that cause Tier 3 resources to be created.
+These are Kubernetes-layer resources, not Azure resources. They run as pods inside the cluster. Some of them trigger Azure API calls that create Tier 3 resources.
 
 | Component | What it does | Azure side-effect |
 |---|---|---|
@@ -261,5 +262,5 @@ These are Kubernetes-layer resources, not Azure resources. They run as pods insi
 | 4 — Kubernetes | ~7 workloads | Helmfile |
 
 Rough total of Terraform-managed resources: **~44**, not counting role assignments
-on objects that don't exist yet at plan time (federated credentials are created
-after the AKS cluster is up and the OIDC issuer URL is known).
+on objects that don't exist yet at plan time (Terraform creates federated
+credentials after the AKS cluster comes up and it knows the OIDC issuer URL).
