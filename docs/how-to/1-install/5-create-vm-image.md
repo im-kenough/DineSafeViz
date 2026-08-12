@@ -1,7 +1,6 @@
-# Create VM Image
+# Create the VM image
 
-Build all three layers in order. Each command will prompt for your vault
-password.
+Build all three layers in order. Each command prompts for your Vault password.
 
 ```bash
 cd infra
@@ -16,17 +15,18 @@ make bake-docker
 make bake-dsv-app
 ```
 
-Or build all at once:
+To build all the layers at once, run the following command.
+
 ```bash
 make bake-all
 ```
 
-Each build takes approximately 5-15 minutes depending on network speed and
-Proxmox host performance.
+Each build takes about 5 to 15 minutes. The time depends on the network speed
+and the Proxmox host performance.
 
-## Verify
+## Verify the templates
 
-Check that all three templates exist in the Proxmox UI:
+Check that all three templates exist in the Proxmox UI.
 
 | Template ID | Name | Description |
 |-------------|------|-------------|
@@ -35,12 +35,13 @@ Check that all three templates exist in the Proxmox UI:
 | 9101 | ubuntu-docker | Ubuntu + Docker CE (Layer 2) |
 | 9102 | dsv-app | App VM identity + GitHub key (Layer 3) |
 
-You can also verify from the command line:
+You can also verify the templates from the command line.
+
 ```bash
 ssh root@10.0.20.21 "qm list" | grep -E "9[01][0-9]{2}"
 ```
 
-## Next Steps
+## Next steps
 
-The image pipeline is complete. To provision a VM and deploy the app, see the
-[IaC Deploy Guide](deploy-guide-iac.md).
+The image pipeline is complete. To provision a VM and deploy the app, see
+[Deploy the application](6-deploy.md).

@@ -1,8 +1,14 @@
-## Setup Workstation
+# Set up the workstation
 
-On the workstation that will be issuing IAC commands, install the following software:
+On the workstation that issues the infrastructure as code (IaC) commands,
+install the following software:
 
-- packer, terraform, ansible, python 3 w/ pyYAML
+- Packer
+- Terraform
+- Ansible
+- Python 3 with PyYAML
+
+## Install Packer
 
 ```bash
 # Install packer
@@ -13,8 +19,9 @@ echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://
 sudo apt update
 sudo apt install -y packer
 packer version
-
 ```
+
+## Install Terraform
 
 ```bash
 sudo apt-get update && sudo apt-get install -y gnupg software-properties-common
@@ -35,44 +42,48 @@ sudo apt-get install -y terraform
 terraform -v
 ```
 
+## Install Ansible
+
 ```bash
 sudo apt install -y ansible
 ansible --version
 ```
 
+## Install PyYAML
 
 ```bash
 pip3 install pyyaml
 ```
 
-### Create SSH key
+## Create the SSH key
 
-Create ssh key on your workstation that will be used for all IAC operations.
+Create an SSH key on your workstation. You use this key for all IaC operations.
 
 ```bash
 ssh-keygen -t ed25519 -C "iac" -f ~/.ssh/iac
 ```
 
-### Create deploy keys
+## Create the deploy keys
 
-We'll create a pair of ssh keys for the deployment VM to clone down the repo
+Create a pair of SSH keys for the deployment VM to clone the repository.
 
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/dsv-deploy-key-RO -C "DineSafeViz deploy key Read Only" -N ''
 ```
 
-Cat out the public key, you'll paste this in to the Deploy Keys section later.
+Display the public key. You paste this value into the **Deploy keys** section
+in the next step.
+
 ```bash
 cat ~/.ssh/dsv-deploy-key-RO.pub
 ```
 
-### Setup deploy keys
+## Set up the deploy keys
 
-In the repo, 
+In the repository, follow these steps.
 
-- click on Settings > Deploy Keys > Add deploy key
-- title = dsv-deploy-key-RO
-- key = the public key
-- allow write access = unchecked
-
-Click Add Key
+1. Go to **Settings** > **Deploy keys** > **Add deploy key**.
+2. In **Title**, enter `dsv-deploy-key-RO`.
+3. In **Key**, enter the public key.
+4. Clear **Allow write access**.
+5. Click **Add key**.

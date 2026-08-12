@@ -1,48 +1,66 @@
-# Journal 2 — Implement DineSafeViz PoC
+# Journal 2
 
-## 2026-04-26 — Session start
+## 2026-08-12 — Documentation restructure to Diátaxis
 
-### Context
-- Branch: `4-setup-a-db`
-- Goal: Execute implementation plan — DB init script, Docker Compose, Flask app, smoke test
-- Plan: `docs/superpowers/plans/2026-04-26-poc-implementation.md`
-- Spec: `docs/superpowers/specs/2026-04-26-poc-design.md`
-- Existing: `db/Dinesafe.csv` present, no other app files yet
+### Task
+Review all repo documentation, restructure to the Diátaxis framework, and
+consolidate related documents. Out of scope: `docs/ref/arch/design-planning`.
 
-### 2026-04-26 — Task 1: Database init script
+### 2026-08-12 — Orientation and decisions
+Surveyed `docs/`. Found a partial Diátaxis attempt (`how-to/`, `ref/`), plus
+superseded `old-ignore/` trees and empty stubs.
 
-- Created `db/init.sql` with staging table approach
-- Staging table (`_csv_staging`) loads all 17 CSV columns as TEXT
-- Final `inspections` table uses explicit casts and `NULLIF` to convert `'None'`/empty strings to actual NULLs
-- `amount_fined` gets double NULLIF (handles both `'None'` and `''`)
-- `latitude`/`longitude` only need empty-string NULLIF since they're numeric fields that wouldn't contain the string `'None'`
+Ran a platform keyword scan across in-scope docs. Finding: all install/deploy
+how-to guides target Proxmox; only `1-workstation-v0.4.0.md` and some reference
+docs (`azure-component-inventory`, `arch-dr`, `arch-checklist`) target Azure/AKS.
 
-### 2026-04-26 — Task 2: Docker Compose
+User decisions (via clarifying questions):
+- Scope: restructure + full prose rewrite to the write-better-docs style guide.
+- Layout: three quadrants — how-to, reference, explanation (no tutorials).
+- Platform: Azure/AKS is the forward direction, but keep Proxmox how-to guides
+  live and label Azure material as target-state (v0.4.0, in progress). Nothing
+  working gets archived.
+- Cruft: move superseded content (old-ignore trees, empty stubs, duplicate
+  workstation file) to a single `docs/archive/` folder rather than deleting.
+- Numbering: user asked to number each doc within its quadrant.
 
-- Created `docker-compose.yml` with `db` and `web` services
-- `db` mounts `init.sql` into `/docker-entrypoint-initdb.d/` (auto-runs on first start) and `Dinesafe.csv` into `/data/`
-- `web` depends on `db` being healthy via `pg_isready` healthcheck (5s interval, 5 retries)
-- Named volume `dsv-db-data` persists DB data across container restarts
+### 2026-08-12 — Design approved, spec written
+Confirmed no static-site generator (no mkdocs) — plain Markdown, so restructure
+is git mv + link fixes. Inbound links found in README.md, GEMINI.md,
+.github/release-drafter.yml, infra/ansible/vault/example-secrets.yml.
 
-### 2026-04-26 — Task 3: Flask web app
+Presented target tree (three quadrants, numbered docs) and file mapping. User
+approved. Wrote spec to
+`docs/superpowers/specs/2026-08-12-docs-diataxis-restructure-design.md`.
+Self-review caught a banner relative-link bug (how-to instance sits one level
+up from reference/explanation) — fixed inline. Did NOT commit the spec:
+CLAUDE.md says commit only when asked.
 
-- Created `web/requirements.txt`: flask 3.1.1, psycopg2-binary 2.9.10
-- Created `web/app.py`: single route `/`, queries inspections ordered by date DESC, maps NULL/falsy severity to "No", non-null to "Yes — {severity}"
-- Created `web/templates/index.html`: Jinja2 table with empty-state fallback
-- Created `web/Dockerfile`: python:3.12-slim, requirements installed before code copy for layer caching
+### 2026-08-12 — Implementation plan written
+User approved spec (and asked to number each doc). Wrote implementation plan to
+`docs/superpowers/plans/2026-08-12-docs-diataxis-restructure.md`. Six tasks:
+(1) scaffold + archive, (2) how-to quadrant, (3) reference quadrant,
+(4) explanation quadrant, (5) docs landing page, (6) inbound link fixes +
+verification. Adapted the TDD cycle to a reusable `scan_links` broken-link check
+since this is docs, not code. Numbering baked in per quadrant.
 
-### 2026-04-26 — Task 4: Smoke test (blocked)
+### 2026-08-12 — Execution complete (all 6 tasks)
+Executed the plan with subagent-driven development: fresh implementer per task,
+task review after each, final whole-branch review. Commits fd03736..7c9129f (10).
 
-- Attempted `docker compose up --build -d` — Docker not in PATH in this environment
-- Smoke test must be run manually in a terminal with Docker available
-- All 3 implementation tasks are committed and ready to test
-- Commands to run:
-  ```
-  docker compose up --build -d
-  docker compose ps
-  docker compose exec db psql -U dinesafe -d dinesafe -c "SELECT count(*) FROM inspections;"
-  curl -s http://localhost:5000 | head -20
-  docker compose exec db psql -U dinesafe -d dinesafe -c "SELECT severity, count(*) FROM inspections GROUP BY severity ORDER BY severity;"
-  ```
-- Expected: 18380 rows, HTML with table, NULL severity rows (show "No") and M/S/C severity rows (show "Yes — ...")
+- Task 1 (725a575): scaffold + archive. Note: `git add -A` swept the spec/plan/
+  journal into this commit (correct locations, cosmetic granularity nit).
+- Task 2 (f7b0e3e..db6e549): how-to quadrant; 1 fix round (sentence length,
+  stale H1, removed an invented sentence).
+- Task 3 (e908697..566a71c): reference quadrant; implementer cut off by a spend
+  limit mid-work, resumed. First commit captured only git-mv renames (prose
+  unstaged) — full rewrite landed in a later commit. 2 fix rounds (passive voice).
+- Task 4 (810907e): explanation quadrant — 11 arch docs, workflow+project-mgmt
+  consolidation, DR banner, internal link fixes. Clean on first review.
+- Task 5 (16a4d19): docs/README.md landing page.
+- Task 6 (61d0667..7c9129f): inbound link fixes. Found 4 pre-existing broken
+  links in .github/release-drafter.yml (older naming scheme) and repointed them.
 
+Final review verdict: READY TO MERGE, no Critical/Important. Live-doc link scan
+clean (broken links only in docs/archive/ frozen content and docs/superpowers/
+meta-files, both expected). Data tables and code fences unchanged by rewrites.
