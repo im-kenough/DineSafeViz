@@ -29,7 +29,7 @@ Small footprint. Deploys to a self-hosted Ubuntu VM in a Proxmox environment.
 
 ### Infrastructure as code
 
-Uses [infrastructure as code](docs/ref/arch/arch-iac.md) to automate VM
+Uses [infrastructure as code](docs/explanation/4-infrastructure-as-code.md) to automate VM
 provisioning and app deployment.
 
 ## Architecture
@@ -43,8 +43,8 @@ visualizes historic data and updates the dataset daily.
 > Data update feature: coming soon.
 
 For details, see the
-[architecture reference](docs/ref/arch/arch-app.md) and the
-[DevOps reference](docs/ref/arch/README.MD).
+[architecture reference](docs/explanation/2-application-architecture.md) and the
+[DevOps reference](docs/explanation/README.md).
 
 ### Application architecture
 
@@ -75,7 +75,7 @@ These are one-off services for the initial setup of a fresh deployment in a VM.
 
 ![Architecture overview diagram](docs/img/root-readme/arch-over.drawio.png)
 
-### [Infrastructure as code](docs/ref/arch/arch-iac.md)
+### [Infrastructure as code](docs/explanation/4-infrastructure-as-code.md)
 
 Terraform, Packer, and Ansible are the infrastructure as code tools that
 automatically:
@@ -84,14 +84,14 @@ automatically:
 - Maintain an app image.
 - Deploy, tear down, and redeploy an application.
 
-### [Information security](docs/ref/arch/arch-security.md)
+### [Information security](docs/explanation/6-security-architecture.md)
 
 The app's Docker Compose configuration is retrieved from a `.env` file. Secrets
 are stored in
 [secrets.yml](infra/ansible/vault/secrets.yml) and are injected into the `.env`
 file during deployment via IaC.
 
-### [Monitoring](docs/ref/arch/arch-monitoring.md) (coming soon)
+### [Monitoring](docs/explanation/9-monitoring-architecture.md) (coming soon)
 
 Grafana dashboards monitor the VM health, web app metrics, and database
 metrics.
@@ -100,7 +100,7 @@ metrics.
 
 - **[Install guide](docs/how-to/1-install/README.md):** instructions for
   installing the application and provisioning the infrastructure from scratch.
-- **[Redeploy guide](docs/how-to/3-redeploy-guide.md):** instructions to
+- **[Redeploy guide](docs/how-to/4-redeploy.md):** instructions to
   redeploy the app to existing infrastructure.
 
 ## Roadmap

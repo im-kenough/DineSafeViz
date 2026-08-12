@@ -34,4 +34,4 @@ vault_github_deploy_keys: |
 The vault holds secrets only. Non-secret identifiers — the Proxmox token IDs,
 database usernames, database name, and Grafana admin username — are set in
 `infra/ansible/group_vars/all.yml`. For the full inventory and how each value
-is used, see [security architecture](../../ref/arch/arch-security.md).
+is used, see [security architecture](../../explanation/6-security-architecture.md).

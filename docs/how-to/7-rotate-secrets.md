@@ -7,7 +7,7 @@ a secret, you change its value.
 
 The application passwords live in the Ansible Vault as `vault_*` keys. Ansible
 renders them into the `.env` file on the VM at deploy time. For the full
-inventory, see [security architecture](../ref/arch/arch-security.md).
+inventory, see [security architecture](../explanation/6-security-architecture.md).
 
 ### PostgreSQL superuser password
 

@@ -137,4 +137,4 @@ candidates for future work, not immediate action items.
 | No end-to-end browser tests | E2E | No Playwright or Selenium tests exercising the full rendered UI |
 | No load or performance tests | Performance | No baseline for response times or concurrency limits |
 | No pre-commit hooks | Code quality | No automated checks before commit (linting, formatting, secrets detection) |
-| PIV not automated | Automation | Smoke tests in `2-piv.md` are manual curl commands, not a scripted test suite |
+| PIV not automated | Automation | Smoke tests in `3-verify-a-deployment.md` are manual curl commands, not a scripted test suite |
