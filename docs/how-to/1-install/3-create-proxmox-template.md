@@ -1,12 +1,13 @@
-### Create the proxmox template
+# Create the Proxmox template
 
-Download the Ubuntu cloud image and import it as-is. The cloud image
-does not ship with `qemu-guest-agent`, but the Ansible base role
-installs it during the Layer 1 build on a running system. The Layer 1
-Packer config uses a temporary static IP (`ssh_host`) instead of agent
-IP discovery, so the seed template needs no modification.
+Download the Ubuntu cloud image and import it as-is. The cloud image does not
+ship with `qemu-guest-agent`, but the Ansible base role installs it during the
+Layer 1 build on a running system. The Layer 1 Packer config uses a temporary
+static IP (`ssh_host`) instead of agent IP discovery, so the seed template
+needs no modification.
 
-ssh into the proxmox VM.
+To create the template, first connect to the Proxmox server with SSH.
+
 ```bash
 # Download cloud image
 wget https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img \
@@ -38,17 +39,17 @@ qm set 9000 --ciuser adm-ubuntu
 qm set 9000 --ipconfig0 ip=dhcp
 ```
 
-On your workstation, upload your IAC public key into Proxmox's temp dir.
-Then tell the VM to import the key from that dir.
-Once converted to a template, the image is frozen and persists the
-authorized public key.
+On your workstation, upload your IaC public key into the Proxmox temporary
+directory. Then tell the VM to import the key from that directory. After you
+convert the VM to a template, the image is frozen and keeps the authorized
+public key.
 
 ```bash
 cat ~/.ssh/iac.pub | ssh root@10.0.20.21 \
   "cat > /tmp/iac.pub && qm set 9000 --sshkeys /tmp/iac.pub"
 ```
 
-On the Proxmox server, convert to template.
+On the Proxmox server, convert the VM to a template.
 
 ```bash
 qm template 9000

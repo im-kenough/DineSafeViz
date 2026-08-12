@@ -1,112 +1,121 @@
-# Deploy application
+# Deploy the application
 
-This document provides instructions for deploying the
-DineSafeViz application using the IaC toolchain.
+This document shows you how to deploy the DineSafeViz application with the IaC
+toolchain.
 
-**Prerequisites:** Complete the [Install Instructions](docs/how-to/install/README.md)
-first. You need templates 9100-9102 built and the Ansible Vault populated.
+**Prerequisites:** First, complete the [install guide](README.md). You need
+templates 9100 to 9102 built and the Ansible Vault populated.
 
-All commands run from the `infra/` directory and prompt for your vault
+All commands run from the `infra/` directory and prompt for your Vault
 password.
 
-## Provision VM and deploy application
+## Provision a VM and deploy the application
 
-Create the VM and deploy the app in one command:
+To create the VM and deploy the app in one command, run the following.
 
 ```bash
 cd infra
 make up
 ```
 
-This runs:
-1. `provision-vm` — Terraform clones template 9102, creating VM
-   `yyz-app-dsv01` at `10.0.20.80`
-2. `deploy-app` — Ansible SSHs into the VM, clones the repo, templates the
-   `.env` file, and runs `docker compose up -d --build`
+This command runs the following steps:
 
-The app will be available at `http://10.0.20.80:5000` once deployment completes.
+1. `provision-vm` — Terraform clones template 9102 and creates VM
+   `yyz-app-dsv01` at `10.0.20.80`.
+2. `deploy-app` — Ansible connects to the VM with SSH, clones the repository,
+   templates the `.env` file, and runs `docker compose up -d --build`.
 
-## Appendix
+The app is available at `http://10.0.20.80:8080` after the deployment
+completes.
 
-## Deploy App Only (VM Already Exists)
+## Other operations
 
-If the VM is already running and you just want to deploy or update the app:
+The following operations redeploy, destroy, and rebuild the application.
+
+### Deploy the app only (VM already exists)
+
+If the VM already runs and you want to deploy or update the app, run the
+following command.
 
 ```bash
 make deploy-app
 ```
 
-This is idempotent:
-- If the repo doesn't exist on the VM, it clones it
-- If the repo exists, it pulls the latest code
-- It always re-templates the `.env` file from the vault
-- It always runs `docker compose up -d --build`
+This command is idempotent:
 
-## Redeploy App
+- If the repository does not exist on the VM, it clones the repository.
+- If the repository exists, it pulls the latest code.
+- It always re-templates the `.env` file from the Vault.
+- It always runs `docker compose up -d --build`.
 
-### Full wipe (containers + volumes + repo)
+### Redeploy the app
+
+#### Full wipe (containers, volumes, and repository)
 
 ```bash
 make redeploy-app
 ```
 
-This removes all containers, Docker volumes (including database data), and the
-cloned repo, then deploys fresh. The database will be re-seeded from the CSV
-on startup.
+This command removes all containers, Docker volumes (including database data),
+and the cloned repository. It then deploys fresh. The database re-seeds from
+the CSV on startup.
 
-### Keep data (containers + repo only, volumes preserved)
+#### Keep the data (containers and repository only, volumes preserved)
 
 ```bash
 make redeploy-app-keep-data
 ```
 
-This stops containers and removes the repo, but preserves Docker volumes. On
-redeploy, the database retains its data — no re-seeding needed.
+This command stops the containers and removes the repository, but it preserves
+the Docker volumes. On redeploy, the database keeps its data, so no re-seeding
+is needed.
 
-## Destroy App Only
+### Destroy the app only
 
-### Full wipe
+#### Full wipe
 
 ```bash
 make destroy-app
 ```
 
-Runs `docker compose down -v` (removes containers and volumes) and deletes the
-cloned repo from the VM. The VM itself stays running.
+This command runs `docker compose down -v` to remove the containers and
+volumes. It then deletes the cloned repository from the VM. The VM stays
+running.
 
-### Keep data
+#### Keep the data
 
 ```bash
 make destroy-app-keep-data
 ```
 
-Runs `docker compose down` (removes containers, keeps volumes) and deletes the
-repo. The VM stays running and volumes persist.
+This command runs `docker compose down` to remove the containers and keep the
+volumes. It then deletes the repository. The VM stays running, and the volumes
+persist.
 
-## Destroy Everything
+### Destroy everything
 
-Tear down the app and delete the VM entirely:
+To tear down the app and delete the VM, run the following command.
 
 ```bash
 make down
 ```
 
-This runs `destroy-app` then `destroy-vm` (Terraform destroy). The VM is
-removed from Proxmox. To start fresh, run `make up`.
+This command runs `destroy-app` and then `destroy-vm` (Terraform destroy).
+Terraform removes the VM from Proxmox. To start fresh, run `make up`.
 
-## Destroy VM Only
+### Destroy the VM only
 
-If you just want to delete the VM without cleaning up Docker first:
+To delete the VM without cleaning up Docker first, run the following command.
 
 ```bash
 make destroy-vm
 ```
 
-This runs `terraform destroy` which deletes the VM from Proxmox.
+This command runs `terraform destroy`, which deletes the VM from Proxmox.
 
-## Rebuild Images
+### Rebuild the images
 
-When to rebuild each layer:
+Rebuild each layer in these cases:
 
 | Layer | When to rebuild |
 |-------|----------------|
@@ -114,7 +123,7 @@ When to rebuild each layer:
 | ubuntu-docker (9101) | Docker major version releases, or when base is rebuilt |
 | dsv-app (9102) | When docker layer is rebuilt, or when GitHub App key is rotated |
 
-To rebuild a single layer:
+To rebuild a single layer, run one of the following commands.
 
 ```bash
 make bake-base       # Layer 1 only
@@ -122,14 +131,13 @@ make bake-docker     # Layer 2 only
 make bake-dsv-app    # Layer 3 only
 ```
 
-To rebuild all layers:
+To rebuild all the layers, run the following command.
 
 ```bash
 make bake-all
 ```
 
-After rebuilding, you must destroy and reprovision the VM to use the new
-template:
+After you rebuild, destroy and reprovision the VM to use the new template.
 
 ```bash
 make down && make up
@@ -139,13 +147,15 @@ make down && make up
 
 ### SSH connection timeout during deploy
 
-The VM may not be fully booted yet. Wait 30 seconds and retry:
+The VM might not have finished booting. Wait 30 seconds, and then retry.
+
 ```bash
 make deploy-app
 ```
 
-If it persists, verify the VM is running in the Proxmox UI and that
-`10.0.20.80` is reachable:
+If the problem persists, verify that the VM runs in the Proxmox UI and that
+`10.0.20.80` is reachable.
+
 ```bash
 ping 10.0.20.80
 ssh adm-ubuntu@10.0.20.80
@@ -154,14 +164,16 @@ ssh adm-ubuntu@10.0.20.80
 ### Vault password error
 
 Ansible Vault prompts for a password on every command. If you get a decryption
-error, verify you're using the correct password:
+error, verify that you use the correct password.
+
 ```bash
 cd infra/ansible && ansible-vault view vault/secrets.yml --ask-vault-pass
 ```
 
 ### Docker Compose fails to start
 
-SSH into the VM and check manually:
+Connect to the VM with SSH, and then check the logs.
+
 ```bash
 ssh adm-ubuntu@10.0.20.80
 cd ~/app/DineSafeViz
@@ -170,22 +182,35 @@ docker compose logs
 
 ### Terraform state mismatch
 
-If the VM was deleted manually outside of Terraform:
+If the VM was deleted manually outside of Terraform, run the following
+commands.
+
 ```bash
 cd infra/terraform
 # Render tfvars first
 cd .. && ansible-vault view ansible/vault/secrets.yml --ask-vault-pass \
-  | python3 scripts/render-tfvars.py > terraform/terraform.tfvars
+  | python3 scripts/render-vars.py terraform > terraform/terraform.tfvars
 cd terraform && terraform refresh
 ```
 
-Then reprovision: `cd .. && make provision-vm`
-Clean up: `rm terraform/terraform.tfvars`
+Then reprovision the VM.
+
+```bash
+cd .. && make provision-vm
+```
+
+Then clean up the rendered file.
+
+```bash
+rm terraform/terraform.tfvars
+```
 
 ### Packer build fails
 
-Check the Packer output for the specific error. Common issues:
-- Template with the target ID already exists — delete it in Proxmox first
-- Proxmox API token expired — regenerate in Proxmox and update the vault
-- SSH timeout — ensure the source template has cloud-init configured with
-  your SSH key
+Check the Packer output for the specific error. Common issues include:
+
+- The template with the target ID already exists. Delete it in Proxmox first.
+- The Proxmox API token expired. Regenerate it in Proxmox, and then update the
+  Vault.
+- SSH timeout. Make sure that the source template has cloud-init configured
+  with your SSH key.

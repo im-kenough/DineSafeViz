@@ -1,13 +1,13 @@
-# Setup Proxmox
+# Set up Proxmox
 
-### Create Proxmox service accounts
+## Create the Proxmox service accounts
 
-- SSH into proxmox with root credentials
+To create the service accounts, first connect to Proxmox with SSH and root
+credentials.
 
-#### Create `svc-packer`
+### Create svc-packer
 
-Create a paker service account `svc-packer` for image builds
-
+Create a Packer service account named `svc-packer` for image builds.
 
 ```bash
 # Create user
@@ -23,11 +23,11 @@ pveum aclmod / -user svc-packer@pve -role Packer
 pveum user token add svc-packer@pve packer --privsep 0
 ```
 
-**Save the token value** — it is only shown once.
+Save the token value. Proxmox shows it only once.
 
-#### Create `svc-terraform`
+### Create svc-terraform
 
-Create a terraform service account `svc-terraform` for vm provisioning
+Create a Terraform service account named `svc-terraform` for VM provisioning.
 
 ```bash
 # Create user
@@ -43,4 +43,4 @@ pveum aclmod / -user svc-terraform@pve -role Terraform
 pveum user token add svc-terraform@pve terraform --privsep 0
 ```
 
-Save the token you'll only see it once.
+Save the token value. Proxmox shows it only once.

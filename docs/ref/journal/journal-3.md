@@ -1,15 +1,12 @@
 # Journal 3
 
-## 2026-04-26 — Update docker-compose.yml to use environment variable secrets
+## 2026-08-12 — Resolve merge conflicts in PR 188
 
-### Context
-User requested that hardcoded DB credentials in docker-compose.yml be replaced with references to environment variables from the host machine.
+### Task
+Resolve merge conflicts between `feat/v0.4.0-design` (PR 188, "chore: reorg for aks planning")
+and `main`, then push so the PR can merge cleanly.
 
-### Changes
-- `docker-compose.yml`: replaced hardcoded `dinesafe` credential values with `${DB_USER}`, `${DB_PASSWORD}`, `${DB_NAME}` in both `db` and `web` service blocks.
-
-### Required env vars
-Set these in your shell before running `docker compose up`:
-- `DB_USER`
-- `DB_PASSWORD`
-- `DB_NAME`
+### 2026-08-12 — Orientation
+Checked PR 188 via `gh pr view 188`. Status: `DIRTY` / `CONFLICTING`.
+Checked out `feat/v0.4.0-design` locally and pulled. Attempting `git merge origin/main`
+to identify the actual conflict files.

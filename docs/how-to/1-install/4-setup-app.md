@@ -1,38 +1,37 @@
-# Setup application
+# Set up the application
 
-### Create the Ansible vault
+## Create the Ansible Vault
 
-From the repo root:
+From the repository root, run the following commands.
 
 ```bash
 cd infra/ansible
 ansible-vault create vault/secrets.yml
 ```
 
-When the editor opens, enter all secrets (use the real values from Steps 1-2):
+When the editor opens, enter the following secrets. Use the real values from
+steps 1 and 2.
 
 ```yaml
-# Proxmox Configuration
-vault_proxmox_node: "yyz-hyp01"
+# Proxmox API token secrets (the token IDs are in group_vars/all.yml)
+vault_proxmox_api_token_secret: "REPLACE_WITH_TERRAFORM_TOKEN_SECRET"
+vault_packer_api_token_secret: "REPLACE_WITH_PACKER_TOKEN_SECRET"
 
-## Proxmox API tokens
-vault_proxmox_api_token_id: "svc-terraform@pve!terraform"
-vault_proxmox_api_token_secret: "aaaaaaaaaaaaaaaaaaaaaaa"
-vault_packer_api_token_id: "svc-packer@pve!packer"
-vault_packer_api_token_secret: "bbbbbbbbbbbbbbbbbbbb"
+# PostgreSQL passwords
+vault_db_password: "REPLACE_WITH_DB_SUPERUSER_PASSWORD"
+vault_db_app_password: "REPLACE_WITH_DB_APP_PASSWORD"
 
-# PostgreSQL credentials
-vault_db_user: "dinesafe"
-vault_db_password: "ccccccccccccc"
-vault_db_name: "dinesafe"
+# Grafana admin password
+vault_analytics_admin_password: "REPLACE_WITH_GRAFANA_ADMIN_PASSWORD"
 
-# Grafana credentials
-vault_analytics_admin_user: "admin"
-vault_analytics_admin_password: "ddddddddddd"
-
-# github deploy key
+# GitHub deploy key (private key)
 vault_github_deploy_keys: |
-  -----BEGIN RSA PRIVATE KEY-----
-  eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
-  -----END RSA PRIVATE KEY-----
+  -----BEGIN OPENSSH PRIVATE KEY-----
+  REPLACE_WITH_DEPLOY_KEY_PRIVATE_KEY
+  -----END OPENSSH PRIVATE KEY-----
 ```
+
+The vault holds secrets only. Non-secret identifiers — the Proxmox token IDs,
+database usernames, database name, and Grafana admin username — are set in
+`infra/ansible/group_vars/all.yml`. For the full inventory and how each value
+is used, see [security architecture](../../explanation/6-security-architecture.md).
