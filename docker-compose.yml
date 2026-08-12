@@ -2,7 +2,7 @@ name: dsv
 
 services:
   dsv-nginx:
-    image: nginx:stable-alpine
+    image: nginx:1.31.3-alpine
     ports:
       - "8080:80"
     volumes:
@@ -32,7 +32,7 @@ services:
         condition: service_healthy
 
   dsv-db:
-    image: postgres:17.0
+    image: postgres:17.10
     environment:
       POSTGRES_USER: ${DSV_DB_USER}
       POSTGRES_PASSWORD: ${DSV_DB_PASSWORD}
@@ -54,13 +54,18 @@ services:
       DSV_DB_NAME: ${DSV_DB_NAME}
       DSV_DB_USER: ${DSV_DB_USER}
       DSV_DB_PASSWORD: ${DSV_DB_PASSWORD}
+      # Set DSV_LOCAL_DATA_DIR=/data in .env to seed from the offline copy
+      # mounted below instead of downloading from the Toronto Open Data portal.
+      DSV_LOCAL_DATA_DIR: ${DSV_LOCAL_DATA_DIR:-}
+    volumes:
+      - ./docs/ref/local-data:/data:ro
     depends_on:
       dsv-db:
         condition: service_healthy
     restart: "no"
 
   dsv-analytics:
-    image: grafana/grafana:11.2.0
+    image: grafana/grafana:13.1
     ports:
       - "3000:3000"
     environment:
@@ -86,7 +91,7 @@ services:
         condition: service_healthy
 
   dsv-init-analytics:
-    image: curlimages/curl:latest
+    image: curlimages/curl:8.21.0
     depends_on:
       dsv-analytics:
         condition: service_started
@@ -98,9 +103,9 @@ services:
       - -c
       - |
         i=0; until curl -s http://dsv-analytics:3000/analytics/api/health | grep -q '"database": "ok"'; do sleep 2; i=$$(($$i+1)); [ $$i -ge 30 ] && echo "Analytics dashboard did not start in time" && exit 1; done
-        DASH_ID=$$(curl -s "http://$$DSV_ANALYTICS_ADMIN_USER:$$DSV_ANALYTICS_ADMIN_PASSWORD@dsv-analytics:3000/analytics/api/dashboards/uid/dinesafe" | grep -oE '"id":[0-9]+' | head -1 | grep -oE '[0-9]+')
-        [ -z "$$DASH_ID" ] && echo "Dashboard not found, skipping permissions grant" && exit 0
-        curl -sf -X POST "http://$$DSV_ANALYTICS_ADMIN_USER:$$DSV_ANALYTICS_ADMIN_PASSWORD@dsv-analytics:3000/analytics/api/dashboards/id/$$DASH_ID/permissions" -H "Content-Type: application/json" -d '{"items":[{"role":"Viewer","permission":1}]}'
+        STATUS=$$(curl -s -o /dev/null -w '%{http_code}' "http://$$DSV_ANALYTICS_ADMIN_USER:$$DSV_ANALYTICS_ADMIN_PASSWORD@dsv-analytics:3000/analytics/api/dashboards/uid/dinesafe")
+        [ "$$STATUS" != "200" ] && echo "Dashboard not found, skipping permissions grant" && exit 0
+        curl -sf -X POST "http://$$DSV_ANALYTICS_ADMIN_USER:$$DSV_ANALYTICS_ADMIN_PASSWORD@dsv-analytics:3000/analytics/api/dashboards/uid/dinesafe/permissions" -H "Content-Type: application/json" -d '{"items":[{"role":"Viewer","permission":1}]}'
     restart: "no"
 
 volumes:
