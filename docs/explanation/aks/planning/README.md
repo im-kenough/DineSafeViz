@@ -11,15 +11,51 @@ flowchart LR
     
     subgraph "Azure Well Architected Framework"
         direction LR
-        a --> b --> c --> d
+        a ~~~ b
+        c ~~~ d
     end
 ```
 
-## Pillars
+## Workflow
 
-## Workloads
+The [process](https://learn.microsoft.com/en-us/azure/well-architected/what-is-well-architected-framework?source=recommendations#suggested-learning-process) for working through the Azure Well-Architected Framework.
 
-## Service guides
+Throughout the process, consider what [maturity model](https://learn.microsoft.com/en-us/azure/well-architected/what-is-well-architected-framework?source=recommendations#adopt-a-maturity-model) is applicable for your implementation
 
-## Design guides
+```mermaid
+flowchart LR
+    a@{ shape: rectangle, label: "Understand all of the design principles"}
+    b@{ shape: rectangle, label: "Prioritize checklist items"}
+    c@{ shape: rectangle, label: "Make tradeoffs"}
+    d@{ shape: rectangle, label: "Match workload scenarios"}
+    e@{ shape: rectangle, label: "Select appropriate Azure service & configure it correctly"}
+    
+    subgraph "Azure Well Architected Framework - Workflow"
+        direction LR
+        a --> b --> c --> d --> e
+    end
+```
+
+
+### 1. Understand all the design principles
+
+Design principles were reviewd in docs/explanation/aks/planning/0-warch-design-principles.md
+
+### 2. Prioritize checklist items
+
+Select checklist items in docs/explanation/aks/planning/1-warch-checklist.md
+
+### 3. Make trade offs
+
+Tradeoffs are considered in docs/explanation/aks/planning/2-warch-tradeoffs.md
+
+### 4. Match workload scenarios
+
+Workloads are considered in docs/explanation/aks/planning/3-well-arch-workloads.md
+
+### 5. Select Azure service
+
+Azure services are considered in docs/explanation/aks/planning/4-1-well-arch-service-guides.md
+
+Azure designs are considered in docs/explanation/aks/planning/4-2-well-arch-design-guides.md
 
