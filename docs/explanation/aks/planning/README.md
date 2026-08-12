@@ -36,7 +36,7 @@ flowchart LR
 
 ### 1. Understand all the design principles
 
-Design principles were reviewd in docs/explanation/aks/planning/0-warch-design-principles.md
+Design principles were reviewed in docs/explanation/aks/planning/0-warch-design-principles.md
 
 ### 2. Prioritize checklist items
 
