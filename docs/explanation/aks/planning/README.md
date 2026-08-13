@@ -36,25 +36,23 @@ flowchart LR
 
 ### 1. Understand all the design principles
 
-Cost optimization design principles are fully adopted. Reliability and Operational Excellence is mostly adopted while the rest are in some form of adapted or deferred.
-
-Design principles were reviewed in docs/explanation/aks/planning/1-warch-design-principles.md
+- Cost optimization design principles are fully adopted. Reliability and Operational Excellence is mostly adopted while the rest are in some form of adapted or deferred.
+- [Design principles review](docs/explanation/aks/planning/1-warch-design-principles.md)
 
 ### 2. Prioritize checklist items
 
-Cost optimization checklist items are prioritized first, followed by Reliability and Operational Excellence.
-
-Design review checklists in docs/explanation/aks/planning/2-warch-checklist.md
+- Cost optimization checklist items are prioritized first, followed by Reliability and Operational Excellence.
+- [Design review checklists prioritization](docs/explanation/aks/planning/2-warch-checklist.md)
 
 ### 3. Make trade offs
 
-Cost Optimization was favoured while preserving Security as much as possible. Performance Efficiency suffered the most trade offs.
-
-Tradeoffs are considered in docs/explanation/aks/planning/3-warch-tradeoffs.md
+- Cost Optimization was favoured while preserving Security as much as possible. Performance Efficiency suffered the most trade offs.
+- [Tradeoff considerations](docs/explanation/aks/planning/3-warch-tradeoffs.md)
 
 ### 4. Match workload scenarios
 
-Workloads are considered in docs/explanation/aks/planning/4-warch-workloads.md
+- None of the Microsoft workload guides described below are applicable to DineSafeViz.
+- [Workload considerations](docs/explanation/aks/planning/4-warch-workloads.md)
 
 ### 5. Select Azure service
 
