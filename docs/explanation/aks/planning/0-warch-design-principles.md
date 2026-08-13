@@ -15,8 +15,39 @@ The questions under each principle are derived from the "Approach" rows of the
 Microsoft principle articles. They are the prompts we must answer to justify
 each decision against DineSafeViz's requirements and budget.
 
-> Status: **template only.** Questions listed; answers to be filled in a later
-> pass.
+> Status: **in progress.** Reliability + Security answered; Cost, Operational
+> Excellence, and Performance Efficiency pending.
+
+## Summary
+
+High-level decision per design principle. Details in the pillar sections below.
+
+| Pillar | ID | Design principle | Decision |
+|---|---|---|---|
+| Reliability | R1 | Design for business requirements | Adopt |
+| Reliability | R2 | Design for resilience | Adapt |
+| Reliability | R3 | Design for recovery | Adopt |
+| Reliability | R4 | Design for operations | Split (adopt automation / defer observability) |
+| Reliability | R5 | Keep it simple | Adopt |
+| Security | S1 | Plan your security readiness | Adapt |
+| Security | S2 | Design to protect confidentiality | Adopt |
+| Security | S3 | Design to protect integrity | Adapt |
+| Security | S4 | Design to protect availability | Adapt |
+| Security | S5 | Sustain and evolve your security posture | Defer (mostly) |
+| Cost Optimization | C1 | Develop cost-management discipline | _TBD_ |
+| Cost Optimization | C2 | Design with a cost-efficiency mindset | _TBD_ |
+| Cost Optimization | C3 | Design for usage optimization | _TBD_ |
+| Cost Optimization | C4 | Design for rate optimization | _TBD_ |
+| Cost Optimization | C5 | Monitor and optimize over time | _TBD_ |
+| Operational Excellence | O1 | Embrace DevOps culture | _TBD_ |
+| Operational Excellence | O2 | Establish development standards | _TBD_ |
+| Operational Excellence | O3 | Evolve operations with observability | _TBD_ |
+| Operational Excellence | O4 | Automate for efficiency | _TBD_ |
+| Operational Excellence | O5 | Adopt safe deployment practices | _TBD_ |
+| Performance Efficiency | P1 | Negotiate realistic performance targets | _TBD_ |
+| Performance Efficiency | P2 | Design to meet capacity requirements | _TBD_ |
+| Performance Efficiency | P3 | Achieve and sustain performance | _TBD_ |
+| Performance Efficiency | P4 | Optimize for long-term improvement | _TBD_ |
 
 ---
 
@@ -29,99 +60,110 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/reliability/pri
 > Get clarity on the workload's scope, user growth, and the promises made to
 > external customers and internal stakeholders.
 
-Questions & decisions:
+- **Required levels / "good enough"?**
+  - Portfolio demo; clusters **stopped by default**, started on demand.
+  - Good enough = "reachable when started"; **no 24/7 availability**.
+  - Resiliency: pod-level self-healing only (Phase 1). Recovery: passive-cold.
+  - Observability: deferred to Phase 3. Simplicity: heavily prioritized.
+- **Constraints?**
+  - Cost: **$100/mo hard cap**, $25–50 steady-state.
+  - Compliance: none (public open data). Latency: no strict target.
+  - Geography: **North America**; specific region chosen at implementation by cost.
+- **Trade-offs accepted?**
+  - Reduced Reliability (single Postgres, no HA, no HPA, no SLA) for **cost** + **simplicity**, while still demonstrating passive-cold DR.
+- **Reliability outcome per critical flow?**
+  - Flow A (Flask) + B (Grafana): **critical** → degrade to holding page via manual DNS flip.
+  - Flow C (ETL refresh): **best-effort** — a missed refresh is acceptable.
+- **Usage / growth?**
+  - Near-zero real traffic; no growth expected. Dataset ~100k rows, grows slowly.
+- **External dependencies?**
+  - Toronto Open Data feed, Let's Encrypt/ACME, Azure platform, GitHub Actions.
+  - Single subscription/owner — no org constraints. Bound Flow C + cert renewal, not A/B.
 
-1. What level of resiliency, recovery, observability, and simplicity is
-   required? What is "good enough"?
-2. Are there defined constraints related to cost, compliance, geography, or
-   latency?
-3. What are the architectural trade-offs (financial cost, engineering
-   complexity, security, operational overhead) we are presenting and accepting?
-4. What are the reliability outcomes for each **critical user flow** (not just
-   generic uptime)? What is each flow's business value, usage pattern, and
-   resilience requirement?
-5. What are the time-horizon usage expectations — user load at launch, and is
-   growth linear, exponential, or uncertain?
-6. What external dependencies limit our autonomy (org constraints, centralized
-   infra, security mandates, network policy, platform decisions), and how do
-   they affect achievable RTO/RPO/SLO?
-
-**Decision:** _TBD_
+**Decision: Adopt** (demo scope). Values pinned in [spec.md](../../../ref/spec.md).
 
 ### R2. Design for resilience
 
 > The workload must continue to operate with full or reduced functionality.
 
-Questions & decisions:
+- **Critical path vs. degraded?**
+  - Critical path = nginx → Flask/Grafana → PostgreSQL (stateful critical component).
+  - ETL CronJob is **non-critical** (Flow C).
+- **Failure points / effect?**
+  - Postgres pod fail → CloudNativePG restart + PVC re-mount (RTO tier 1).
+  - Node fail → reschedule. Zone/region outage → passive-cold DR (RTO tier 2).
+  - Ingress restart → survives via static Public IP.
+  - Backlog: [Failure Mode Analysis](../../backlog/failure-mode-analysis.md) not yet done.
+- **Self-preservation?**
+  - Health probes, `postgres_exporter` sidecar, nginx gateway offload/route, Cilium default-deny NetworkPolicy.
+- **Scale out?**
+  - Cluster autoscaler (`syspool` 1–2, `usrpool` 1–3), multi-AZ-capable pools.
+  - No HPA in Phase 1 (no traffic to justify it).
+- **Redundancy in layers?**
+  - Multi-AZ pool defs (min 1); GRS = cross-region data copy; passive-cold = active-passive.
+  - **Single-instance Postgres = no data-tier HA** (multi-replica → Phase 2).
+- **Overprovision?**
+  - No — burstable B2s, spot user pool, min-1 pools. Risk accepted (zero traffic).
 
-1. Which components are on the **critical path** vs. able to run in a degraded
-   state?
-2. What are the potential **failure points** for critical components, and the
-   effect (full vs. partial outage) on user flows?
-3. What **self-preservation** capabilities (design patterns, modularization,
-   fault isolation) do we build in?
-4. How do critical components **scale out**, given regional capacity
-   constraints?
-5. Where do we build **redundancy in layers** (physical, data replication,
-   functional/services/personnel) — active-active or active-passive?
-6. Do we **overprovision** to absorb individual failures and runaway resource
-   consumption? By how much?
-
-**Decision:** _TBD_
+**Decision: Adapt** — resilience deliberately minimized for cost.
 
 ### R3. Design for recovery
 
 > The workload must anticipate and recover from failures of all magnitudes with
 > minimal disruption.
 
-Questions & decisions:
+- **Recovery plans / drills?**
+  - Passive-cold DR pattern documented; RPO ≤ 24h / two-tier RTO in [spec.md](../../../ref/spec.md).
+  - Backlog: [DR runbook RB-16](../../backlog/dr-runbook-rb16.md), [recovery drill](../../backlog/recovery-drill.md).
+- **Repair data within targets?**
+  - CloudNativePG WAL archive + daily basebackup to GRS; PITR via Barman.
+  - Weekly backup-verification workflow (issues on stale backup).
+  - Backlog: [backup immutability](../../backlog/backup-immutability.md).
+- **Automated self-healing?**
+  - CloudNativePG pod restart / PVC re-mount; K8s probes restart unhealthy pods.
+- **Immutable ephemeral units?**
+  - Stateless Flask/Grafana as immutable images via Helm; environments reprovisionable from IaC.
 
-1. Do we have structured, tested, documented **recovery plans** aligned to
-   negotiated recovery targets (per component and system-wide)? Are recovery
-   drills scheduled?
-2. Can we **repair data** for all stateful components within recovery targets
-   (immutable, transactionally consistent backups)?
-3. What **automated self-healing** capabilities are in the design?
-4. Which stateless components are replaced with **immutable ephemeral units**
-   (side-by-side / repeatable deployment)?
-
-**Decision:** _TBD_
+**Decision: Adopt** — a relative strength.
 
 ### R4. Design for operations
 
 > Shift left in operations to anticipate failure conditions.
 
-Questions & decisions:
+- **Observable systems?**
+  - Phase 1: Container Insights + Azure Monitor (30-day retention); `postgres_exporter` ready.
+  - Full observability stack (self-hosted VMs) **deferred to Phase 3**.
+- **Predict / actionable alerts?**
+  - Cost guardrails (budget, >12h running), backup-verification, cert-renewal heartbeat.
+  - Broader predictive alerting **deferred to Phase 3**.
+- **Simulate failures?**
+  - Staging env (`stg`) exists. Backlog: [failure simulation](../../backlog/failure-simulation.md).
+- **Automation?**
+  - Strong — Terraform, Helm/Helmfile, GitHub Actions for every op. No portal clicks.
+- **Routine ops impact?**
+  - AKS upgrades, cert renewal, backups. Backlog: [AKS upgrade runbook](../../backlog/aks-upgrade-runbook.md).
+- **Learn from incidents?**
+  - Pre-launch, none yet. Backlog: [incident-review process](../../backlog/incident-review-process.md).
 
-1. How do we build **observable systems** that correlate telemetry (component
-   and end-to-end user-flow level)?
-2. How do we **predict malfunctions** and surface prioritized, actionable
-   alerts?
-3. Do we **simulate failures** / test in pre-production and production?
-4. What is built with **automation in mind**, and how much is automated?
-5. How do **routine operations** (revisions, audits, upgrades, backups) affect
-   system stability, and how do we scrutinize them?
-6. How do we **learn from production incidents** and drive improvements?
-
-**Decision:** _TBD_
+**Decision: Split** — Adopt automation; Defer observability & incident learning to Phase 3.
 
 ### R5. Keep it simple
 
 > Avoid overengineering the architecture, code, and operations.
 
-Questions & decisions:
+- **Lean critical path?**
+  - Yes — single region/cluster, single Postgres, nginx ingress (no AGW), no service mesh, no messaging. YAGNI throughout.
+- **Standards + automated validation?**
+  - Naming + tags (`workload`, `environment`, `managed_by`, `cost_center`, `owner`, `repo`); Terraform/Helm conventions; IaC validated in pipelines.
+  - Azure Policy (policy-as-code) **out of scope** at this scale.
+- **Pragmatic design?**
+  - Yes — monolithic Flask, direct SQL, no premature decomposition.
+- **Just enough code?**
+  - Yes — single Python ETL CronJob, not Data Factory.
+- **Platform features / prebuilt assets?**
+  - Heavy reuse — managed AKS, CloudNativePG, cert-manager, nginx, CSI Secrets Store.
 
-1. Is every component justified by target business value? Is the **critical
-   path lean**?
-2. What **standards** (naming, code style, deployment, process) do we establish
-   and enforce with automated validation?
-3. Do our approaches translate to **pragmatic design** for our use cases (not
-   over-granular)?
-4. Are we developing **just enough code**?
-5. Where do we **use platform-provided features** and prebuilt assets instead
-   of building our own?
-
-**Decision:** _TBD_
+**Decision: Adopt** — a core design driver.
 
 ---
 
@@ -133,98 +175,100 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/security/princi
 
 > Adopt security practices in design and operations with minimal friction.
 
-Questions & decisions:
+- **Segmentation strategy?**
+  - Per-environment isolation: separate clusters, Key Vaults, managed identities, WAL storage, Public IPs.
+  - Namespaces + Cilium default-deny NetworkPolicy. Team: single owner.
+- **Role-based training?**
+  - N/A — solo operator.
+- **Incident response plan?**
+  - Backlog: [security incident response plan](../../backlog/security-incident-response.md).
+- **Compliance requirements?**
+  - None — public open data, personal project; no regulatory/industry standard applies.
+- **Team-level security standards?**
+  - No secrets in Git; GitHub Environments approval gate on prod; RBAC Key Vault + CSI Secrets Store; 30-day log retention.
+- **SOC alignment?**
+  - N/A — no SOC.
 
-1. What is our **segmentation strategy** (environment, processes, team) to
-   isolate access and function?
-2. What **role-based security skills/training** do we need?
-3. Do we have an **incident response plan** (preparedness, detection,
-   containment, mitigation, post-incident)?
-4. What external **security compliance requirements** (org policy, regulatory,
-   industry standards) apply?
-5. What **team-level security standards** (coding, gated approvals, release
-   management, data protection/retention) do we define and enforce?
-6. How does incident response align with any centralized **SOC** function?
-
-**Decision:** _TBD_
+**Decision: Adapt** — right-sized for a solo/personal workload; formal IR plan deferred.
 
 ### S2. Design to protect confidentiality
 
 > Prevent exposure of private/regulatory/proprietary information via access
 > restrictions and obfuscation.
 
-Questions & decisions:
+- **Strong / least-privilege access controls?**
+  - Entra Workload Identity per pod-class; RBAC Key Vault; per-env identity scoping; IP-allowlisted API server; default-deny NetworkPolicy.
+- **Data classification?**
+  - App data = **public** (open data). Only **secrets** (DB credentials) are sensitive → Key Vault.
+- **Encryption at rest / in transit / processing?**
+  - At rest: default managed-key encryption + **encryption at host** on node pool.
+  - In transit: cluster-internal TLS via cert-manager; Blob HTTPS enforced.
+- **Guard against exploits?**
+  - AKS kept on latest version. Image scanning deferred → [image vuln scanning](../../backlog/image-vulnerability-scanning.md).
+- **Guard against exfiltration?**
+  - Default-deny NetworkPolicy; no public Postgres endpoint; creds never in Git.
+  - Egress via default AKS load balancer (Azure Firewall egress filtering out of scope — cost).
+- **Confidentiality across flows?**
+  - Internal TLS even for in-cluster traffic; secrets surfaced via CSI, not baked into images.
+- **Audit trail?**
+  - Container Insights logs (30-day). Formal audit logging out of scope (Phase 1).
 
-1. What **strong access controls** grant access on a need-to-know / least-
-   privilege basis?
-2. How is data **classified** by type, sensitivity, and risk, with a
-   confidentiality level per class?
-3. What **encryption** at rest, in transit, and in processing do we apply per
-   confidentiality level?
-4. How do we **guard against exploits** that expose information (auth,
-   configuration, code, operations)?
-5. How do we **guard against data exfiltration** (networking, identity,
-   encryption controls)?
-6. How do we **maintain confidentiality as data flows** across components /
-   security tiers?
-7. What **audit trail** of access activities do we keep?
-
-**Decision:** _TBD_
+**Decision: Adopt** (adapted) — strong for a demo; exploit-scanning + formal audit deferred.
 
 ### S3. Design to protect integrity
 
 > Prevent corruption of design, implementation, operations, and data.
 
-Questions & decisions:
+- **Authn/authz minimized by privilege/scope/time?**
+  - Workload Identity + OIDC (no standing secrets); RBAC Key Vault; per-env scoping. No JIT/JEA (scoped-but-standing).
+- **Supply-chain vulnerability protection?**
+  - Backlog: [image vulnerability scanning](../../backlog/image-vulnerability-scanning.md) (Trivy in CI).
+- **Cryptography for trust/verification?**
+  - cert-manager TLS certs. Image signing (cosign) not planned at this scale.
+- **Backup immutable + encrypted?**
+  - Encrypted by default (GRS). Immutability → [backup immutability](../../backlog/backup-immutability.md).
+- **Operating within intended limits?**
+  - Pod resource requests/limits; NetworkPolicy constrains reachable surface.
 
-1. What **access controls** authenticate/authorize and minimize access by
-   privilege, scope, and time?
-2. How do we protect and detect vulnerabilities in the **supply chain**
-   (build-time and runtime scanning)?
-3. What **cryptography** (attestation, code signing, certificates, encryption)
-   establishes trust and verification?
-4. Is **backup data immutable and encrypted** when replicated/transferred?
-5. How do we prevent the workload from **operating outside its intended limits
-   and purpose**?
-
-**Decision:** _TBD_
+**Decision: Adapt** — integrity basics (TLS, RBAC, no secrets in Git) adopted; supply-chain scanning + immutability deferred.
 
 ### S4. Design to protect availability
 
 > Prevent/minimize downtime and degradation during a security incident.
 
-Questions & decisions:
+- **Prevent compromised-identity misuse?**
+  - Per-env identity scoping; least-privilege managed identities; no cross-env access. No JIT (scoped-standing accepted).
+- **Prevent resource exhaustion (DDoS)?**
+  - API server IP-allowlisted; pod resource limits. No WAF/Front Door (Phase 2, cost) — accepted given zero traffic + holding-page fallback.
+- **Preventative measures (patches, scanners, malware)?**
+  - AKS latest version/patching. Image scanning deferred (backlog). Antimalware N/A (managed nodes).
+- **Prioritize controls on critical components?**
+  - Postgres hardened: default-deny NetworkPolicy, no public endpoint, creds in Key Vault.
+- **Same rigor in recovery resources?**
+  - DR provisioned from same IaC/identities; GRS backups encrypted. Immutability pending (backlog).
 
-1. How do we prevent **compromised identities** from misusing access (scope /
-   time limits, JIT/JEA)?
-2. What controls/patterns prevent **resource exhaustion** attacks (e.g. DDoS)?
-3. What **preventative measures** address attack vectors in code, network
-   protocols, identity, and malware?
-4. How do we **prioritize security controls** on critical components and flows?
-5. Do **recovery resources and processes** get the same security rigor as
-   production?
-
-**Decision:** _TBD_
+**Decision: Adapt** — right-sized; DDoS/WAF deferred to Phase 2, accepted for now.
 
 ### S5. Sustain and evolve your security posture
 
 > Continuous improvement and vigilance against evolving attackers.
 
-Questions & decisions:
+- **Automated asset inventory?**
+  - De-facto via Terraform state + resource tags. No dedicated inventory tool.
+- **Threat modeling?**
+  - Backlog: [threat model](../../backlog/threat-model.md).
+- **Measure vs. baseline (posture management)?**
+  - Microsoft Defender for Cloud secure score / Azure Policy **out of scope** (cost/complexity).
+- **Periodic security tests + vuln scanning?**
+  - No pen testing. Vuln scanning deferred → [image vuln scanning](../../backlog/image-vulnerability-scanning.md).
+- **Detect/respond/recover?**
+  - Container Insights only; no SIEM. Limited by design.
+- **Post-incident activities?**
+  - Backlog: [incident-review process](../../backlog/incident-review-process.md).
+- **Get / stay current?**
+  - AKS kept on latest version; dependency updates via GitHub.
 
-1. Do we maintain an automated **asset inventory** (resources, locations,
-   dependencies, owners, metadata)?
-2. Do we perform **threat modeling** to identify and prioritize threats?
-3. How do we **measure current state** against a security baseline and set
-   remediation priorities (posture management, compliance enforcement)?
-4. Do we run **periodic security tests** (pen testing) and integrated
-   **vulnerability scanning**?
-5. How do we **detect, respond, and recover** with swift security operations?
-6. Do we run **post-incident activities** (root-cause, postmortems, reports)?
-7. How do we **get current and stay current** (patching, SDL reviews, threat
-   intelligence, automation)?
-
-**Decision:** _TBD_
+**Decision: Defer** (mostly) — posture management, threat modeling, pen testing, vuln scanning deferred; patching adopted. Weakest security area by design.
 
 ---
 
