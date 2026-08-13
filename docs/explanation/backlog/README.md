@@ -16,3 +16,4 @@ doing, why, and when it's "done." Linked from the pillar decisions in
 | [Security incident response plan](security-incident-response.md) | Security S1 | Phase 2 |
 | [Threat model](threat-model.md) | Security S5 | Phase 2 |
 | [Image vulnerability scanning](image-vulnerability-scanning.md) | Security S3/S4/S5 | Phase 2 |
+| [Cost alert review cadence](cost-alert-review-cadence.md) | Cost Optimization C5 | Phase 1 |

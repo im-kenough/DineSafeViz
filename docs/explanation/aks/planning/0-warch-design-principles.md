@@ -15,39 +15,61 @@ The questions under each principle are derived from the "Approach" rows of the
 Microsoft principle articles. They are the prompts we must answer to justify
 each decision against DineSafeViz's requirements and budget.
 
-> Status: **in progress.** Reliability + Security answered; Cost, Operational
-> Excellence, and Performance Efficiency pending.
+> Status: **complete.** All five pillars answered (24 principles). Open items
+> tracked in [backlog](../../backlog/README.md).
 
 ## Summary
 
 High-level decision per design principle. Details in the pillar sections below.
 
-| Pillar | ID | Design principle | Decision |
-|---|---|---|---|
-| Reliability | R1 | Design for business requirements | Adopt |
-| Reliability | R2 | Design for resilience | Adapt |
-| Reliability | R3 | Design for recovery | Adopt |
-| Reliability | R4 | Design for operations | Split (adopt automation / defer observability) |
-| Reliability | R5 | Keep it simple | Adopt |
-| Security | S1 | Plan your security readiness | Adapt |
-| Security | S2 | Design to protect confidentiality | Adopt |
-| Security | S3 | Design to protect integrity | Adapt |
-| Security | S4 | Design to protect availability | Adapt |
-| Security | S5 | Sustain and evolve your security posture | Defer (mostly) |
-| Cost Optimization | C1 | Develop cost-management discipline | _TBD_ |
-| Cost Optimization | C2 | Design with a cost-efficiency mindset | _TBD_ |
-| Cost Optimization | C3 | Design for usage optimization | _TBD_ |
-| Cost Optimization | C4 | Design for rate optimization | _TBD_ |
-| Cost Optimization | C5 | Monitor and optimize over time | _TBD_ |
-| Operational Excellence | O1 | Embrace DevOps culture | _TBD_ |
-| Operational Excellence | O2 | Establish development standards | _TBD_ |
-| Operational Excellence | O3 | Evolve operations with observability | _TBD_ |
-| Operational Excellence | O4 | Automate for efficiency | _TBD_ |
-| Operational Excellence | O5 | Adopt safe deployment practices | _TBD_ |
-| Performance Efficiency | P1 | Negotiate realistic performance targets | _TBD_ |
-| Performance Efficiency | P2 | Design to meet capacity requirements | _TBD_ |
-| Performance Efficiency | P3 | Achieve and sustain performance | _TBD_ |
-| Performance Efficiency | P4 | Optimize for long-term improvement | _TBD_ |
+### Reliability
+
+| ID | Design principle | Decision |
+|---|---|---|
+| R1 | Design for business requirements | Adopt |
+| R2 | Design for resilience | Adapt |
+| R3 | Design for recovery | Adopt |
+| R4 | Design for operations | Split (adopt automation / defer observability) |
+| R5 | Keep it simple | Adopt |
+
+### Security
+
+| ID | Design principle | Decision |
+|---|---|---|
+| S1 | Plan your security readiness | Adapt |
+| S2 | Design to protect confidentiality | Adopt |
+| S3 | Design to protect integrity | Adapt |
+| S4 | Design to protect availability | Adapt |
+| S5 | Sustain and evolve your security posture | Defer (mostly) |
+
+### Cost Optimization
+
+| ID | Design principle | Decision |
+|---|---|---|
+| C1 | Develop cost-management discipline | Adopt |
+| C2 | Design with a cost-efficiency mindset | Adopt |
+| C3 | Design for usage optimization | Adopt (adapted) |
+| C4 | Design for rate optimization | Adopt |
+| C5 | Monitor and optimize over time | Adopt |
+
+### Operational Excellence
+
+| ID | Design principle | Decision |
+|---|---|---|
+| O1 | Embrace DevOps culture | Adapt |
+| O2 | Establish development standards | Adapt |
+| O3 | Evolve operations with observability | Split (baseline now / full to Phase 3) |
+| O4 | Automate for efficiency | Adopt |
+| O5 | Adopt safe deployment practices | Adopt (adapted) |
+
+### Performance Efficiency
+
+| ID | Design principle | Decision |
+|---|---|---|
+| P1 | Negotiate realistic performance targets | Adapt |
+| P2 | Design to meet capacity requirements | Adapt |
+| P3 | Achieve and sustain performance | Defer |
+| P4 | Optimize for long-term improvement | Defer |
 
 ---
 
@@ -280,83 +302,91 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/cost-optimizati
 
 > Build awareness of budget, expenses, reporting, and cost tracking.
 
-Questions & decisions:
+- **Cost model?**
+  - Per-resource cost estimates in the technology-choices analysis; TCO segmented (compute, storage, identities, DR).
+- **Accountability model?**
+  - Solo owner; tags include `cost_center` + `owner`.
+- **Realistic budgets + thresholds?**
+  - **$100/mo hard cap**, alerts at 50%/80%, steady-state $25–50. In [spec.md](../../../ref/spec.md).
+- **SLA penalties vs. implementation?**
+  - N/A — no SLA.
+- **Training/hiring/infra costs?**
+  - Minimal — solo operator, free/open-source tooling.
+- **Communicate cost implications of changes?**
+  - Decision log in the AKS planning doc (e.g., passive-cold DR chosen with $/mo rationale).
 
-1. What is our **cost model** (segment expenses; estimate/forecast total cost
-   of ownership)?
-2. What is the **accountability model** (roles, responsibilities, governance)?
-3. What are the **realistic budgets** covering requirements, personnel,
-   processes, and anticipated growth, with threshold notifications?
-4. For any SLA, do we budget toward **penalties vs. implementation**? (Likely
-   N/A — no SLA.)
-5. What **training/hiring/infra costs** accompany workload maturity?
-6. How do we **communicate cost implications** of design changes learned from
-   production?
-
-**Decision:** _TBD_
+**Decision: Adopt.**
 
 ### C2. Design with a cost-efficiency mindset
 
 > Spend only on what you need for the highest ROI.
 
-Questions & decisions:
+- **Cost baseline fits budget?**
+  - Steady-state $25–50 within the $100 cap; every technology choice is cost-justified.
+- **Cost guardrails?**
+  - Budget alerts + **auto-shutdown at 100%**; alert if a cluster runs >12h; **clusters stopped by default**.
+- **SDLC environments differently?**
+  - Prod + staging both stopped by default and started on demand; no always-on non-prod cost.
 
-1. What is our **cost baseline** (including projected growth) and do design
-   choices fit the budget?
-2. What **cost guardrails** keep resources within upper/lower limits?
-3. How do we **treat SDLC environments differently** (prod vs. non-prod SKUs,
-   counts, logging; on-demand teardown)?
-
-**Decision:** _TBD_
+**Decision: Adopt.**
 
 ### C3. Design for usage optimization
 
 > Maximize use of resources and operations against negotiated requirements.
 
-Questions & decisions:
+- **Full capabilities of SKUs?**
+  - AKS Free control-plane tier; B2s burstable VMs (use burst credits, not idle capacity).
+- **Dynamically adjust capacity?**
+  - Cluster autoscaler (`syspool` 1–2, `usrpool` 1–3); stop-by-default is the biggest lever.
+- **Active-active over active-passive?**
+  - No — passive-cold DR chosen deliberately; we do **not** pay for a standing secondary, so there are no idle paid resources to convert.
+- **Commitment-based discounts?**
+  - No — spot VMs instead; reservations don't fit bursty, stop-by-default usage.
+- **Support plan?**
+  - N/A — no paid support plan (community/free).
 
-1. Are we using the **full capabilities of selected SKUs** (not paying for
-   unused features)?
-2. Where do we **dynamically adjust capacity** (scale up/down with demand)?
-3. Do we prefer **active-active over active-passive** where resources are
-   already paid for?
-4. Do we use **commitment-based discounted resources** for new work?
-5. Are we making the most of any **support plan** and training allowance?
+**Decision: Adopt** (adapted) — usage optimized via stop-by-default, autoscale, and spot; reservations/active-active deliberately unused.
 
-**Decision:** _TBD_
+> **Reviewer note:** WAF's cost pillar recommends reservations and active-active
+> for already-paid resources. Both were **evaluated and consciously rejected**
+> here — stop-by-default leaves near-zero idle compute, so reservations would be
+> wasteful and there is no idle paid capacity to convert to active-active.
 
 ### C4. Design for rate optimization
 
 > Increase efficiency without redesigning or sacrificing requirements.
 
-Questions & decisions:
+- **Reservations for stable usage?**
+  - No — bursty, stopped-by-default usage; reservations would waste money. Spot chosen instead.
+- **No-additional-licensing alternatives?**
+  - Yes — open-source throughout (PostgreSQL, Grafana, nginx, cert-manager, CloudNativePG); zero licensing.
+- **Consumption-based pricing?**
+  - Yes — pay-as-you-go compute, billed near-zero while stopped. The core cost lever.
+- **Fixed-price billing?**
+  - No — low/unpredictable utilization makes consumption cheaper.
+- **Co-locate usage?**
+  - Yes — Flask, Grafana, ETL, and Postgres share one cluster/node pool (compute consolidation).
+- **Lower-cost regions?**
+  - Cheapest North America region chosen at implementation (see [spec.md](../../../ref/spec.md)).
+- **Higher density?**
+  - Yes — one cluster hosts all workloads; security boundary held by NetworkPolicy.
 
-1. Which resources have **stable/predictable usage** suitable for prepurchase
-   discounts (reservations)?
-2. Are there **no-additional-licensing alternatives** (hybrid use, pre-prod
-   pricing)?
-3. Where is **consumption-based pricing** more cost-effective?
-4. Where is **fixed-price billing** better (high, predictable utilization)?
-5. Can we **co-locate usage** with other workloads/teams to share cost?
-6. Can we deploy to **lower-cost regions** (esp. non-prod) without compromise?
-7. Where do we prefer services that enable **higher density** (mind security
-   boundaries)?
-
-**Decision:** _TBD_
+**Decision: Adopt.**
 
 ### C5. Monitor and optimize over time
 
 > Continuously right-size investment as the workload evolves.
 
-Questions & decisions:
+- **Capture/classify expense?**
+  - Resource tags (`workload`, `environment`, `managed_by`, `cost_center`, `owner`, `repo`) enable breakdown in Azure Cost Management.
+- **Cost alerts at thresholds?**
+  - 50%/80% warnings, 100% auto-shutdown. Review cadence → [cost alert review cadence](../../backlog/cost-alert-review-cadence.md).
+- **Continuously evaluate/adjust?**
+  - Decision log; planned tier upgrade (Standard HDD → SSD, Q1 2028) shows ongoing review.
+- **Decommission underutilized/obsolete?**
+  - Stop-by-default is continuous decommission; ACR untagged-image cleanup workflow; delete unnecessary data.
 
-1. What captures and **classifies expense** (showback/chargeback boundaries)?
-2. What **cost alerts** fire at budget thresholds, and how are they reviewed?
-3. How do we **continuously evaluate/adjust** design decisions on cost?
-4. How do we **decommission underutilized/obsolete resources** and delete
-   unnecessary data?
-
-**Decision:** _TBD_
+**Decision: Adopt.**
 
 ---
 
@@ -369,98 +399,98 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/operational-exc
 > Continuously improve system design and processes through collaboration,
 > shared responsibility, and ownership.
 
-Questions & decisions:
+- **Common systems/tools + shared backlog?**
+  - Single Git repo; GitHub Issues + Actions. Escalation paths N/A (solo).
+- **Continuous learning / blameless postmortems?**
+  - Documentation set (this planning) + session journals; postmortems → [incident-review process](../../backlog/incident-review-process.md).
+- **Agile practices + shift-left?**
+  - Lightweight; shift-left via CI checks in pipelines.
+- **Standards for dev/ops procedures + drills?**
+  - Runbook catalog (RB-01..RB-16); emergency drill → [recovery drill](../../backlog/recovery-drill.md).
+- **Centralized ops teams?**
+  - No — solo operator.
 
-1. What **common systems and tools** promote collaboration and progress
-   tracking (shared backlog, escalation paths)?
-2. How do we build a **continuous learning/experimentation mindset** (blameless
-   postmortems, knowledge sharing, docs)?
-3. What **agile practices** and **shift-left** opportunities do we adopt?
-4. What **standards for development and operational procedures** do we set and
-   review on a cadence (incl. emergency drills)?
-5. Do we use any **centralized operations teams** / shared resources? (Likely
-   solo — state so.)
-
-**Decision:** _TBD_
+**Decision: Adapt** — DevOps practices at solo scale; team/centralized aspects N/A.
 
 ### O2. Establish development standards
 
 > Standardize development practices, enforce quality gates, and track progress.
 
-Questions & decisions:
+- **Document features + derive requirements + sizing?**
+  - Planning docs + [spec.md](../../../ref/spec.md); sizing = pod resource requests.
+- **Methodology + shared backlog?**
+  - Lightweight; GitHub Issues. No formal Scrum (solo).
+- **Source control strategy?**
+  - Git; feature branches + PR workflow (audit trail). Peer review N/A (solo).
+- **QA / early testing / immutable artifacts?**
+  - Immutable container images promoted across envs; CI checks. Synthetic e2e tests deferred to Phase 2.
+- **Style guides / conventions?**
+  - Repo conventions + `CLAUDE.md` doc/code standards; Terraform/Helm style.
+- **Code docs as written?**
+  - Doc-as-you-go + session journals (per `CLAUDE.md`).
+- **Progress/trend reporting?**
+  - Minimal — solo; not formalized.
 
-1. How do we **document workload features** and derive functional/nonfunctional
-   requirements and sizing estimates?
-2. What **software development methodology** and shared backlog do we use for
-   our team size?
-3. What **source control** strategy (branching, peer review, audit trail)
-   covers code, scripts, templates, pipelines, docs?
-4. What **quality assurance** / early testing and immutable-artifact promotion
-   through quality gates do we use?
-5. What **style guides, tooling, and conventions** (patterns, API design,
-   logging, exception handling) enforce consistency?
-6. How do we insist on **code documentation as it's written**?
-7. What **progress/trend reporting** (bugs, failed updates, time-to-deploy)
-   measures efficiency?
-
-**Decision:** _TBD_
+**Decision: Adapt** — standards at solo scale; formal QA/trend reporting kept light.
 
 ### O3. Evolve operations with observability
 
 > Gain visibility, derive insight, make data-driven decisions.
 
-Questions & decisions:
+- **Decoupled monitoring stack?**
+  - Phase 1: Container Insights + Azure Monitor. Full stack (Prometheus/Grafana on self-hosted VMs) → Phase 3.
+- **Standardize collection per source?**
+  - `postgres_exporter` sidecar; Container Insights for cluster/app logs.
+- **Emit correlated telemetry from app?**
+  - Flask `/health` today; broader instrumentation → Phase 3.
+- **Own emitting/collecting when shared?**
+  - Shared Log Analytics workspace, owned by the workload.
+- **Just enough data / retention?**
+  - 30-day retention (cost tradeoff).
+- **Distinguish signals?**
+  - Metrics (exporter) + logs (Container Insights); distributed **tracing** deferred to Phase 2.
+- **Aggregate/visualize dashboards?**
+  - Grafana (app) + Azure Monitor; operator dashboards → Phase 3.
+- **Actionable alerts?**
+  - Cost, backup-verify, cert-renewal, >12h-cluster alerts (action-only).
 
-1. Do we build a **decoupled monitoring stack** covering infra, app health, and
-   build/release?
-2. How do we **standardize collection** per data-source type (telemetry
-   standards, instrumentation)?
-3. How does app code **emit correlated telemetry** across the execution flow?
-4. Who **owns emitting/collecting data** even when sinks are shared/central?
-5. Do we collect **just enough data for just enough time** (cost tradeoffs)?
-6. Do we distinguish the **monitoring signals** (profiles, logs, metrics,
-   traces) and use each for its right purpose?
-7. How do we **aggregate/visualize in dashboards** (situational vs.
-   operational)?
-8. How do we make **alerts actionable** (accountable roles, severity, proactive
-   thresholds, action-only triggers)?
-
-**Decision:** _TBD_
+**Decision: Split** — Phase 1 baseline adopted; full observability + tracing deferred to Phase 2/3 (ties to R4).
 
 ### O4. Automate for efficiency
 
 > Replace repetitive manual tasks with software automation.
 
-Questions & decisions:
+- **Evaluate + prioritize workflows?**
+  - GitHub Actions for cluster lifecycle, app deploy, DR, secret rotation, dataset refresh, monitoring deploy.
+- **Build vs. buy?**
+  - Buy the platform (GitHub Actions); build custom workflows for specialized ops.
+- **Components designed for automation?**
+  - IaC (Terraform) + Helm + parameterized `workflow_dispatch`.
+- **Automation as critical dependency (5 pillars)?**
+  - OIDC-secured workflows, per-env identity scoping.
+- **Automate at scale ("design once, run everywhere")?**
+  - Environment-parameterized workflows (no per-env wrappers); identical Terraform module for prod + DR.
 
-1. How do we **evaluate workflows** (complexity, effort, frequency, accuracy,
-   lifespan) and prioritize which to automate/remove?
-2. For each automation, do we **build vs. buy** (explicit decision)?
-3. Are workload components **designed to support automation**?
-4. Do we treat **automation as a critical dependency** that adheres to all five
-   pillars?
-5. Where do we **automate at scale** ("design once, run everywhere" templates)?
-
-**Decision:** _TBD_
+**Decision: Adopt** — a core strength.
 
 ### O5. Adopt safe deployment practices
 
 > Use guardrails that reduce the effect of errors and unexpected conditions.
 
-Questions & decisions:
+- **IaC for desired state?**
+  - Terraform per env + Helm/Helmfile; remote state in Azure Blob with blob-lease locking.
+- **Small, incremental, frequent updates?**
+  - Small releases via feature-branch workflow.
+- **Automated pipelines across envs?**
+  - GitHub Actions for all deploys; GitHub Environments approval gate on prod.
+- **Test updates rigorously?**
+  - Staging environment (`stg`); synthetic e2e tests deferred to Phase 2.
+- **Progressive-exposure rollout?**
+  - Minimal by scale — single-instance, no canary/blue-green. Per-PR preview envs → Phase 2.
+- **Compensating/rollback + emergency process?**
+  - Helm rollback + IaC reprovision; DR runbook (RB-16, backlog). Pre-approved emergency path is informal.
 
-1. How do we use **IaC** for desired state (modular, layered, lifecycle-
-   aligned)?
-2. Do we prefer **small, incremental, frequent updates**?
-3. Are all code and infra changes deployed via **automated pipelines** across
-   environments?
-4. How do we **test updates rigorously** in pre-prod and prod?
-5. What **progressive-exposure rollout patterns** (with backward/forward
-   compatibility) do we use? (May be minimal at this scale — state so.)
-6. What **compensating/rollback actions** and pre-approved emergency process
-   recover from faulty deployments?
-
-**Decision:** _TBD_
+**Decision: Adopt** (adapted) — IaC + pipelines + approval gate adopted; progressive rollout minimal by scale.
 
 ---
 
@@ -473,63 +503,60 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/performance-eff
 > Define the intended user experience and a strategy to benchmark and measure
 > against business requirements.
 
-Questions & decisions:
+- **Prepare to set targets?**
+  - Small static dataset (~100k rows); informal target is sub-second query. No production history yet.
+- **User expectations / standards?**
+  - Loose by design — "fast enough" page loads; no latency SLA/SLO.
+- **Critical flows + tolerance ranges?**
+  - Flows A/B critical, but tolerances not quantified. Connection target still _TBD_ in [spec.md](../../../ref/spec.md).
+- **Performance model?**
+  - None formal — deferred; no traffic to model yet.
 
-1. How do we **prepare to set targets** (technical options, historical data,
-   usage patterns, bottlenecks, industry standards)?
-2. What **user expectations / performance standards** do we align on given
-   investment level?
-3. Which **critical flows** get prioritized, with performance tolerance ranges
-   (ideal → unacceptable)?
-4. What **performance model** (usage patterns, business impact, operational
-   cost) yields initial targets, refined iteratively?
-
-**Decision:** _TBD_
+**Decision: Adapt** — targets intentionally loose; formal model deferred.
 
 ### P2. Design to meet capacity requirements
 
 > Provide enough supply to address anticipated demand.
 
-Questions & decisions:
+- **Dynamic scaling needs per flow?**
+  - Low — cluster autoscaler + burstable VMs suffice. HPA deferred to Phase 2.
+- **Right-sized + autoscale features?**
+  - B2s burstable; Postgres requests (250m CPU / 512Mi in prod); Standard SSD (E10); cluster autoscaler.
+- **Capacity planning / predictive modeling?**
+  - None — vertical scaling (larger node) if ever needed.
+- **Proof of concept?**
+  - The existing dockerized deployment is the working PoC.
 
-1. What are the **dynamic scaling needs** per prioritized flow (elasticity)?
-2. Are resources **right-sized** across the stack, using built-in autoscale
-   features?
-3. What **capacity planning / predictive modeling** forecasts future capacity?
-4. Do we validate design choices with a **proof of concept**?
-
-**Decision:** _TBD_
+**Decision: Adapt** — right-sized for a small dataset; HPA/predictive modeling deferred.
 
 ### P3. Achieve and sustain performance
 
 > Protect against performance degradation while the system is in use and evolves.
 
-Questions & decisions:
+- **Performance testing strategy?**
+  - None in Phase 1; load testing (k6) deferred to Phase 2.
+- **Perf tests as quality gates?**
+  - No — deferred with the load-test tooling.
+- **Performance monitoring + regression alerts?**
+  - Baseline metrics via Container Insights / `postgres_exporter`; formal perf monitoring → Phase 3.
+- **Review data as usage grows?**
+  - Deferred — no usage yet.
+- **Design patterns to fine-tune (caching/pooling)?**
+  - PgBouncer pooling → Phase 2; read replicas → Phase 3; Redis cache considered, not needed.
+- **Performance-focused coding standards?**
+  - Minimal — small app, direct SQL.
 
-1. What is our **performance testing strategy** (manual + pipeline-integrated
-   tests)?
-2. Are performance tests **quality gates**?
-3. What **performance monitoring** (end-to-end transactions + technical metrics,
-   real + synthetic) and regression alerts do we set?
-4. How do we **review test/monitoring data** as usage grows and backlog
-   remediation?
-5. What **design patterns** fine-tune performance across app/compute/data
-   layers?
-6. What **performance-focused coding standards** do we follow?
-
-**Decision:** _TBD_
+**Decision: Defer** — sustaining practices deferred to Phase 2/3; no traffic to justify them now.
 
 ### P4. Optimize for long-term improvement
 
 > Improve system efficiency within defined targets to increase workload value.
 
-Questions & decisions:
+- **Dedicated time for perf optimization?**
+  - No regular cadence — ad-hoc, revisited if usage appears.
+- **Revisit NFRs from production trends?**
+  - Deferred until real usage data exists (e.g., planned Standard HDD → SSD upgrade, Q1 2028).
+- **Stay current with updates?**
+  - AKS kept on latest version; dependency/library updates via GitHub.
 
-1. Do we set aside **dedicated time for performance optimization** as regular
-   practice?
-2. Do we **revisit nonfunctional requirements** and set new targets from
-   production trends (caching, CDN, etc.)?
-3. How do we **stay current** with framework/library/platform updates that
-   affect performance?
-
-**Decision:** _TBD_
+**Decision: Defer** — revisit with production data; staying current is adopted.
