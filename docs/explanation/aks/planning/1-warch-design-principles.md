@@ -135,7 +135,7 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/reliability/pri
 - **Immutable ephemeral units?**
   - Stateless Flask/Grafana as immutable images via Helm; environments reprovisionable from IaC.
 
-**Decision: Adopt** — a relative strength.
+**Decision: Adopt**
 
 ### R4. Design for operations
 
@@ -174,7 +174,7 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/reliability/pri
 - **Platform features / prebuilt assets?**
   - Heavy reuse — managed AKS, CloudNativePG, cert-manager, nginx, CSI Secrets Store.
 
-**Decision: Adopt** — a core design driver.
+**Decision: Adopt**
 
 ---
 
