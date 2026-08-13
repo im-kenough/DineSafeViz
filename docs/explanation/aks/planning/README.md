@@ -36,23 +36,29 @@ flowchart LR
 
 ### 1. Understand all the design principles
 
-Design principles were reviewed in docs/explanation/aks/planning/0-warch-design-principles.md
+Cost optimization design principles are fully adopted. Reliability and Operational Excellence is mostly adopted while the rest are in some form of adapted or deferred.
+
+Design principles were reviewed in docs/explanation/aks/planning/1-warch-design-principles.md
 
 ### 2. Prioritize checklist items
 
-Select checklist items in docs/explanation/aks/planning/1-warch-checklist.md
+Cost optimization checklist items are prioritized first, followed by Reliability and Operational Excellence.
+
+Design review checklists in docs/explanation/aks/planning/2-warch-checklist.md
 
 ### 3. Make trade offs
 
-Tradeoffs are considered in docs/explanation/aks/planning/2-warch-tradeoffs.md
+Cost Optimization was favoured while preserving Security as much as possible. Performance Efficiency suffered the most trade offs.
+
+Tradeoffs are considered in docs/explanation/aks/planning/3-warch-tradeoffs.md
 
 ### 4. Match workload scenarios
 
-Workloads are considered in docs/explanation/aks/planning/3-well-arch-workloads.md
+Workloads are considered in docs/explanation/aks/planning/4-warch-workloads.md
 
 ### 5. Select Azure service
 
-Azure services are considered in docs/explanation/aks/planning/4-1-well-arch-service-guides.md
+Azure services are considered in docs/explanation/aks/planning/5-1-warch-service-guides.md
 
-Azure designs are considered in docs/explanation/aks/planning/4-2-well-arch-design-guides.md
+Azure designs are considered in docs/explanation/aks/planning/5-2-warch-design-guides.md
 
