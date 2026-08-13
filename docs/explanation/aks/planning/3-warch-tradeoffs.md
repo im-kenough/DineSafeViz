@@ -1,46 +1,26 @@
 # 3. Well-Architected tradeoffs
 
-Step 3 of the [WAF suggested learning process](https://learn.microsoft.com/en-us/azure/well-architected/what-is-well-architected-framework#suggested-learning-process):
-**recognize that improving one pillar usually costs another, and record which
-tradeoffs this workload is consciously making.**
+After deciding which checklist items to prioritize in [Step 2](2-warch-checklist.md), Step 3 of the [Well Architected Framework process](https://learn.microsoft.com/en-us/azure/well-architected/what-is-well-architected-framework#suggested-learning-process) requires us to understand the trade offs given these decisions.
 
-Each Microsoft tradeoffs article is written as *"pursuing pillar **X**, and the
-bill that lands on pillar **Y**."* The sections below mirror that: one section
-per pillar we pursue, listing every tradeoff Microsoft names, and recording how
-DineSafeViz resolved it against the decisions in
-[Step 1](1-warch-design-principles.md), [Step 2](2-warch-checklist.md), and
-[`spec.md`](../../../ref/spec.md).
+## Tradeoff analysis
 
-## Reading this document
+DineSafeViz is a budget workload and favours the Cost Optimization pillar.
+- As a result, we accepted reduced resiliency, capacity and observability.
+- Core security controls were kept in place, and premium security features are risk accepted.
 
-| Column | Meaning |
-|---|---|
-| **Tradeoff** | Microsoft's exact heading for the tradeoff. |
-| **Pillar impacted** | The pillar that *pays the cost* when we pursue this section's pillar. |
-| **Decision** | How we resolved it — see below. |
-| **Rationale** | The step-1/step-2/`spec.md` decision that drives it. |
-
-**Decision** values:
-
-- **Accepted** — we prioritized this section's pillar and knowingly took the hit
-  on the impacted pillar. Qualifiers: *(min.)* small, *(capped/bounded)*
+For each tradeoff in a Pillar, we make a decision:
+- **Accepted**: This tradeoff is accepted is accepted.
+  - Raises priority of this pillar. 
+  - Lowers priority of impacted pillar.
+  - Qualifiers:
+    - *(min.)* small
+    - *(capped/bounded)*
+    - managed
   deliberately limited.
-- **Declined** — we resolved it the *other* way, prioritizing the impacted
-  pillar instead.
+- **Rejected**: This trade off is rejected.
+  - Lowers the priority of this pillar. 
+  - Raises priority of impacted pillar.
 - **N/A** — our architecture doesn't trigger this tradeoff.
-
-## Headline
-
-DineSafeViz is a **budget-first** workload (hard $100/mo cap, stop-by-default,
-free/OSS preference). In WAF terms that means its consequential tradeoffs
-cluster in **Cost Optimization** — we repeatedly chose the cheaper option and
-*accepted* reduced resiliency, capacity, and observability. The mirror image is
-that in the **Reliability**, **Security**, and **Performance** sections we
-often **decline** the tradeoff, because we did not over-invest in those pillars
-in the first place. One deliberate line is drawn: we do **not** trade away
-security controls for cost — the cost-driven security omissions are premium
-threat-monitoring extras (Defender, Firewall, Entra ID P1), risk-accepted and
-backlogged, not core controls.
 
 ---
 
@@ -48,6 +28,8 @@ backlogged, not core controls.
 
 > Pursuing reliability. Source:
 > https://learn.microsoft.com/en-us/azure/well-architected/reliability/tradeoffs
+
+Optimizing the Reliability pillar results in the trade offs below, at the detriment to elements in other pillars.
 
 | Tradeoff | Pillar impacted | Decision | Rationale |
 |---|---|---|---|
@@ -79,6 +61,8 @@ backlogged, not core controls.
 
 > Pursuing security. Source:
 > https://learn.microsoft.com/en-us/azure/well-architected/security/tradeoffs
+
+Optimizing the Security pillar results in the trade offs below, at the detriment to elements in other pillars.
 
 | Tradeoff | Pillar impacted | Decision | Rationale |
 |---|---|---|---|
@@ -115,6 +99,8 @@ backlogged, not core controls.
 > Pursuing cost optimization — **the dominant pillar for this workload.** Source:
 > https://learn.microsoft.com/en-us/azure/well-architected/cost-optimization/tradeoffs
 
+Optimizing the Cost Optimization pillar results in the trade offs below, at the detriment to elements in other pillars.
+
 | Tradeoff | Pillar impacted | Decision | Rationale |
 |---|---|---|---|
 | Reduced resiliency | Reliability | **Accepted** | stop-by-default, B2s burstable, single Postgres, hard $100 cap, budget SKUs, autoscale from 1 — accept a lower SLO; bounded by flow criticality + holding-page fallback (spec.md) |
@@ -147,6 +133,8 @@ backlogged, not core controls.
 > Pursuing operational excellence. Source:
 > https://learn.microsoft.com/en-us/azure/well-architected/operational-excellence/tradeoffs
 
+Optimizing the Operational Excellence pillar results in the trade offs below, at the detriment to elements in other pillars.
+
 | Tradeoff | Pillar impacted | Decision | Rationale |
 |---|---|---|---|
 | Increased complexity | Reliability | **Accepted (min.)** | IaC (Terraform/Helm/Helmfile) + safe-deploy compatibility add surface; kept modular; single Postgres avoids blue/green data complexity (OE:05, OE:11) |
@@ -178,6 +166,8 @@ backlogged, not core controls.
 > Pursuing performance efficiency — **deliberately loose for this workload.**
 > Source:
 > https://learn.microsoft.com/en-us/azure/well-architected/performance-efficiency/tradeoffs
+
+Optimizing the Performance Efficiency pillar results in the trade offs below, at the detriment to elements in other pillars.
 
 Performance targets are intentionally loose (PE:01, "loose by design"), so most
 of these tradeoffs are **declined or N/A** — we are not chasing performance hard
