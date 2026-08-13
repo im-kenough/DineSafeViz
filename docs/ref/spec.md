@@ -51,6 +51,22 @@
 | Postgres PITR window | **7 days** | Daily basebackup + continuous WAL; covers the ≤24h RPO (CO:10) |
 | ACR images | **Untagged-image cleanup** | Scheduled cleanup workflow removes untagged images (CO:07/CO:10) |
 
+## Health & observability
+
+Health model detailed in [5-2-3 Health modeling](../explanation/aks/planning/5-2-3-design-guides-health-modelling.md).
+
+| Decision | Value | Notes / source |
+|---|---|---|
+| Health model scope | **Flow-level + shared DB entity** | Flows A/B/C + PostgreSQL; not per-component (RE:04) |
+| Health states | **Healthy / Degraded / Unhealthy / Offline (expected)** | Offline = cluster intentionally stopped (RE:04) |
+| Latency SLO (flows A/B) | Healthy **< 1s** · Degraded **1–3s** · Unhealthy **> 3s** (p95) | Anchored on the <1s query budget (PE:01 / RE:10) |
+| Availability signal | **`/readyz` synthetic probe** (503 = Unhealthy); ingress 5xx **> 5%** secondary | Probe-based, not organic error-rate, due to near-zero traffic (RE:10) |
+| Evaluation window | **5-minute rolling** | Smooths noise; detects within tier-1 RTO (RE:10) |
+| Running-window signal | **Log Analytics `Heartbeat`** presence | Suppresses alerts while Offline (expected) |
+| Observability tooling | **Log Analytics only** (KQL over Container Insights); no Prometheus | Flow-C freshness reuses the existing Grafana Postgres datasource |
+| Alert channel | **Discord/Slack webhook** | LA action group + Grafana contact point |
+| Health visualization | **Log Analytics workbook** | Grafana + Azure Monitor datasource backlogged (needs Azure auth setup) |
+
 ## Cost / FinOps
 
 | Decision | Value | Notes |
