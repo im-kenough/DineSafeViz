@@ -26,7 +26,21 @@ For each tradeoff within a pillar, we record a decision:
 The **Pillar impacted** column names the pillar that is negatively impacted when we
 pursue the section's pillar.
 
----
+## Summary
+
+| Pillar pursued | Accepted (fully) | Accepted (capped) | Accepted (mitigated) | Accepted (negligible) | Rejected | N/A | Total |
+|---|---|---|---|---|---|---|---|
+| Reliability | — | 3 | — | 1 | 4 | 1 | 9 |
+| Security | 2 | 3 | 2 | 3 | 1 | 1 | 12 |
+| Cost Optimization | 2 | 4 | 1 | — | 3 | 1 | 11 |
+| Operational Excellence | — | 3 | 2 | 1 | 1 | 3 | 10 |
+| Performance Efficiency | — | 1 | 1 | — | 5 | 6 | 13 |
+| **Total** | **4** | **14** | **6** | **5** | **14** | **12** | **55** |
+
+- 10 of 12 security tradeoffs were accepted to some degree, negatively impacting other pillars
+- only 4 tradeoffs fully accepted and they are all in Security and Cost Optimization
+  - if assumptions change these are the rows to review first.
+- 5 of 13 performance tradeoffs were rejected. Deprioritized in favour of lowering costs.
 
 ## Reliability tradeoffs
 
