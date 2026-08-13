@@ -1,4 +1,4 @@
-# 0. Well-Architected Design Principles
+# 1. Well-Architected Design Principles
 
 This document reviews each pillar and their design principles. Each principle will be reviewed to decide if it should be incoporated into this project.
 

@@ -1,4 +1,4 @@
-# 1. Well-Architected Checklists
+# 2. Well-Architected Checklists
 
 Step 2 of the [WAF suggested learning process](https://learn.microsoft.com/en-us/azure/well-architected/what-is-well-architected-framework#suggested-learning-process):
 **prioritize the checklist items relevant to this workload; defer the rest.**
