@@ -1,14 +1,14 @@
-# 2. Well-Architected Checklists
+# 2. Well-Architected Checklist prioritization
 
 Step 2 of the [WAF suggested learning process](https://learn.microsoft.com/en-us/azure/well-architected/what-is-well-architected-framework#suggested-learning-process):
 **prioritize the checklist items relevant to this workload; defer the rest.**
 
-Having selected which design principles to apply to DineSafeViz in [Step 1](docs/explanation/aks/planning/1-warch-design-principles.md), we'll now prioritize which checklist item to implement first.
+In [Step 1](docs/explanation/aks/planning/1-warch-design-principles.md), we selected which design principles to apply to DineSafeViz. Now we'll prioritize which checklist item to implement first.
 
-- **Phase 1** — now. Items partly done now sit here; the deferred slice is noted.
+- **Phase 1** — now.
 - **Phase 2** — a later phase.
-- **Phase 3** — a still-later phase.
-- **N/A** — not applicable (reason noted).
+- **Phase 3** — a much later phase.
+- **N/A** — not applicable.
 
 ## Summary
 
@@ -25,7 +25,7 @@ N-A) and their rationale are in the pillar tables below.
 
 ---
 
-## Reliability
+## Reliability - Checklist priority
 
 Source: https://learn.microsoft.com/en-us/azure/well-architected/reliability/checklist
 
@@ -42,100 +42,7 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/reliability/che
 | RE:09 | DR plans (structured, tested) | Phase 1 | R3 | [RB-16](../../backlog/re09-dr-runbook-rb16.md), [drill](../../backlog/re08-recovery-drill.md) | pattern now; RB-16 + drill → Phase 2 |
 | RE:10 | Health monitoring & indicators | Phase 1 | R4 | — | Container Insights now; full stack → Phase 3 |
 
-## Security
-
-Source: https://learn.microsoft.com/en-us/azure/well-architected/security/checklist
-
-| Code | Recommendation | Priority | Design principle | Backlog | Note |
-|---|---|---|---|---|---|
-| SE:01 | Security baseline | Phase 1 | S1/S5 | — | platform defaults now; secure-score/posture → Phase 2 |
-| SE:02 | Secure development lifecycle | Phase 1 | S3 | — | light SDL now; image scanning → Phase 2 |
-| SE:03 | Data classification | Phase 1 | S2 | — | app data public; secrets sensitive |
-| SE:04 | Segmentation & perimeters | Phase 1 | S1 | — | per-env isolation, NetworkPolicy |
-| SE:05 | Identity & access management | Phase 1 | S2/S3 | — | Workload Identity, RBAC, OIDC |
-| SE:06 | Network traffic isolation | Phase 1 | S2 | — | default-deny now; egress filtering (Firewall) → Phase 2 |
-| SE:07 | Encryption | Phase 1 | S2 | — | at rest + at host + TLS |
-| SE:08 | Harden resources | Phase 1 | S3/S4 | — | hardening now; PSS-restricted → Phase 2 |
-| SE:09 | Protect secrets + rotation | Phase 1 | S1/S2 | — | Key Vault + CSI, rotation workflow |
-| SE:10 | Threat monitoring / detection | Phase 2 | S5 | — | no SIEM/Defender in Phase 1 |
-| SE:11 | Security testing regimen | Phase 2 | S5 | [image vuln scanning](../../backlog/se11-image-vulnerability-scanning.md) | no pen test |
-| SE:12 | Incident response procedures | Phase 2 | S1 | [security IR plan](../../backlog/se12-security-incident-response.md) | — |
-
-## Cost Optimization
-
-Source: https://learn.microsoft.com/en-us/azure/well-architected/cost-optimization/checklist
-
-| Code | Recommendation | Priority | Design principle | Backlog | Note |
-|---|---|---|---|---|---|
-| CO:01 | Culture of financial responsibility | Phase 1 | C1 | — | — |
-| CO:02 | Cost model | Phase 1 | C1 | — | — |
-| CO:03 | Collect & review cost data | Phase 1 | C5 | [review cadence](../../backlog/co03-cost-alert-review-cadence.md) | alerts now |
-| CO:04 | Spending guardrails | Phase 1 | C2 | — | budget alerts + auto-shutdown |
-| CO:05 | Best rates from providers | Phase 1 | C4 | — | spot, cheapest NA region, no reservations |
-| CO:06 | Align usage to billing increments | Phase 1 | C3/C4 | — | burstable + stop-by-default |
-| CO:07 | Optimize component costs | Phase 1 | C5 | — | remove unused; ACR cleanup |
-| CO:08 | Optimize environment costs | Phase 1 | C2 | — | prod/stg stopped by default |
-| CO:09 | Optimize flow costs | Phase 1 | C4 | — | — |
-| CO:10 | Optimize data costs | Phase 1 | — | — | storage: Standard HDD, LRS/GRS split, retention |
-| CO:11 | Optimize code costs | Phase 1 | — | — | single ETL CronJob; direct SQL |
-| CO:12 | Optimize scaling costs | Phase 1 | C3 | — | autoscaler + spot |
-| CO:13 | Optimize personnel time | Phase 1 | O4 | — | automation reduces toil |
-| CO:14 | Consolidate resources | Phase 1 | C4 | — | one cluster hosts all workloads |
-
-## Operational Excellence
-
-Source: https://learn.microsoft.com/en-us/azure/well-architected/operational-excellence/checklist
-
-| Code | Recommendation | Priority | Design principle | Backlog | Note |
-|---|---|---|---|---|---|
-| OE:01 | Standard practices / DevOps culture | Phase 1 | O1 | — | solo scale |
-| OE:02 | Standardize operations (routine/emergency) | Phase 1 | O1/O5 | [AKS upgrade runbook](../../backlog/oe02-aks-upgrade-runbook.md) | runbook catalog |
-| OE:03 | Formalize development practices | Phase 1 | O2 | — | lightweight, solo |
-| OE:04 | Tools, QA, source control, style | Phase 1 | O2 | — | — |
-| OE:05 | Infrastructure as Code | Phase 1 | O5 | — | Terraform + Helm/Helmfile |
-| OE:06 | Workload supply chain / pipelines | Phase 1 | O5 | — | GHA now; e2e tests → Phase 2 |
-| OE:07 | Monitoring stack | Phase 1 | O3 | — | baseline now; full stack → Phase 3 |
-| OE:08 | Incident management | Phase 2 | O1/S1 | [incident-review](../../backlog/oe08-incident-review-process.md) | — |
-| OE:09 | Testing | Phase 2 | O2 | — | synthetic e2e |
-| OE:10 | Automation (reliable, secure) | Phase 1 | O4 | — | core strength |
-| OE:11 | Safe deployment practices | Phase 1 | O5 | — | pipelines + approval gate; progressive rollout minimal |
-
-## Performance Efficiency
-
-Source: https://learn.microsoft.com/en-us/azure/well-architected/performance-efficiency/checklist
-
-| Code | Recommendation | Priority | Design principle | Backlog | Note |
-|---|---|---|---|---|---|
-| PE:01 | Define performance targets | Phase 2 | P1 | — | loose by design; connection target TBD (spec.md) |
-| PE:02 | Capacity planning | Phase 2 | P2 | — | vertical scaling if needed |
-| PE:03 | Select the right services | Phase 1 | P2 | — | AKS/Postgres/SSD chosen (tech-choices) |
-| PE:04 | Consistent performance measurement | Phase 3 | P3 | — | baseline metrics only in Phase 1 |
-| PE:05 | Optimize scaling & partitioning | Phase 2 | P2 | — | autoscaler now; HPA → Phase 2 |
-| PE:06 | Performance testing | Phase 2 | P3 | — | k6 load test |
-| PE:07 | Optimize code & infrastructure | Phase 1 | P3 | — | offload to platform; right-sized |
-| PE:08 | Optimize data usage | Phase 1 | P2 | — | indexes on filtered columns |
-| PE:09 | Prioritize critical-flow performance | Phase 1 | P1 | — | flows A/B identified |
-| PE:10 | Optimize operational tasks | Phase 1 | — | — | backups, rotation, deploy impact |
-| PE:11 | Respond to live performance issues | Phase 3 | P3 | — | — |
-| PE:12 | Continuously optimize | Phase 3 | P4 | — | — |
-
----
-
-# Decisions surfaced by the checklist
-
-Reading each checklist item's detail, most are fully resolved by the design
-principles in [0-warch-design-principles.md](0-warch-design-principles.md). The
-items below raised **new, implementation-level decisions** beyond step 1; each is
-now resolved. Items not listed are already covered by step 1 or by a
-[backlog](../../backlog/README.md) task.
-
-Each item records the **Q** it raised and the **A** decision taken, sourced from
-the v1 [design-planning](../../../0-needs-review/ref/arch/design-planning/) docs
-and [spec.md](../../../ref/spec.md). A few tuning values (probe timings,
-Postgres/Flask sizing) are tagged **revisit post-load-test** — a sensible Phase 1
-default to confirm against the Phase 2 load test rather than guess precisely now.
-
-## Reliability — decisions
+### Reliability - Checklist priority decisions
 
 - **RE:02 — Identify & rate flows**
   - **Q:** Adopt a formal criticality scale (e.g. high/medium/low), or keep the
@@ -183,8 +90,27 @@ default to confirm against the Phase 2 load test rather than guess precisely now
     sidecar. Visible in Azure Monitor now; full operator dashboards → Phase 3
     (R4).
 
-## Security — decisions
 
+## Security - Checklist priority
+
+Source: https://learn.microsoft.com/en-us/azure/well-architected/security/checklist
+
+| Code | Recommendation | Priority | Design principle | Backlog | Note |
+|---|---|---|---|---|---|
+| SE:01 | Security baseline | Phase 1 | S1/S5 | — | platform defaults now; secure-score/posture → Phase 2 |
+| SE:02 | Secure development lifecycle | Phase 1 | S3 | — | light SDL now; image scanning → Phase 2 |
+| SE:03 | Data classification | Phase 1 | S2 | — | app data public; secrets sensitive |
+| SE:04 | Segmentation & perimeters | Phase 1 | S1 | — | per-env isolation, NetworkPolicy |
+| SE:05 | Identity & access management | Phase 1 | S2/S3 | — | Workload Identity, RBAC, OIDC |
+| SE:06 | Network traffic isolation | Phase 1 | S2 | — | default-deny now; egress filtering (Firewall) → Phase 2 |
+| SE:07 | Encryption | Phase 1 | S2 | — | at rest + at host + TLS |
+| SE:08 | Harden resources | Phase 1 | S3/S4 | — | hardening now; PSS-restricted → Phase 2 |
+| SE:09 | Protect secrets + rotation | Phase 1 | S1/S2 | — | Key Vault + CSI, rotation workflow |
+| SE:10 | Threat monitoring / detection | Phase 2 | S5 | — | no SIEM/Defender in Phase 1 |
+| SE:11 | Security testing regimen | Phase 2 | S5 | [image vuln scanning](../../backlog/se11-image-vulnerability-scanning.md) | no pen test |
+| SE:12 | Incident response procedures | Phase 2 | S1 | [security IR plan](../../backlog/se12-security-incident-response.md) | — |
+
+### Security - Checklist priority decisions
 - **SE:01 — Security baseline**
   - **Q:** Which baseline — Microsoft Cloud Security Benchmark or CIS AKS? How often?
   - **A:** Measure against the **CIS AKS Benchmark** using
@@ -224,16 +150,40 @@ default to confirm against the Phase 2 load test rather than guess precisely now
     expiry. DB credentials — stored in Key Vault, surfaced via CSI; rotated via
     an on-demand rotation workflow (runbook) plus an annual scheduled rotation.
 
-## Cost Optimization — decisions
+## Cost Optimization - Checklist priority
+
+Source: https://learn.microsoft.com/en-us/azure/well-architected/cost-optimization/checklist
+
+| Code | Recommendation | Priority | Design principle | Backlog | Note |
+|---|---|---|---|---|---|
+| CO:01 | Culture of financial responsibility | Phase 1 | C1 | — | — |
+| CO:02 | Cost model | Phase 1 | C1 | — | — |
+| CO:03 | Collect & review cost data | Phase 1 | C5 | [review cadence](../../backlog/co03-cost-alert-review-cadence.md) | alerts now |
+| CO:04 | Spending guardrails | Phase 1 | C2 | — | budget alerts + auto-shutdown |
+| CO:05 | Best rates from providers | Phase 1 | C4 | — | spot, cheapest NA region, no reservations |
+| CO:06 | Align usage to billing increments | Phase 1 | C3/C4 | — | burstable + stop-by-default |
+| CO:07 | Optimize component costs | Phase 1 | C5 | — | remove unused; ACR cleanup |
+| CO:08 | Optimize environment costs | Phase 1 | C2 | — | prod/stg stopped by default |
+| CO:09 | Optimize flow costs | Phase 1 | C4 | — | — |
+| CO:10 | Optimize data costs | Phase 1 | — | — | storage: Standard HDD, LRS/GRS split, retention |
+| CO:11 | Optimize code costs | Phase 1 | — | — | single ETL CronJob; direct SQL |
+| CO:12 | Optimize scaling costs | Phase 1 | C3 | — | autoscaler + spot |
+| CO:13 | Optimize personnel time | Phase 1 | O4 | — | automation reduces toil |
+| CO:14 | Consolidate resources | Phase 1 | C4 | — | one cluster hosts all workloads |
+
+### Cost Optimization - Checklist priority decisions
 
 - **CO:02 — Cost model**
-  - **Q:** Produce a consolidated per-resource monthly cost estimate in spec.md?
-  - **A:** Yes — consolidate the figures already scattered in v1
-    into one table in [spec.md](../../../ref/spec.md): AKS Free saves ~$73/mo
-    per cluster; static PIP ~$4/mo vs AGW ~$30/mo; no Azure Firewall saves
-    ~$30/mo; passive-cold DR ~$2/mo; GRS staging ~$1/mo uplift; self-hosted
-    Postgres avoids ~$15–20/mo. Steady-state stays $25–50/mo within the $100
-    cap. (Follow-up doc task.)
+  - **Q:** Produce a consolidated per-resource monthly cost estimate?
+  - **A:** Consolidated figures in [spec.md](../../../ref/spec.md):
+    - AKS Free saves ~$73/mo per cluster
+    - static PIP ~$4/mo vs AGW ~$30/mo
+    - no Azure Firewall saves ~$30/mo
+    - passive-cold DR ~$2/mo
+    - GRS staging ~$1/mo uplift
+    - self-hosted Postgres avoids ~$15–20/mo
+    - Steady-state stays $25–50/mo within the $100 cap. (Follow-up doc task.)
+    
 - **CO:08 — Optimize environment costs**
   - **Q:** Right-size staging below prod, or keep parity for production fidelity?
   - **A:** Keep node-pool parity (same B2s, same autoscale bounds) —
@@ -247,7 +197,25 @@ default to confirm against the Phase 2 load test rather than guess precisely now
     basebackup + continuous WAL), which comfortably covers the ≤24h RPO.
     Retention values recorded in spec.md.
 
-## Operational Excellence — decisions
+## Operational Excellence - Checklist priority
+
+Source: https://learn.microsoft.com/en-us/azure/well-architected/operational-excellence/checklist
+
+| Code | Recommendation | Priority | Design principle | Backlog | Note |
+|---|---|---|---|---|---|
+| OE:01 | Standard practices / DevOps culture | Phase 1 | O1 | — | solo scale |
+| OE:02 | Standardize operations (routine/emergency) | Phase 1 | O1/O5 | [AKS upgrade runbook](../../backlog/oe02-aks-upgrade-runbook.md) | runbook catalog |
+| OE:03 | Formalize development practices | Phase 1 | O2 | — | lightweight, solo |
+| OE:04 | Tools, QA, source control, style | Phase 1 | O2 | — | — |
+| OE:05 | Infrastructure as Code | Phase 1 | O5 | — | Terraform + Helm/Helmfile |
+| OE:06 | Workload supply chain / pipelines | Phase 1 | O5 | — | GHA now; e2e tests → Phase 2 |
+| OE:07 | Monitoring stack | Phase 1 | O3 | — | baseline now; full stack → Phase 3 |
+| OE:08 | Incident management | Phase 2 | O1/S1 | [incident-review](../../backlog/oe08-incident-review-process.md) | — |
+| OE:09 | Testing | Phase 2 | O2 | — | synthetic e2e |
+| OE:10 | Automation (reliable, secure) | Phase 1 | O4 | — | core strength |
+| OE:11 | Safe deployment practices | Phase 1 | O5 | — | pipelines + approval gate; progressive rollout minimal |
+
+### Operational Excellence - Checklist priority decisions
 
 - **OE:02 — Standardize operations**
   - **Q:** Runbook template/format, and which runbooks beyond the current catalog?
@@ -280,7 +248,26 @@ default to confirm against the Phase 2 load test rather than guess precisely now
     `helm rollback`; infra via Terraform reprovision; regional failure via the
     DR runbook (RB-16, backlogged).
 
-## Performance Efficiency — decisions
+## Performance Efficiency - Checklist priority
+
+Source: https://learn.microsoft.com/en-us/azure/well-architected/performance-efficiency/checklist
+
+| Code | Recommendation | Priority | Design principle | Backlog | Note |
+|---|---|---|---|---|---|
+| PE:01 | Define performance targets | Phase 2 | P1 | — | loose by design; connection target TBD (spec.md) |
+| PE:02 | Capacity planning | Phase 2 | P2 | — | vertical scaling if needed |
+| PE:03 | Select the right services | Phase 1 | P2 | — | AKS/Postgres/SSD chosen (tech-choices) |
+| PE:04 | Consistent performance measurement | Phase 3 | P3 | — | baseline metrics only in Phase 1 |
+| PE:05 | Optimize scaling & partitioning | Phase 2 | P2 | — | autoscaler now; HPA → Phase 2 |
+| PE:06 | Performance testing | Phase 2 | P3 | — | k6 load test |
+| PE:07 | Optimize code & infrastructure | Phase 1 | P3 | — | offload to platform; right-sized |
+| PE:08 | Optimize data usage | Phase 1 | P2 | — | indexes on filtered columns |
+| PE:09 | Prioritize critical-flow performance | Phase 1 | P1 | — | flows A/B identified |
+| PE:10 | Optimize operational tasks | Phase 1 | — | — | backups, rotation, deploy impact |
+| PE:11 | Respond to live performance issues | Phase 3 | P3 | — | — |
+| PE:12 | Continuously optimize | Phase 3 | P4 | — | — |
+
+### Performance Efficiency - Checklist priority decisions
 
 - **PE:01 — Define performance targets**
   - **Q:** Concurrent-connections target (spec.md TBD) and a query budget for A/B?
