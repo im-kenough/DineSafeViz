@@ -27,14 +27,15 @@
 | RTO (tier 1) | **~20–30 min** | Pod/node self-healing within a running cluster (CloudNativePG) |
 | RTO (tier 2) | **≤ 4h** | Full passive-cold regional DR: provision from IaC, restore WAL, repoint DNS |
 | DR strategy | Passive-cold (backup-and-restore), data-only | No standing secondary cluster |
+| DR criticality tier | **Tier 2 (Business Operational)** | Cold standby, cheapest posture the tier allows ([5-2-2](../explanation/aks/planning/5-2-2-design-guides-dr.md)) |
 
 ## Region & residency
 
 | Decision | Value | Notes |
 |---|---|---|
-| Region scope | Single active region + cold DR region | |
+| Region scope | Single active region + cold DR region | Locally redundant + backup across regions; zone redundancy not pursued — single Postgres primary ([5-2-1](../explanation/aks/planning/5-2-1-design-guides-av-zones.md)) |
 | Residency constraint | **North America** (latency-driven) | No legal residency requirement |
-| Specific region | _TBD at implementation — cheapest NA option_ | v1 docs variously said East US 2 / Canada Central; deferred to cost check |
+| Specific region | _TBD at implementation — cheapest NA option_ | Must be an AZ-supporting, **paired** region so GRS replicates (East US 2 and Canada Central both qualify); deferred to cost check |
 
 ## Performance targets
 
