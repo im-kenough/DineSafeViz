@@ -1,7 +1,6 @@
 # Backlog — deferred design tasks
 
-Open items deferred during WAF planning. Each doc briefly outlines what needs
-doing, why, and when it's "done." Linked from the pillar decisions in
+These are backlogged tasks uncovered during the design process when working through the Azure Well Architected framework. These items eventually should be addressed for completeness. Linked from the pillar decisions in
 `docs/explanation/aks/planning/`.
 
 | Item | From | Phase |
