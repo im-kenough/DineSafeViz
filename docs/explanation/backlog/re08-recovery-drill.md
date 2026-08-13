@@ -1,4 +1,4 @@
-# Recovery drill
+# RE:08 — Recovery drill
 
 - **From:** Reliability R3 (Design for recovery)
 - **Checklist item:** [RE:08](https://learn.microsoft.com/en-us/azure/well-architected/reliability/reliability-test) — Test for resiliency/recovery scenarios (backup & restore).

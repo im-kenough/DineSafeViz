@@ -104,7 +104,7 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/reliability/pri
   - Postgres pod fail → CloudNativePG restart + PVC re-mount (RTO tier 1).
   - Node fail → reschedule. Zone/region outage → passive-cold DR (RTO tier 2).
   - Ingress restart → survives via static Public IP.
-  - Backlog: [Failure Mode Analysis](../../backlog/failure-mode-analysis.md) not yet done.
+  - Backlog: [Failure Mode Analysis](../../backlog/re03-failure-mode-analysis.md) not yet done.
 - **Self-preservation?**
   - Health probes, `postgres_exporter` sidecar, nginx gateway offload/route, Cilium default-deny NetworkPolicy.
 - **Scale out?**
@@ -125,11 +125,11 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/reliability/pri
 
 - **Recovery plans / drills?**
   - Passive-cold DR pattern documented; RPO ≤ 24h / two-tier RTO in [spec.md](../../../ref/spec.md).
-  - Backlog: [DR runbook RB-16](../../backlog/dr-runbook-rb16.md), [recovery drill](../../backlog/recovery-drill.md).
+  - Backlog: [DR runbook RB-16](../../backlog/re09-dr-runbook-rb16.md), [recovery drill](../../backlog/re08-recovery-drill.md).
 - **Repair data within targets?**
   - CloudNativePG WAL archive + daily basebackup to GRS; PITR via Barman.
   - Weekly backup-verification workflow (issues on stale backup).
-  - Backlog: [backup immutability](../../backlog/backup-immutability.md).
+  - Backlog: [backup immutability](../../backlog/re09-backup-immutability.md).
 - **Automated self-healing?**
   - CloudNativePG pod restart / PVC re-mount; K8s probes restart unhealthy pods.
 - **Immutable ephemeral units?**
@@ -148,13 +148,13 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/reliability/pri
   - Cost guardrails (budget, >12h running), backup-verification, cert-renewal heartbeat.
   - Broader predictive alerting **deferred to Phase 3**.
 - **Simulate failures?**
-  - Staging env (`stg`) exists. Backlog: [failure simulation](../../backlog/failure-simulation.md).
+  - Staging env (`stg`) exists. Backlog: [failure simulation](../../backlog/re08-failure-simulation.md).
 - **Automation?**
   - Strong — Terraform, Helm/Helmfile, GitHub Actions for every op. No portal clicks.
 - **Routine ops impact?**
-  - AKS upgrades, cert renewal, backups. Backlog: [AKS upgrade runbook](../../backlog/aks-upgrade-runbook.md).
+  - AKS upgrades, cert renewal, backups. Backlog: [AKS upgrade runbook](../../backlog/oe02-aks-upgrade-runbook.md).
 - **Learn from incidents?**
-  - Pre-launch, none yet. Backlog: [incident-review process](../../backlog/incident-review-process.md).
+  - Pre-launch, none yet. Backlog: [incident-review process](../../backlog/oe08-incident-review-process.md).
 
 **Decision: Split** — Adopt automation; Defer observability & incident learning to Phase 3.
 
@@ -192,7 +192,7 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/security/princi
 - **Role-based training?**
   - N/A — solo operator.
 - **Incident response plan?**
-  - Backlog: [security incident response plan](../../backlog/security-incident-response.md).
+  - Backlog: [security incident response plan](../../backlog/se12-security-incident-response.md).
 - **Compliance requirements?**
   - None — public open data, personal project; no regulatory/industry standard applies.
 - **Team-level security standards?**
@@ -215,7 +215,7 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/security/princi
   - At rest: default managed-key encryption + **encryption at host** on node pool.
   - In transit: cluster-internal TLS via cert-manager; Blob HTTPS enforced.
 - **Guard against exploits?**
-  - AKS kept on latest version. Image scanning deferred → [image vuln scanning](../../backlog/image-vulnerability-scanning.md).
+  - AKS kept on latest version. Image scanning deferred → [image vuln scanning](../../backlog/se11-image-vulnerability-scanning.md).
 - **Guard against exfiltration?**
   - Default-deny NetworkPolicy; no public Postgres endpoint; creds never in Git.
   - Egress via default AKS load balancer (Azure Firewall egress filtering out of scope — cost).
@@ -233,11 +233,11 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/security/princi
 - **Authn/authz minimized by privilege/scope/time?**
   - Workload Identity + OIDC (no standing secrets); RBAC Key Vault; per-env scoping. No JIT/JEA (scoped-but-standing).
 - **Supply-chain vulnerability protection?**
-  - Backlog: [image vulnerability scanning](../../backlog/image-vulnerability-scanning.md) (Trivy in CI).
+  - Backlog: [image vulnerability scanning](../../backlog/se11-image-vulnerability-scanning.md) (Trivy in CI).
 - **Cryptography for trust/verification?**
   - cert-manager TLS certs. Image signing (cosign) not planned at this scale.
 - **Backup immutable + encrypted?**
-  - Encrypted by default (GRS). Immutability → [backup immutability](../../backlog/backup-immutability.md).
+  - Encrypted by default (GRS). Immutability → [backup immutability](../../backlog/re09-backup-immutability.md).
 - **Operating within intended limits?**
   - Pod resource requests/limits; NetworkPolicy constrains reachable surface.
 
@@ -267,15 +267,15 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/security/princi
 - **Automated asset inventory?**
   - De-facto via Terraform state + resource tags. No dedicated inventory tool.
 - **Threat modeling?**
-  - Backlog: [threat model](../../backlog/threat-model.md).
+  - Backlog: [threat model](../../backlog/se02-threat-model.md).
 - **Measure vs. baseline (posture management)?**
   - Microsoft Defender for Cloud secure score / Azure Policy **out of scope** (cost/complexity).
 - **Periodic security tests + vuln scanning?**
-  - No pen testing. Vuln scanning deferred → [image vuln scanning](../../backlog/image-vulnerability-scanning.md).
+  - No pen testing. Vuln scanning deferred → [image vuln scanning](../../backlog/se11-image-vulnerability-scanning.md).
 - **Detect/respond/recover?**
   - Container Insights only; no SIEM. Limited by design.
 - **Post-incident activities?**
-  - Backlog: [incident-review process](../../backlog/incident-review-process.md).
+  - Backlog: [incident-review process](../../backlog/oe08-incident-review-process.md).
 - **Get / stay current?**
   - AKS kept on latest version; dependency updates via GitHub.
 
@@ -369,7 +369,7 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/cost-optimizati
 - **Capture/classify expense?**
   - Resource tags (`workload`, `environment`, `managed_by`, `cost_center`, `owner`, `repo`) enable breakdown in Azure Cost Management.
 - **Cost alerts at thresholds?**
-  - 50%/80% warnings, 100% auto-shutdown. Review cadence → [cost alert review cadence](../../backlog/cost-alert-review-cadence.md).
+  - 50%/80% warnings, 100% auto-shutdown. Review cadence → [cost alert review cadence](../../backlog/co03-cost-alert-review-cadence.md).
 - **Continuously evaluate/adjust?**
   - Decision log; planned tier upgrade (Standard HDD → SSD, Q1 2028) shows ongoing review.
 - **Decommission underutilized/obsolete?**
@@ -391,11 +391,11 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/operational-exc
 - **Common systems/tools + shared backlog?**
   - Single Git repo; GitHub Issues + Actions. Escalation paths N/A (solo).
 - **Continuous learning / blameless postmortems?**
-  - Documentation set (this planning) + session journals; postmortems → [incident-review process](../../backlog/incident-review-process.md).
+  - Documentation set (this planning) + session journals; postmortems → [incident-review process](../../backlog/oe08-incident-review-process.md).
 - **Agile practices + shift-left?**
   - Lightweight; shift-left via CI checks in pipelines.
 - **Standards for dev/ops procedures + drills?**
-  - Runbook catalog (RB-01..RB-16); emergency drill → [recovery drill](../../backlog/recovery-drill.md).
+  - Runbook catalog (RB-01..RB-16); emergency drill → [recovery drill](../../backlog/re08-recovery-drill.md).
 - **Centralized ops teams?**
   - No — solo operator.
 

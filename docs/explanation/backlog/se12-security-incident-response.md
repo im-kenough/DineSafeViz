@@ -1,4 +1,4 @@
-# Security incident response plan
+# SE:12 — Security incident response plan
 
 - **From:** Security S1 (Plan your security readiness)
 - **Checklist item:** [SE:12](https://learn.microsoft.com/en-us/azure/well-architected/security/incident-response) — Define and test incident response procedures.

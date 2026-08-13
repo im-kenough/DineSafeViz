@@ -1,4 +1,4 @@
-# DR activation runbook (RB-16)
+# RE:09 — DR activation runbook (RB-16)
 
 - **From:** Reliability R3 (Design for recovery)
 - **Checklist item:** [RE:09](https://learn.microsoft.com/en-us/azure/well-architected/reliability/disaster-recovery) — Implement structured, tested, documented DR plans.

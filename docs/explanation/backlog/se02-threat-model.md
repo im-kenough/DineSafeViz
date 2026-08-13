@@ -1,4 +1,4 @@
-# Threat model
+# SE:02 — Threat model
 
 - **From:** Security S5 (Sustain and evolve posture); supports S2
 - **Checklist item:** [SE:02](https://learn.microsoft.com/en-us/azure/well-architected/security/secure-development-lifecycle) — Threat modeling within the secure development lifecycle.
