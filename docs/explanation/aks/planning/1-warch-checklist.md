@@ -107,3 +107,93 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/performance-eff
 | PE:10 | Optimize operational tasks | P1 | backups, rotation, deploy impact |
 | PE:11 | Respond to live performance issues | P3 | P3 |
 | PE:12 | Continuously optimize | P3 | P4 |
+
+---
+
+# Open decisions surfaced by the checklist
+
+Reading each checklist item's detail, most are fully resolved by the step-1
+decisions in [0-warch-design-principles.md](0-warch-design-principles.md). The
+items below raise **new, implementation-level decisions** not yet made. Items
+not listed are already covered by step 1 or by a [backlog](../../backlog/README.md)
+task. These are questions to answer in a later decision pass — not yet decided.
+
+## Reliability — open decisions
+
+- **RE:02 — Identify & rate flows**
+  - Adopt a formal criticality scale (e.g. high/medium/low), or keep the binary
+    critical / best-effort split?
+- **RE:04 — Reliability & recovery targets**
+  - Define a **health model**: what signals mark each component (Flask, Grafana,
+    Postgres, ingress) healthy vs. unhealthy?
+  - Set informal **SLOs** for flows A/B (e.g. success rate) despite having no
+    formal SLA?
+- **RE:06 — Scaling strategy**
+  - What triggers/thresholds drive the cluster autoscaler (CPU/memory %, node
+    pressure)?
+- **RE:07 — Self-preservation**
+  - Set liveness/readiness/startup **probe parameters** per workload?
+  - Does Flask implement DB connection **retry/timeout** (transient-fault
+    handling)?
+- **RE:10 — Health monitoring**
+  - Which **SLIs** (uptime, error rate, latency) do we track for A/B, and where
+    are they retained/visible?
+
+## Security — open decisions
+
+- **SE:01 — Security baseline**
+  - Which baseline do we measure against — Microsoft Cloud Security Benchmark or
+    CIS AKS benchmark? How often?
+- **SE:02 — Secure development lifecycle**
+  - Which SDL scans run in P1 — dependency scanning (Dependabot), secret
+    scanning (GitHub secret scanning / gitleaks), SAST? (image scanning is
+    already backlogged as [SE:11](../../backlog/se11-image-vulnerability-scanning.md))
+- **SE:05 — Identity & access**
+  - MFA / conditional access on the admin (Entra) account?
+  - Granularity of Azure RBAC role assignments per managed identity?
+- **SE:08 — Harden resources**
+  - Pod Security Standards level for P1 — baseline or restricted?
+  - Disable AKS local accounts (Entra-only auth)? Confirm API-server authorized
+    IP ranges.
+- **SE:09 — Protect secrets + rotation**
+  - Rotation cadence for DB credentials and TLS certs — automated or manual?
+
+## Cost Optimization — open decisions
+
+- **CO:02 — Cost model**
+  - Produce a consolidated per-resource monthly cost estimate (in
+    [spec.md](../../../ref/spec.md))?
+- **CO:08 — Optimize environment costs**
+  - Right-size staging below prod (smaller SKU / fewer nodes), or keep parity
+    for production fidelity?
+- **CO:10 — Optimize data costs**
+  - Retention windows: Log Analytics (30d set), WAL/basebackup retention, ACR
+    image retention?
+
+## Operational Excellence — open decisions
+
+- **OE:02 — Standardize operations**
+  - Runbook template/format, and which runbooks beyond the current catalog?
+- **OE:03 / OE:04 — Development practices & tooling**
+  - Branching strategy (trunk-based vs. GitFlow), PR/commit conventions, and
+    pre-commit linters (tflint, hadolint, markdownlint)?
+- **OE:06 — Workload supply chain**
+  - Pipeline stages + quality gates, and the artifact promotion path stg → prod?
+- **OE:09 — Testing**
+  - Which tests run in CI in P1 (unit/integration for Flask + ETL), and are they
+    release gates?
+- **OE:11 — Safe deployment**
+  - Deployment strategy (rolling vs. recreate) and a documented rollback
+    procedure?
+
+## Performance Efficiency — open decisions
+
+- **PE:01 — Define performance targets**
+  - Set the concurrent-connections target (currently TBD in
+    [spec.md](../../../ref/spec.md)) and a sub-second query budget for A/B?
+- **PE:07 — Optimize code & infrastructure**
+  - Postgres tuning (`shared_buffers`, `work_mem`, `max_connections`) and Flask
+    worker / connection-pool sizing?
+- **PE:08 — Optimize data usage**
+  - Index design — which columns get secondary indexes (establishment ID,
+    inspection date)?
