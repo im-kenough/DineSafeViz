@@ -1,13 +1,5 @@
 # DineSafeViz — Design Decision Register (spec)
 
-Canonical record of workload-level design decisions: the numbers and
-non-negotiables that other planning documents reference instead of restating.
-When a value is decided here, cite it from the WAF planning docs rather than
-duplicating it.
-
-> Status: living document. Populated as the WAF planning process
-> (`docs/explanation/aks/planning/`) resolves each decision.
-
 ## Business & availability targets
 
 | Decision | Value | Notes / source |
