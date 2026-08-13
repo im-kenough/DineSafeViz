@@ -47,9 +47,10 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/reliability/che
 - **RE:02 — Identify & rate flows**
   - **Q:** Adopt a formal criticality scale (e.g. high/medium/low), or keep the
     binary critical / best-effort split?
-  - **A:** Keep the binary split. Only three flows exist (spec.md:
-    A/B critical, C best-effort); a graded scale adds ceremony without changing
-    any operational response (R5 simplicity).
+  - **A:** Keep the binary split.
+    - Only three flows exist (spec.md: A/B critical, C best-effort).
+    - A graded scale adds ceremony without changing any operational response
+      (R5 simplicity).
 - **RE:04 — Reliability & recovery targets**
   - **Q:** Define a **health model** — what signals mark each component healthy?
   - **A:** Health signals per component —
@@ -60,35 +61,38 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/reliability/che
     - Ingress: Standard LB backend healthy behind the static Public IP.
     - The probe parameters that enforce these are RE:07.
   - **Q:** Set informal **SLOs** for flows A/B despite no formal SLA?
-  - **A:** No numeric SLO — no SLA and near-zero traffic (spec.md,
-    Phase 1). Informal objective only: "reachable within minutes of cluster start,
-    sub-second page loads." A success-rate SLO is unmeasurable without traffic.
+  - **A:** No numeric SLO — no SLA and near-zero traffic (spec.md, Phase 1).
+    - Informal objective only: "reachable within minutes of cluster start,
+      sub-second page loads."
+    - A success-rate SLO is unmeasurable without traffic.
 - **RE:06 — Scaling strategy**
   - **Q:** What triggers/thresholds drive the cluster autoscaler?
-  - **A:** The cluster autoscaler is node-level and reacts to
-    unschedulable pods (pending on CPU/memory requests) — "scale up upon
-    resource contention" (arch-design-aks). Pools: `syspool` 1–2, `usrpool`
-    1–3. No custom % threshold; per-pod CPU/memory scaling is HPA's job, and
-    HPA is deferred to Phase 2.
+  - **A:** Node-level cluster autoscaler reacting to unschedulable pods (pending
+    on CPU/memory requests) — "scale up upon resource contention"
+    (arch-design-aks).
+    - Pools: `syspool` 1–2, `usrpool` 1–3.
+    - No custom % threshold.
+    - Per-pod CPU/memory scaling is HPA's job; HPA is deferred to Phase 2.
 - **RE:07 — Self-preservation**
   - **Q:** Set liveness/readiness/startup **probe parameters** per workload?
-  - **A (revisit post-load-test):** Not set in v1.
-    Starting points — Flask/Grafana: readiness + liveness on the health
-    endpoints, ~10s period, 3-failure threshold, ~15–30s initial delay;
-    Postgres: rely on CloudNativePG's built-in probes (no manual tuning). Tune
-    after the Phase 2 load test.
+  - **A (revisit post-load-test):** Not set in v1. Starting points:
+    - Flask/Grafana: readiness + liveness on the health endpoints, ~10s period,
+      3-failure threshold, ~15–30s initial delay.
+    - Postgres: rely on CloudNativePG's built-in probes (no manual tuning).
+    - Tune after the Phase 2 load test.
   - **Q:** Does Flask implement DB connection **retry/timeout**?
-  - **A:** Adopt a short connect timeout plus limited retry/backoff on
-    transient DB errors so a Postgres pod restart (RTO tier 1) degrades
-    gracefully instead of returning 500s. A code-level choice, implemented in
-    Flask's DB layer.
+  - **A:** Short connect timeout plus limited retry/backoff on transient DB
+    errors.
+    - A Postgres pod restart (RTO tier 1) degrades gracefully instead of
+      returning 500s.
+    - A code-level choice, implemented in Flask's DB layer.
 - **RE:10 — Health monitoring**
   - **Q:** Which **SLIs** do we track for A/B, and where are they retained/visible?
   - **A:** Phase 1 SLIs from Container Insights (30-day retention in
-    `log-dsv-shared-eus2`): endpoint/pod availability, HTTP error rate, and
-    request latency for A/B; Postgres metrics via the `postgres_exporter`
-    sidecar. Visible in Azure Monitor now; full operator dashboards → Phase 3
-    (R4).
+    `log-dsv-shared-eus2`):
+    - Endpoint/pod availability, HTTP error rate, and request latency for A/B.
+    - Postgres metrics via the `postgres_exporter` sidecar.
+    - Visible in Azure Monitor now; full operator dashboards → Phase 3 (R4).
 
 
 ## Security - Checklist priority
@@ -113,42 +117,45 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/security/checkl
 ### Security - Checklist priority decisions
 - **SE:01 — Security baseline**
   - **Q:** Which baseline — Microsoft Cloud Security Benchmark or CIS AKS? How often?
-  - **A:** Measure against the **CIS AKS Benchmark** using
-    `kube-bench` (free, open-source). MCSB scoring rides Microsoft Defender for
-    Cloud, which is out of scope on cost. Run at each AKS version upgrade and on
-    a quarterly cadence.
+  - **A:** Measure against the **CIS AKS Benchmark** using `kube-bench` (free,
+    open-source).
+    - MCSB scoring rides Microsoft Defender for Cloud, which is out of scope on
+      cost.
+    - Run at each AKS version upgrade and on a quarterly cadence.
 - **SE:02 — Secure development lifecycle**
   - **Q:** Which SDL scans run in Phase 1?
-  - **A:** Free GitHub-native scans in Phase 1 — Dependabot (dependency),
-    GitHub secret scanning + push protection (or `gitleaks` in CI), and CodeQL
-    SAST (free for public repos; enable if the repo is public). Container image
-    scanning is already backlogged
-    ([SE:11](../../backlog/se11-image-vulnerability-scanning.md)).
+  - **A:** Free GitHub-native scans in Phase 1:
+    - Dependabot (dependency).
+    - GitHub secret scanning + push protection (or `gitleaks` in CI).
+    - CodeQL SAST (free for public repos; enable if the repo is public).
+    - Container image scanning is already backlogged
+      ([SE:11](../../backlog/se11-image-vulnerability-scanning.md)).
 - **SE:05 — Identity & access**
   - **Q:** MFA / conditional access on the admin (Entra) account?
-  - **A:** Enable MFA on the Entra admin account via **security
-    defaults** (free). Conditional Access needs Entra ID P1 (~$6/user/mo) —
-    deferred on cost.
+  - **A:** Enable MFA on the Entra admin account via **security defaults** (free).
+    - Conditional Access needs Entra ID P1 (~$6/user/mo) — deferred on cost.
   - **Q:** Granularity of Azure RBAC role assignments per managed identity?
   - **A:** Least-privilege per pod-class identity (arch-design-aks):
-    each gets only its scoped role — `AcrPull` on ACR, `Key Vault Secrets User`
-    on its own environment Key Vault; no cross-environment assignment. A
-    separate control-plane identity per environment.
+    - Each gets only its scoped role — `AcrPull` on ACR, `Key Vault Secrets
+      User` on its own environment Key Vault.
+    - No cross-environment assignment.
+    - A separate control-plane identity per environment.
 - **SE:08 — Harden resources**
   - **Q:** Pod Security Standards level for Phase 1 — baseline or restricted?
   - **A:** Baseline (default) profile in Phase 1; **Restricted** deferred
     to Phase 2 (arch-design-aks conformance table).
   - **Q:** Disable AKS local accounts? Confirm API-server authorized IP ranges.
-  - **A:** Disable local accounts (`--disable-local-accounts`,
-    Entra-only) — free hardening; Workload Identity/OIDC is already the auth
-    path. API-server authorized IP ranges are confirmed in v1 (workstation +
-    GHA runner ranges).
+  - **A:** Disable local accounts (`--disable-local-accounts`, Entra-only):
+    - Free hardening; Workload Identity/OIDC is already the auth path.
+    - API-server authorized IP ranges are confirmed in v1 (workstation + GHA
+      runner ranges).
 - **SE:09 — Protect secrets + rotation**
   - **Q:** Rotation cadence for DB credentials and TLS certs — automated or manual?
-  - **A:** TLS certs — automated via cert-manager/ACME (Let's Encrypt
-    ~90-day certs); a monthly cert-renewal heartbeat forces a start to prevent
-    expiry. DB credentials — stored in Key Vault, surfaced via CSI; rotated via
-    an on-demand rotation workflow (runbook) plus an annual scheduled rotation.
+  - **A:** Split by secret type —
+    - TLS certs: automated via cert-manager/ACME (Let's Encrypt ~90-day certs);
+      a monthly cert-renewal heartbeat forces a start to prevent expiry.
+    - DB credentials: stored in Key Vault, surfaced via CSI; rotated via an
+      on-demand rotation workflow (runbook) plus an annual scheduled rotation.
 
 ## Cost Optimization - Checklist priority
 
@@ -186,16 +193,18 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/cost-optimizati
     
 - **CO:08 — Optimize environment costs**
   - **Q:** Right-size staging below prod, or keep parity for production fidelity?
-  - **A:** Keep node-pool parity (same B2s, same autoscale bounds) —
-    stop-by-default drives idle cost to ~zero, so parity is nearly free and
-    preserves prod fidelity — but size the staging Postgres `Cluster` requests
-    below prod (prod is 250m CPU / 512Mi). Confirm.
+  - **A:** Keep node-pool parity (same B2s, same autoscale bounds):
+    - Stop-by-default drives idle cost to ~zero, so parity is nearly free and
+      preserves prod fidelity.
+    - But size the staging Postgres `Cluster` requests below prod (prod is
+      250m CPU / 512Mi). Confirm.
 - **CO:10 — Optimize data costs**
   - **Q:** Retention windows — Log Analytics, WAL/basebackup, ACR images?
-  - **A:** Log Analytics — 30 days. ACR — untagged-image cleanup
-    workflow already runs. WAL/basebackup — a 7-day PITR window (daily
-    basebackup + continuous WAL), which comfortably covers the ≤24h RPO.
-    Retention values recorded in spec.md.
+  - **A:** Retention values (recorded in spec.md):
+    - Log Analytics — 30 days.
+    - ACR — untagged-image cleanup workflow already runs.
+    - WAL/basebackup — a 7-day PITR window (daily basebackup + continuous WAL),
+      which comfortably covers the ≤24h RPO.
 
 ## Operational Excellence - Checklist priority
 
@@ -219,34 +228,40 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/operational-exc
 
 - **OE:02 — Standardize operations**
   - **Q:** Runbook template/format, and which runbooks beyond the current catalog?
-  - **A:** Adopt a standard template — Purpose / Trigger /
-    Prerequisites / Steps / Verification / Rollback / Escalation. Catalog =
-    RB-01…RB-16; the known gap is an AKS version-upgrade runbook (backlogged
-    [OE:02](../../backlog/oe02-aks-upgrade-runbook.md)).
+  - **A:** Adopt a standard template:
+    - Sections: Purpose / Trigger / Prerequisites / Steps / Verification /
+      Rollback / Escalation.
+    - Catalog = RB-01…RB-16.
+    - Known gap: an AKS version-upgrade runbook (backlogged
+      [OE:02](../../backlog/oe02-aks-upgrade-runbook.md)).
 - **OE:03 / OE:04 — Development practices & tooling**
   - **Q:** Branching strategy, PR/commit conventions, pre-commit linters?
-  - **A:** Short-lived feature branches off `main` with PR + squash
-    merge (audit trail; solo, so self-review). Conventional Commits. CI /
-    pre-commit linters, all free OSS: `tflint`, `hadolint`, `markdownlint`, plus
-    `terraform fmt`.
+  - **A:** Lightweight, solo-scale practices:
+    - Short-lived feature branches off `main` with PR + squash merge (audit
+      trail; solo, so self-review).
+    - Conventional Commits.
+    - CI / pre-commit linters, all free OSS: `tflint`, `hadolint`,
+      `markdownlint`, plus `terraform fmt`.
 - **OE:06 — Workload supply chain**
   - **Q:** Pipeline stages + quality gates, and the promotion path stg → prod?
-  - **A:** build → lint/test → build image → push to ACR → deploy to
+  - **A:** Pipeline: build → lint/test → build image → push to ACR → deploy to
     `stg` → **GitHub Environments approval gate** → deploy the same image digest
-    to `prod`. The immutable image is promoted by digest (no rebuild between
-    environments).
+    to `prod`.
+    - The immutable image is promoted by digest (no rebuild between environments).
 - **OE:09 — Testing**
   - **Q:** Which tests run in CI in Phase 1, and are they release gates?
-  - **A:** Phase 1 CI runs unit tests for Flask + ETL and the linters as
-    **required gates**; integration and synthetic e2e tests are deferred to Phase 2
-    (arch-design-aks).
+  - **A:** Phase 1 CI:
+    - Unit tests for Flask + ETL and the linters run as **required gates**.
+    - Integration and synthetic e2e tests are deferred to Phase 2
+      (arch-design-aks).
 - **OE:11 — Safe deployment**
   - **Q:** Deployment strategy (rolling vs. recreate) and a rollback procedure?
-  - **A:** Stateless (Flask/Grafana) — Helm rolling update (default
-    `RollingUpdate`). Postgres — single instance, so a version change is a brief
-    recreate (short downtime acceptable given stop-by-default). Rollback via
-    `helm rollback`; infra via Terraform reprovision; regional failure via the
-    DR runbook (RB-16, backlogged).
+  - **A:** Strategy by component, with layered rollback:
+    - Stateless (Flask/Grafana): Helm rolling update (default `RollingUpdate`).
+    - Postgres: single instance, so a version change is a brief recreate (short
+      downtime acceptable given stop-by-default).
+    - Rollback: `helm rollback`; infra via Terraform reprovision; regional
+      failure via the DR runbook (RB-16, backlogged).
 
 ## Performance Efficiency - Checklist priority
 
@@ -271,21 +286,26 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/performance-eff
 
 - **PE:01 — Define performance targets**
   - **Q:** Concurrent-connections target (spec.md TBD) and a query budget for A/B?
-  - **A:** **~10 concurrent connections** (sizes Postgres
-    `max_connections` and Flask worker/pool counts) and a **sub-second (<1s)
-    query budget** for flows A/B — matched to a genuine solo/portfolio-demo
-    load. Recorded in spec.md (closes the prior TBD).
+  - **A:** Matched to a genuine solo/portfolio-demo load (recorded in spec.md,
+    closes the prior TBD):
+    - **~10 concurrent connections** (sizes Postgres `max_connections` and Flask
+      worker/pool counts).
+    - **Sub-second (<1s) query budget** for flows A/B.
 - **PE:07 — Optimize code & infrastructure**
   - **Q:** Postgres tuning and Flask worker / connection-pool sizing?
-  - **A (revisit post-load-test):** Only "basic
-    tuning" is noted in v1. Phase 1 starting points on B2s (2 vCPU / 4 GiB; Postgres
-    request 512Mi): `shared_buffers` ~128–256MB, `work_mem` ~4MB,
-    `max_connections` ~25–30 (headroom over the ~10 target in PE:01, covering
-    the Flask pool plus admin/replication connections). Flask: 2–4 gunicorn
-    workers with a small SQLAlchemy pool. Tune after the Phase 2 load test.
+  - **A (revisit post-load-test):** Only "basic tuning" is noted in v1. Phase 1
+    starting points on B2s (2 vCPU / 4 GiB; Postgres request 512Mi):
+    - `shared_buffers` ~128–256MB, `work_mem` ~4MB.
+    - `max_connections` ~25–30 (headroom over the ~10 target in PE:01, covering
+      the Flask pool plus admin/replication connections).
+    - Flask: 2–4 gunicorn workers with a small SQLAlchemy pool.
+    - Tune after the Phase 2 load test.
 - **PE:08 — Optimize data usage**
   - **Q:** Index design — which columns get secondary indexes?
   - **A:** Secondary indexes on commonly filtered/joined columns
-    (arch-design-planning): establishment ID and inspection date, plus the
-    `inspections`→`establishments` and `infractions`→`inspections` foreign keys,
-    and infraction severity if filtered. Primary keys are already indexed.
+    (arch-design-planning):
+    - Establishment ID and inspection date.
+    - The `inspections`→`establishments` and `infractions`→`inspections` foreign
+      keys.
+    - Infraction severity if filtered.
+    - Primary keys are already indexed.
