@@ -1,13 +1,5 @@
 # DineSafeViz — Design Decision Register (spec)
 
-Canonical record of workload-level design decisions: the numbers and
-non-negotiables that other planning documents reference instead of restating.
-When a value is decided here, cite it from the WAF planning docs rather than
-duplicating it.
-
-> Status: living document. Populated as the WAF planning process
-> (`docs/explanation/aks/planning/`) resolves each decision.
-
 ## Business & availability targets
 
 | Decision | Value | Notes / source |
@@ -16,7 +8,7 @@ duplicating it.
 | Availability model | On-demand; **clusters stopped by default**, started for demos | No 24/7 uptime |
 | Formal SLA | **None** | AKS Free control plane has no uptime SLA |
 | Expected load | Near-zero real traffic; shown to employers on demand | No user-growth forecast |
-| Concurrent connections target | _TBD_ | To size Postgres `max_connections`, Flask workers |
+| Concurrent connections target | **~10** | Sizes Postgres `max_connections`, Flask workers (PE:01) |
 | Dataset scale | ~100k rows, grows slowly | Toronto Open Data DineSafe feed |
 
 ## Critical user flows
@@ -43,6 +35,21 @@ duplicating it.
 | Region scope | Single active region + cold DR region | |
 | Residency constraint | **North America** (latency-driven) | No legal residency requirement |
 | Specific region | _TBD at implementation — cheapest NA option_ | v1 docs variously said East US 2 / Canada Central; deferred to cost check |
+
+## Performance targets
+
+| Decision | Value | Notes / source |
+|---|---|---|
+| Query budget (flows A/B) | **< 1s** | Sub-second page/dashboard queries (PE:01) |
+| Concurrent connections | **~10** | See Business & availability above |
+
+## Data retention
+
+| Decision | Value | Notes / source |
+|---|---|---|
+| Log Analytics | **30 days** | Container Insights logs in `log-dsv-shared-eus2` (CO:10) |
+| Postgres PITR window | **7 days** | Daily basebackup + continuous WAL; covers the ≤24h RPO (CO:10) |
+| ACR images | **Untagged-image cleanup** | Scheduled cleanup workflow removes untagged images (CO:07/CO:10) |
 
 ## Cost / FinOps
 

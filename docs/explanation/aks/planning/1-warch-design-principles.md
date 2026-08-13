@@ -1,22 +1,11 @@
-# 0. Well-Architected Design Principles
+# 1. Well-Architected Design Principles
 
-Step 1 of the [WAF suggested learning process](https://learn.microsoft.com/en-us/azure/well-architected/what-is-well-architected-framework#suggested-learning-process):
-**understand all of the design principles and craft a design strategy.**
-
-All five pillars apply to this workload. Every design principle below must be
-considered — none are optional. For each principle, record a **decision**:
+This document reviews each pillar and their design principles. Each principle will be reviewed to decide if it should be incoporated into this project.
 
 - **Adopt** — implement the approach as recommended.
 - **Adapt** — implement a lighter/modified version (state how).
 - **Defer** — valid but postponed to a later phase (state which).
 - **N/A** — not applicable to this workload (state why).
-
-The questions under each principle are derived from the "Approach" rows of the
-Microsoft principle articles. They are the prompts we must answer to justify
-each decision against DineSafeViz's requirements and budget.
-
-> Status: **complete.** All five pillars answered (24 principles). Open items
-> tracked in [backlog](../../backlog/README.md).
 
 ## Summary
 
@@ -146,7 +135,7 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/reliability/pri
 - **Immutable ephemeral units?**
   - Stateless Flask/Grafana as immutable images via Helm; environments reprovisionable from IaC.
 
-**Decision: Adopt** — a relative strength.
+**Decision: Adopt**
 
 ### R4. Design for operations
 
@@ -185,7 +174,7 @@ Source: https://learn.microsoft.com/en-us/azure/well-architected/reliability/pri
 - **Platform features / prebuilt assets?**
   - Heavy reuse — managed AKS, CloudNativePG, cert-manager, nginx, CSI Secrets Store.
 
-**Decision: Adopt** — a core design driver.
+**Decision: Adopt**
 
 ---
 
