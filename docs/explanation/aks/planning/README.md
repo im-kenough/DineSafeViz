@@ -36,23 +36,23 @@ flowchart LR
 
 ### 1. Understand all the design principles
 
-Design principles were reviewed in docs/explanation/aks/planning/0-warch-design-principles.md
+Design principles were reviewed in docs/explanation/aks/planning/1-warch-design-principles.md
 
 ### 2. Prioritize checklist items
 
-Select checklist items in docs/explanation/aks/planning/1-warch-checklist.md
+Select checklist items in docs/explanation/aks/planning/2-warch-checklist.md
 
 ### 3. Make trade offs
 
-Tradeoffs are considered in docs/explanation/aks/planning/2-warch-tradeoffs.md
+Tradeoffs are considered in docs/explanation/aks/planning/3-warch-tradeoffs.md
 
 ### 4. Match workload scenarios
 
-Workloads are considered in docs/explanation/aks/planning/3-well-arch-workloads.md
+Workloads are considered in docs/explanation/aks/planning/4-warch-workloads.md
 
 ### 5. Select Azure service
 
-Azure services are considered in docs/explanation/aks/planning/4-1-well-arch-service-guides.md
+Azure services are considered in docs/explanation/aks/planning/5-1-warch-service-guides.md
 
-Azure designs are considered in docs/explanation/aks/planning/4-2-well-arch-design-guides.md
+Azure designs are considered in docs/explanation/aks/planning/5-2-warch-design-guides.md
 
