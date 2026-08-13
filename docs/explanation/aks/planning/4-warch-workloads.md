@@ -1,30 +1,16 @@
 # 4. Match workload scenarios
 
-Step 4 of the [Well Architected Framework process](https://learn.microsoft.com/en-us/azure/well-architected/what-is-well-architected-framework#suggested-learning-process):
-find a published [workload guide](https://learn.microsoft.com/en-us/azure/well-architected/workloads)
-that matches your scenario and follow its design methodology.
-
-A workload guide is an **overlay** on the five pillars, tuned for a whole
-*class* of workload. It re-ranks the pillars for that class, names class-specific
-design areas, and highlights the considerations that matter most — so you don't
-rediscover them yourself.
+Step 4 of the [Well Architected Framework process](https://learn.microsoft.com/en-us/azure/well-architected/what-is-well-architected-framework#suggested-learning-process) directs architects to find an applicable [workload guide](https://learn.microsoft.com/en-us/azure/well-architected/workloads), which introduces architecture patterns and workload specific design principles.
 
 ## Summary
 
-Microsoft publishes workload guides for the types below, but **none are
-applicable to DineSafeViz**. DineSafeViz is a small, single-tenant,
-budget-capped portfolio web app on AKS with near-zero traffic and no SLA — it
-does not fit any published class. Each guide, and why it doesn't apply, follows.
-
-The AKS-specific design guidance DineSafeViz *does* use isn't a workload guide at
-all; it lives in the **service guides / AKS baseline reference architecture**,
-which is [Step 5](5-1-warch-service-guides.md).
+None of the Microsoft workload guides described below are applicable to DineSafeViz.
 
 ## Workload types
 
 ### [AI](https://learn.microsoft.com/en-us/azure/well-architected/ai/get-started)
 
-- **What it is:**
+- **Workload overview:**
   - Built around predictive, discriminative, or generative AI, where models
     (GPT-style language models, classifiers) become first-class components.
   - Replaces deterministic logic with nondeterministic model behaviour.
@@ -37,7 +23,7 @@ which is [Step 5](5-1-warch-service-guides.md).
 
 ### [SaaS](https://learn.microsoft.com/en-us/azure/well-architected/saas/get-started)
 
-- **What it is:**
+- **Workload overview:**
   - A commercial software-as-a-service product run by an ISV and sold to
     businesses (B2B) or consumers (B2C).
   - Centres on multitenancy — sharing infrastructure across paying customers
@@ -50,7 +36,7 @@ which is [Step 5](5-1-warch-service-guides.md).
 
 ### [Mission-critical](https://learn.microsoft.com/en-us/azure/well-architected/mission-critical/mission-critical-overview)
 
-- **What it is:**
+- **Workload overview:**
   - A workload where unavailability carries significant financial
     (business-critical) or human (safety-critical) cost, so it must always be
     available.
@@ -66,7 +52,7 @@ which is [Step 5](5-1-warch-service-guides.md).
 
 ### [HPC (high-performance computing)](https://learn.microsoft.com/en-us/azure/well-architected/hpc/get-started-overview)
 
-- **What it is:**
+- **Workload overview:**
   - Compute-intensive workloads — large-scale simulation, modeling, or analysis.
   - Need far more processing, memory, and I/O than a normal system can provide.
   - Achieved through massive parallelism across many CPUs, GPUs, or nodes (with
@@ -79,7 +65,7 @@ which is [Step 5](5-1-warch-service-guides.md).
 
 ### [Sustainability](https://learn.microsoft.com/en-us/azure/well-architected/sustainability/overview)
 
-- **What it is:**
+- **Workload overview:**
   - A cross-cutting *lens*, not a distinct workload class.
   - Minimizes a workload's energy use and carbon emissions — right-sizing,
     killing idle infrastructure, trimming excess telemetry and replication.
