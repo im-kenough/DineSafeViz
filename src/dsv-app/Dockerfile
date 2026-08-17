@@ -1,10 +1,10 @@
-FROM python:3.14.6-slim-trixie AS build
+FROM python:3.14.7-slim-trixie AS build
 ENV PIP_NO_CACHE_DIR=1 PYTHONDONTWRITEBYTECODE=1
 WORKDIR /build
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-FROM python:3.14.6-slim-trixie
+FROM python:3.14.7-slim-trixie
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 RUN groupadd --gid 65532 nonroot \
  && useradd --uid 65532 --gid 65532 --no-create-home nonroot
