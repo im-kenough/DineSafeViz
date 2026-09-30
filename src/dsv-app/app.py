@@ -13,7 +13,7 @@ import collections
 import itertools
 from contextlib import closing
 from datetime import date, datetime, timedelta
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -136,6 +136,11 @@ def get_valid_years(first: date, last: date) -> List[int]:
     return list(range(first.year, last.year + 1))
 
 
+def quarter_of(month: int) -> int:
+    """Get the quarter number (1-4) containing a month (1-12)."""
+    return (month - 1) // 3 + 1
+
+
 def get_valid_quarters(year: int, first: date, last: date) -> List[int]:
     """Get valid quarters for a given year based on data availability.
 
@@ -150,9 +155,26 @@ def get_valid_quarters(year: int, first: date, last: date) -> List[int]:
     Returns:
         A list of valid quarter numbers (1-4) for the given year.
     """
-    lo = (first.month - 1) // 3 + 1 if year == first.year else 1
-    hi = (last.month - 1) // 3 + 1 if year == last.year else 4
+    lo = quarter_of(first.month) if year == first.year else 1
+    hi = quarter_of(last.month) if year == last.year else 4
     return list(range(lo, hi + 1))
+
+
+def get_adjacent_quarters(
+    year: int, q: int, first: date, last: date
+) -> Tuple[Optional[Tuple[int, int]], Optional[Tuple[int, int]]]:
+    """Get the (year, quarter) before and after the given quarter.
+
+    Either side is None when it falls outside the quarters with data.
+
+    Returns:
+        A tuple of (previous, next), each a (year, quarter) pair or None.
+    """
+    prev = (year, q - 1) if q > 1 else (year - 1, 4)
+    nxt = (year, q + 1) if q < 4 else (year + 1, 1)
+    first_q = (first.year, quarter_of(first.month))
+    last_q = (last.year, quarter_of(last.month))
+    return (prev if prev >= first_q else None, nxt if nxt <= last_q else None)
 
 
 def parse_year_quarter(args: Dict[str, str], first: date, last: date) -> Tuple[int, int]:
@@ -236,17 +258,23 @@ def _after_request(response):
 def inject_globals():
     """Inject global variables into all templates."""
     first, last = get_data_range()
-    year, q = parse_year_quarter(request.args, first, last)
     years = get_valid_years(first, last)
     year_quarters = [
         (y, get_valid_quarters(y, first, last))
         for y in sorted(years, reverse=True)
     ]
+    recent, archive = year_quarters[:RECENT_YEARS], year_quarters[RECENT_YEARS:]
+    # Only the inspections page has a selected quarter to highlight in the picker.
+    year, q = (
+        parse_year_quarter(request.args, first, last)
+        if request.endpoint == "index" else (None, None)
+    )
     return {
         "current_year": date.today().year,
         "version": _VERSION,
-        "recent_year_quarters": year_quarters[:RECENT_YEARS],
-        "archive_year_quarters": year_quarters[RECENT_YEARS:],
+        "recent_year_quarters": recent,
+        "archive_year_quarters": archive,
+        "archive_open": bool(archive) and year is not None and year <= archive[0][0],
         "selected_year": year,
         "selected_q": q,
     }
@@ -443,6 +471,7 @@ def index():
     start, end = months[-1][0], months[0][1]
     latest_start, latest_end = months[0]
     rows = _fetch_inspections(latest_start, latest_end, "inspections")
+    prev_q, next_q = get_adjacent_quarters(year, q, first, last)
 
     return render_template(
         "index.html",
@@ -450,6 +479,8 @@ def index():
         months=months,
         start=start,
         end=end,
+        prev_q=prev_q,
+        next_q=next_q,
     )
 
 
@@ -470,7 +501,7 @@ def inspections_month():
     except (KeyError, ValueError):
         abort(404)
     first, last = get_data_range()
-    q = (m - 1) // 3 + 1
+    q = quarter_of(m)
     if year not in get_valid_years(first, last) or q not in get_valid_quarters(year, first, last):
         abort(404)
     months = {s.month: (s, e) for s, e in get_quarter_months(year, q, first)}
