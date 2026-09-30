@@ -236,6 +236,7 @@ def test_build_days_clean_pass_has_no_infractions():
     d = date(2024, 1, 1)
     days = build_days([_row(d, "1", "Pass")], d, d)
     assert days[0][1][0]["infractions"] == []
+    assert days[0][1][0]["infraction_groups"] == []
 
 
 def test_sort_rows_ties_broken_by_name():
@@ -275,7 +276,12 @@ def test_build_days_groups_infractions_by_severity_and_category():
     ]
 
 
-def test_build_days_clean_pass_has_no_infraction_groups():
+def test_build_days_blank_category_forms_one_group():
     d = date(2024, 1, 1)
-    days = build_days([_row(d, "1", "Pass")], d, d)
-    assert days[0][1][0]["infraction_groups"] == []
+    rows = [
+        _row(d, "1", "Pass", infraction_details="a", infraction_category=None, severity="M - Minor"),
+        _row(d, "1", "Pass", infraction_details="b", infraction_category="", severity="M - Minor"),
+        _row(d, "1", "Pass", infraction_details="c", infraction_category=None, severity="M - Minor"),
+    ]
+    groups = build_days(rows, d, d)[0][1][0]["infraction_groups"]
+    assert [[i["infraction_details"] for i in g["infractions"]] for g in groups] == [["a", "b", "c"]]

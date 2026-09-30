@@ -283,30 +283,34 @@ def group_establishments(rows: List[Dict]) -> List[Dict]:
         rows: Inspection record dictionaries for a single date.
 
     Returns:
-        A list of establishment dicts (establishment fields plus an
-        "infractions" list sorted most severe first, then by category and
-        details for a stable order, and a "severity_counts" Counter of those
-        infractions, and an "infraction_groups" list of those infractions
-        grouped by severity and category), in input order.
+        A list of establishment dicts in input order. Each has the
+        establishment fields plus:
+
+        - "infractions": sorted most severe first, then by category and
+          details for a stable order.
+        - "severity_counts": a Counter of those infractions by severity.
+        - "infraction_groups": those infractions grouped by severity and
+          category, in the same order.
     """
+    def category_key(r):
+        return (
+            SEVERITY_ORDER.get(r.get("severity"), 3),
+            r.get("severity") or "",
+            r.get("infraction_category") or "",
+        )
+
     groups = {}
     for row in rows:
         group = groups.setdefault(row["establishment_id"], {**row, "infractions": []})
         if row.get("infraction_details"):
             group["infractions"].append(row)
     for group in groups.values():
-        group["infractions"].sort(key=lambda r: (
-            SEVERITY_ORDER.get(r.get("severity"), 3),
-            r.get("infraction_category") or "",
-            r.get("infraction_details") or "",
-        ))
+        group["infractions"].sort(key=lambda r: category_key(r) + (r.get("infraction_details") or "",))
         group["severity_counts"] = collections.Counter(r.get("severity") for r in group["infractions"])
-        # Sorted by severity then category, so groupby sees each pair contiguously.
+        # Sorted by category_key first, so groupby sees each pair contiguously.
         group["infraction_groups"] = [
             {"severity": severity, "category": category, "infractions": list(items)}
-            for (severity, category), items in itertools.groupby(
-                group["infractions"], key=lambda r: (r.get("severity"), r.get("infraction_category"))
-            )
+            for (_, severity, category), items in itertools.groupby(group["infractions"], key=category_key)
         ]
     return list(groups.values())
 
