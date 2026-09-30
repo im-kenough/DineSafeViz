@@ -19,16 +19,15 @@
     </header>
     <nav class="tabs">
         <a href="{{ url_for('home') }}" class="nav-btn {{ 'active' if request.endpoint == 'home' else '' }}">Home</a>
-        {% set on_index = request.endpoint == 'index' %}
         <details class="dropdown">
-            <summary class="nav-btn {{ 'active' if on_index else '' }}">Inspections ▾</summary>
+            <summary class="nav-btn {{ 'active' if request.endpoint == 'index' else '' }}">Inspections ▾</summary>
             {# One row per year, one column per quarter; quarters without data are empty cells #}
             {% macro year_rows(year_quarters) %}
                 {% for y, qs in year_quarters %}
                 <tr>
                     <th scope="row">{{ y }}</th>
                     {% for q in range(1, 5) %}
-                    {% set active = on_index and y == selected_year and q == selected_q %}
+                    {% set active = y == selected_year and q == selected_q %}
                     <td>{% if q in qs %}<a href="{{ url_for('index', year=y, q=q) | safe }}" class="nav-btn picker-cell{{ ' active' if active }}"{{ ' aria-current="page"' | safe if active }}>Q{{ q }}</a>{% else %}<span class="picker-cell is-empty" aria-hidden="true">·</span>{% endif %}</td>
                     {% endfor %}
                 </tr>
@@ -40,7 +39,6 @@
                     <tbody>{{ year_rows(recent_year_quarters) }}</tbody>
                 </table>
                 {% if archive_year_quarters %}
-                {% set archive_open = on_index and selected_year in archive_year_quarters | map('first') %}
                 <details class="picker-archive"{{ ' open' if archive_open }}>
                     <summary>Older years ({{ archive_year_quarters[-1][0] }}–{{ archive_year_quarters[0][0] }})</summary>
                     <table class="picker-grid">

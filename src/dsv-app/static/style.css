@@ -85,7 +85,6 @@ h2.page-heading {
     color: var(--text);
 }
 /* date range sits under the quarter as a subtitle */
-.heading-sep { display: none; }
 .heading-dates {
     display: block;
     font-size: 1rem;
@@ -93,7 +92,7 @@ h2.page-heading {
     color: var(--text-muted);
 }
 
-/* ── nav button (shared by tabs, social links, flyout) ──── */
+/* ── nav button (shared by tabs, social links, picker, timeline) */
 .nav-btn {
     padding: 0.5rem 1.0625rem;
     border: 1px solid var(--accent);
@@ -110,7 +109,8 @@ h2.page-heading {
 
 /* ── tabs ───────────────────────────────────────────────── */
 .tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
-.tabs > a {
+.tabs > a,
+.dropdown > summary {
     display: block;
     text-align: center;
 }
@@ -168,16 +168,18 @@ h2.page-heading {
 .toggle-all:hover { color: var(--text); }
 .toggle-icon { margin-right: 0.35rem; }
 .month-box { margin-bottom: 1rem; scroll-margin-top: 4.5rem; }
+/* disclosure summaries: no native marker; month and archive use ▸/▾ arrows */
+details > summary { cursor: pointer; list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+.month-box > summary::before,
+.picker-archive > summary::before { content: "▸ "; color: var(--accent); }
+.month-box[open] > summary::before,
+.picker-archive[open] > summary::before { content: "▾ "; }
 .month-box > summary {
-    cursor: pointer;
     font-size: 1.25rem;
     font-weight: 700;
     padding: 0.5rem 0;
-    list-style: none;
 }
-.month-box > summary::-webkit-details-marker { display: none; }
-.month-box > summary::before { content: "▸ "; color: var(--accent); }
-.month-box[open] > summary::before { content: "▾ "; }
 .month-body > .no-data { margin-bottom: 1rem; }
 
 /* ── table ──────────────────────────────────────────────── */
@@ -255,13 +257,6 @@ footer {
 
 /* ── inspections dropdown ───────────────────────────────── */
 .dropdown { position: relative; }
-.dropdown > summary {
-    display: block;
-    text-align: center;
-    cursor: pointer;
-    list-style: none;
-}
-.dropdown > summary::-webkit-details-marker { display: none; }
 
 .dropdown-menu {
     position: absolute;
@@ -291,15 +286,10 @@ footer {
     border-top: 1px solid var(--border);
 }
 .picker-archive > summary {
-    cursor: pointer;
     padding: 0.25rem;
     font-weight: 600;
     color: var(--text-muted);
-    list-style: none;
 }
-.picker-archive > summary::-webkit-details-marker { display: none; }
-.picker-archive > summary::before { content: "▸ "; color: var(--accent); }
-.picker-archive[open] > summary::before { content: "▾ "; }
 
 /* ── mobile (≤ 600px: all phones in portrait) ───────────── */
 @media (max-width: 600px) {

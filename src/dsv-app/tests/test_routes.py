@@ -42,10 +42,10 @@ def _render(client, rows):
     return resp.data.decode()
 
 
-def _render_page(client, db=None):
-    """Render the Q1 2024 /inspections page."""
+def _render_page(client, db=None, url="/inspections?year=2024&q=1"):
+    """Render an /inspections page, Q1 2024 by default."""
     with patch("app.psycopg2.connect", return_value=db or _mock_db([])):
-        return client.get("/inspections?year=2024&q=1").data.decode()
+        return client.get(url).data.decode()
 
 
 _HOME_STATS = {
@@ -164,8 +164,7 @@ def test_picker_older_years_collapsed_with_range_label(client):
 
 
 def test_picker_older_years_open_when_viewing_archived_quarter(client):
-    with patch("app.psycopg2.connect", return_value=_mock_db([])):
-        html = client.get("/inspections?year=2005&q=3").data.decode()
+    html = _render_page(client, url="/inspections?year=2005&q=3")
     assert 'class="picker-archive" open>' in html
     assert 'href="/inspections?year=2005&q=3" class="nav-btn picker-cell active" aria-current="page"' in html
 
@@ -193,15 +192,13 @@ def test_timeline_quarter_links_flank_months(client):
 
 
 def test_timeline_omits_prev_at_first_quarter(client):
-    with patch("app.psycopg2.connect", return_value=_mock_db([])):
-        bar = _timeline(client.get("/inspections?year=2001&q=1").data.decode())
+    bar = _timeline(_render_page(client, url="/inspections?year=2001&q=1"))
     assert 'rel="prev"' not in bar
     assert 'href="/inspections?year=2001&q=2" rel="next"' in bar
 
 
 def test_timeline_omits_next_at_latest_quarter(client):
-    with patch("app.psycopg2.connect", return_value=_mock_db([])):
-        bar = _timeline(client.get("/inspections").data.decode())
+    bar = _timeline(_render_page(client, url="/inspections"))
     assert 'rel="prev"' in bar
     assert 'rel="next"' not in bar
 
@@ -376,7 +373,6 @@ def test_address_without_street_shows_dash(client):
 def test_heading_shows_quarter_and_date_range(client):
     html = _render_page(client)
     assert ('<h2 class="page-heading">DineSafe Inspections | Q1 2024'
-            '<span class="heading-sep"> | </span>'
             '<span class="heading-dates">January 1, 2024 - March 31, 2024</span></h2>') in html
 
 
@@ -386,7 +382,7 @@ def test_heading_end_date_is_today_for_current_quarter(client):
     start = date(today.year, 3 * q - 2, 1)
     with patch("app.psycopg2.connect", return_value=_mock_db([])):
         html = client.get(f"/inspections?year={today.year}&q={q}").data.decode()
-    expected = (f'DineSafe Inspections | Q{q} {today.year}<span class="heading-sep"> | </span>'
+    expected = (f'DineSafe Inspections | Q{q} {today.year}'
                 f'<span class="heading-dates">{start.strftime("%B %-d, %Y")} - {today.strftime("%B %-d, %Y")}</span>')
     assert f'<h2 class="page-heading">{expected}</h2>' in html
     assert f"<h2>{today.strftime('%A, %B %-d, %Y')}</h2>" in html
