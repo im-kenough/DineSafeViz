@@ -125,7 +125,6 @@ h2.page-heading {
 .no-data { margin: 0; color: var(--text-muted); font-style: italic; }
 
 /* ── table ──────────────────────────────────────────────── */
-.table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; }
 th, td {
     border: 1px solid var(--border);
@@ -155,14 +154,13 @@ th {
 }
 .est-card:last-child { margin-bottom: 0; }
 .est-location { display: flex; flex-direction: column; gap: 0.15rem; }
-.est-type, .inf-meta, .no-infractions, .label { color: var(--text-muted); }
-.label { font-weight: 600; margin-right: 0.35rem; }
+.est-type, .inf-meta { color: var(--text-muted); }
+.label { color: var(--text-muted); font-weight: 600; margin-right: 0.35rem; }
 .est-status { margin-bottom: 0.4rem; }
 .infractions th:first-child { width: 9.5rem; }
 .infractions td { vertical-align: top; }
 .inf-summary td { font-weight: 600; border-bottom: none; }
 .inf-details td { border-top: none; padding-bottom: 0.5rem; }
-.no-infractions { margin: 0; font-style: italic; }
 
 /* ── status accents ─────────────────────────────────────── */
 .est-card.status-closed      { border-left-color: var(--status-closed); }
@@ -260,7 +258,6 @@ footer {
 
     .link-label { display: none; }
 
-    /* flyout stacks below year row instead of floating right */
     /* establishment card stacks location above results */
     .est-card { grid-template-columns: 1fr; gap: 0.4rem; padding: 0.5rem 0.6rem; }
     /* narrow severity column so category/details get the width */
@@ -268,6 +265,7 @@ footer {
     .infractions th:first-child { width: 5.5rem; }
     .infractions th, .infractions td { padding: 0.3rem 0.4rem; }
 
+    /* flyout stacks below year row instead of floating right */
     .flyout {
         position: static;
         margin-top: 0.25rem;

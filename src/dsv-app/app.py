@@ -397,7 +397,7 @@ def index():
             "amount_fined": r[9],
             "establishment_id": r[10],
             "severity": r[11],
-            # Seeder stores the infraction category (typeDesc/deficiencyDesc swap) here
+            # inspection_observation is a misnomer; it holds the infraction category (deficiencyDesc)
             "infraction_category": r[12],
         }
         for r in raw_rows

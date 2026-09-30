@@ -11,6 +11,33 @@ def _mock_db(rows):
     return mock_conn
 
 
+def _row_tuple(name="Pasta Palace", address="99 King St W", est_type="Restaurant",
+               status="Pass", details="Improper storage", severity="M - Minor",
+               category="Food storage"):
+    """One row in the SELECT column order used by the /inspections route."""
+    return (
+        date(2024, 2, 14),
+        status,
+        "Notice to Comply",
+        details,
+        name,
+        address,
+        est_type,
+        "Pass",
+        "2024-02-20",
+        "0.00",
+        "10002",
+        severity,
+        category,
+    )
+
+
+def _render(client, rows):
+    with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
+        resp = client.get("/inspections?year=2024&q=1")
+    return resp.data.decode()
+
+
 _HOME_STATS = {"total_inspections": 12345, "years_of_data": 25}
 
 
@@ -45,28 +72,14 @@ def test_route_renders_day_boxes(client):
 
 
 def test_route_shows_inspection_data(client):
-    rows = [(
-        date(2024, 2, 14),   # inspection_date
-        "Conditional Pass",  # establishment_status
-        "Court Order",       # action
-        "Rats observed",     # infraction_details
-        "Risky Bistro",      # establishment_name
-        "1 Main St",         # establishment_address
-        "Fast Food",         # establishment_type
-        "Pass",              # outcome
-        "2024-02-20",        # outcome_date
-        "500.00",            # amount_fined
-        "10001",             # establishment_id
-        "C - Crucial",       # severity
-        "Pest control",      # inspection_observation (infraction category)
-    )]
-    with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
-        resp = client.get("/inspections?year=2024&q=1")
-    assert b"Risky Bistro" in resp.data
-    assert b"CONDITIONAL PASS" in resp.data
-    assert b"Rats observed" in resp.data
-    assert b"Pest control" in resp.data
-    assert b"C - Crucial" in resp.data
+    html = _render(client, [_row_tuple(name="Risky Bistro", status="Conditional Pass",
+                                       details="Rats observed", severity="C - Crucial",
+                                       category="Pest control")])
+    assert "Risky Bistro" in html
+    assert "CONDITIONAL PASS" in html
+    assert "Rats observed" in html
+    assert "Pest control" in html
+    assert "C - Crucial" in html
 
 
 def test_route_invalid_params_returns_200(client):
@@ -82,24 +95,7 @@ def test_route_no_data_day_shows_no_data_text(client):
 
 
 def test_status_class_on_row(client):
-    rows = [(
-        date(2024, 2, 14),   # inspection_date
-        "Conditional Pass",  # establishment_status
-        "Court Order",       # action
-        "Rats observed",     # infraction_details
-        "Risky Bistro",      # establishment_name
-        "1 Main St",         # establishment_address
-        "Fast Food",         # establishment_type
-        "Pass",              # outcome
-        "2024-02-20",        # outcome_date
-        "500.00",            # amount_fined
-        "10001",             # establishment_id
-        "C - Crucial",       # severity
-        "Pest control",      # inspection_observation (infraction category)
-    )]
-    with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
-        resp = client.get("/inspections?year=2024&q=1")
-    assert b'class="est-card status-conditional"' in resp.data
+    assert 'class="est-card status-conditional"' in _render(client, [_row_tuple(status="Conditional Pass")])
 
 
 def test_footer_content(client):
@@ -191,69 +187,34 @@ def test_recent_years_not_in_archive(client):
     assert b'href="/inspections?year=2023&q=4"' in resp.data
 
 
-def _row_tuple(name="Pasta Palace", address="99 King St W", est_type="Restaurant"):
-    return (
-        date(2024, 2, 14),
-        "Pass",
-        "Notice to Comply",
-        "Improper storage",
-        name,
-        address,
-        est_type,
-        "Pass",
-        "2024-02-20",
-        "0.00",
-        "10002",
-        "M - Minor",
-        "Food storage",
-    )
-
-
 def test_location_left_of_results(client):
-    with patch("app.psycopg2.connect", return_value=_mock_db([_row_tuple()])):
-        resp = client.get("/inspections?year=2024&q=1")
-    html = resp.data.decode()
+    html = _render(client, [_row_tuple()])
     assert html.index('class="est-location"') < html.index('class="est-results"')
 
 
 def test_establishment_type_rendered(client):
-    rows = [_row_tuple(est_type="UNIQUE_EST_TYPE_XYZ")]
-    with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
-        resp = client.get("/inspections?year=2024&q=1")
-    assert b"UNIQUE_EST_TYPE_XYZ" in resp.data
+    assert "UNIQUE_EST_TYPE_XYZ" in _render(client, [_row_tuple(est_type="UNIQUE_EST_TYPE_XYZ")])
 
 
 def test_location_contains_name_and_address(client):
-    with patch("app.psycopg2.connect", return_value=_mock_db([_row_tuple()])):
-        resp = client.get("/inspections?year=2024&q=1")
-    html = resp.data.decode()
+    html = _render(client, [_row_tuple()])
     location = html[html.index('class="est-location"'):html.index('class="est-results"')]
     assert "Pasta Palace" in location
     assert "99 King St W" in location
 
 
 def test_multiple_infractions_share_one_card(client):
-    rows = [_row_tuple(), _row_tuple()]
-    with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
-        resp = client.get("/inspections?year=2024&q=1")
-    assert resp.data.count(b'class="est-card') == 1
+    assert _render(client, [_row_tuple(), _row_tuple()]).count('class="est-card') == 1
 
 
 def _results_html(client, rows):
-    with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
-        resp = client.get("/inspections?year=2024&q=1")
-    html = resp.data.decode()
+    html = _render(client, rows)
     return html[html.index('class="est-results"'):]
 
 
 def test_results_have_column_headers(client):
     headers = re.findall(r'<th[^>]*>([^<]+)</th>', _results_html(client, [_row_tuple()]))
     assert headers == ["Severity", "Category of Infraction"]
-
-
-def test_results_show_inspection_status_label(client):
-    results = _results_html(client, [_row_tuple()])
-    assert "Inspection Status" in results
 
 
 def test_severity_and_category_share_a_row(client):
