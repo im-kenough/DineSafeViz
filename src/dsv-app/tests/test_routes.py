@@ -255,3 +255,11 @@ def test_infraction_counts_under_address(client):
 
 def test_no_infraction_counts_without_infractions(client):
     assert '<span class="label">Infractions</span>' not in _render(client, [_row_tuple(details=None, severity=None)])
+
+
+def test_address_rendered_as_lines(client):
+    html = _render(client, [_row_tuple(address="102 BERKELEY ST None M5A 2W7")])
+    assert "<span>102 BERKELEY ST</span>" in html
+    assert "<span>Toronto, ON</span>" in html
+    assert "<span>M5A 2W7</span>" in html
+    assert "None" not in html

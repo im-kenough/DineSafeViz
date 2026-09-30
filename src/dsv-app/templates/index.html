@@ -19,7 +19,7 @@
             <!-- Establishment name and location -->
             <div class="est-location">
                 <strong>{{ est.establishment_name or '—' }}</strong>
-                <span>{{ est.establishment_address or '—' }}</span>
+                {% for line in est.establishment_address|address_lines %}<span>{{ line }}</span>{% else %}<span>—</span>{% endfor %}
                 {% if est.establishment_type %}<span class="est-type">{{ est.establishment_type }}</span>{% endif %}
                 {% if est.infractions %}
                 {% set crucial = est.infractions|selectattr('severity', 'equalto', 'C - Crucial')|list|length %}
