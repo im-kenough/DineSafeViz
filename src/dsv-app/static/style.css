@@ -84,8 +84,15 @@ h2.page-heading {
     font-weight: 700;
     color: var(--text);
 }
+/* date range sits under the quarter as a subtitle */
+.heading-dates {
+    display: block;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-muted);
+}
 
-/* ── nav button (shared by tabs, social links, flyout) ──── */
+/* ── nav button (shared by tabs, social links, picker, timeline) */
 .nav-btn {
     padding: 0.5rem 1.0625rem;
     border: 1px solid var(--accent);
@@ -103,7 +110,7 @@ h2.page-heading {
 /* ── tabs ───────────────────────────────────────────────── */
 .tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
 .tabs > a,
-.tabs > .dropdown > a {
+.dropdown > summary {
     display: block;
     text-align: center;
 }
@@ -124,26 +131,55 @@ h2.page-heading {
 }
 .no-data { margin: 0; color: var(--text-muted); font-style: italic; }
 
-/* ── contents bar and month sections ────────────────────── */
-.contents {
+/* ── timeline bar and month sections ────────────────────── */
+.timeline {
+    position: sticky;
+    top: 0;
+    z-index: 5;
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
-    margin-bottom: 1rem;
+    margin: 0 -0.5rem 1rem;
+    padding: 0.5rem;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
 }
-.contents button.nav-btn { font-family: inherit; cursor: pointer; }
-.month-box { margin-bottom: 1rem; scroll-margin-top: 1rem; }
-.month-box > summary {
+.timeline-months {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0 0.5rem;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+}
+.timeline-months .nav-btn { border-color: transparent; background: none; }
+.timeline .month-link.current { border-color: var(--accent); color: var(--accent); }
+.timeline .month-link.current:hover { color: #fff; }
+.timeline .short { display: none; }
+.toggle-all {
+    margin-left: auto;
+    padding: 0.5rem 0.25rem;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: clamp(0.85rem, 0.9vw, 1.05rem);
     cursor: pointer;
+}
+.toggle-all:hover { color: var(--text); }
+.toggle-icon { margin-right: 0.35rem; }
+.month-box { margin-bottom: 1rem; scroll-margin-top: 4.5rem; }
+/* disclosure summaries: no native marker; month and archive use ▸/▾ arrows */
+details > summary { cursor: pointer; list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+.month-box > summary::before,
+.picker-archive > summary::before { content: "▸ "; color: var(--accent); }
+.month-box[open] > summary::before,
+.picker-archive[open] > summary::before { content: "▾ "; }
+.month-box > summary {
     font-size: 1.25rem;
     font-weight: 700;
     padding: 0.5rem 0;
-    list-style: none;
 }
-.month-box > summary::-webkit-details-marker { display: none; }
-.month-box > summary::before { content: "▸ "; color: var(--accent); }
-.month-box[open] > summary::before { content: "▾ "; }
 .month-body > .no-data { margin-bottom: 1rem; }
 
 /* ── table ──────────────────────────────────────────────── */
@@ -220,58 +256,40 @@ footer {
 }
 
 /* ── inspections dropdown ───────────────────────────────── */
-.dropdown {
-    position: relative;
-    display: inline-block;
-}
+.dropdown { position: relative; }
 
-.dropdown-menu,
-.flyout {
-    padding: 0.25rem;
+.dropdown-menu {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    left: 0;
+    z-index: 10;
+    max-height: min(70vh, 32rem);
+    overflow-y: auto;
+    padding: 0.5rem;
     background: var(--surface);
     border: 1px solid var(--accent);
     border-radius: 4px;
-    flex-direction: column;
-    gap: 0.25rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.dropdown-menu {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    z-index: 10;
-}
+/* year × quarter grid */
+.picker-grid { width: auto; border-collapse: separate; border-spacing: 0.25rem; }
+.picker-grid th,
+.picker-grid td { border: none; padding: 0; background: none; text-align: center; }
+.picker-grid th[scope="row"] { padding-right: 0.5rem; text-align: right; color: var(--text); }
+.picker-cell { display: block; padding: 0.35rem 0.6rem; }
+.picker-cell.is-empty { color: var(--border); }
 
-.dropdown:hover .dropdown-menu,
-.dropdown-menu.is-open { display: flex; }
-
-.dropdown-year {
-    position: relative;
-    cursor: pointer;
-}
-
-.dropdown-year > .flyout { display: none; }
-
-.archive-item {
+.picker-archive {
     margin-top: 0.25rem;
     padding-top: 0.5rem;
     border-top: 1px solid var(--border);
 }
-
-.dropdown-year:hover > .flyout,
-.flyout.is-open { display: flex; }
-
-.flyout {
-    position: absolute;
-    top: 0;
-    left: 100%;
+.picker-archive > summary {
+    padding: 0.25rem;
+    font-weight: 600;
+    color: var(--text-muted);
 }
-
-.flyout a { display: block; }
-
-/* year→quarters flyouts (regular and archive) display horizontally */
-.dropdown-year:not(.archive-item) > .flyout { flex-direction: row; }
 
 /* ── mobile (≤ 600px: all phones in portrait) ───────────── */
 @media (max-width: 600px) {
@@ -280,14 +298,30 @@ footer {
         padding: 0 0.75rem;
     }
 
+    /* tabs share the first row; icon-only social links take the second */
+    .tabs { position: relative; }
+    .tabs > a,
+    .tabs > .dropdown { flex: 1 1 auto; }
+    .tabs .nav-btn { padding: 0.5rem 0.6rem; }
     .social-links { margin-left: 0; }
 
     .link-label { display: none; }
 
-    /* page heading date range drops to its own line */
+    /* picker spans the nav width instead of hanging off the Inspections tab */
+    .dropdown { position: static; }
+    .dropdown-menu { right: 0; }
+    .picker-grid { width: 100%; }
+
     h2.page-heading { font-size: 1.15rem; }
-    .heading-sep { display: none; }
-    .heading-dates { display: block; }
+    .heading-dates { font-size: 0.9rem; }
+
+    /* timeline fits one line: short month names, year-less quarters, icon-only toggle */
+    .timeline { gap: 0.25rem; margin: 0 -0.75rem 1rem; padding: 0.4rem 0.75rem; }
+    .timeline .nav-btn { padding: 0.4rem 0.5rem; }
+    .timeline-months { padding: 0 0.25rem; gap: 0; }
+    .timeline .long { display: none; }
+    .timeline .short { display: inline; }
+    .toggle-icon { margin-right: 0; font-size: 1.25rem; line-height: 1; }
 
     /* establishment card stacks location above results */
     .est-card { grid-template-columns: 1fr; gap: 0.4rem; padding: 0.5rem 0.6rem; }
@@ -295,17 +329,6 @@ footer {
     .infractions { table-layout: fixed; }
     .infractions th:first-child { width: 5.5rem; }
     .infractions th, .infractions td { padding: 0.3rem 0.4rem; }
-
-    /* flyout stacks below year row instead of floating right */
-    .flyout {
-        position: static;
-        margin-top: 0.25rem;
-        margin-left: 0.5rem;
-        border-top: none;
-        border-right: none;
-        border-bottom: none;
-        border-radius: 0;
-    }
 }
 
 /* ── tablet (601px – 1023px: iPad portrait, phone landscape) */

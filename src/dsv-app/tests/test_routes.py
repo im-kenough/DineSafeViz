@@ -42,10 +42,10 @@ def _render(client, rows):
     return resp.data.decode()
 
 
-def _render_page(client, db=None):
-    """Render the Q1 2024 /inspections page."""
+def _render_page(client, db=None, url="/inspections?year=2024&q=1"):
+    """Render an /inspections page, Q1 2024 by default."""
     with patch("app.psycopg2.connect", return_value=db or _mock_db([])):
-        return client.get("/inspections?year=2024&q=1").data.decode()
+        return client.get(url).data.decode()
 
 
 _HOME_STATS = {
@@ -118,11 +118,89 @@ def test_footer_content(client):
     assert b"DineSafeViz v0.1.0" in resp.data
 
 
+def _picker(html):
+    """The Inspections period picker markup from the nav."""
+    return html[html.index('<details class="dropdown"'):html.index('<a href="/dashboard"')]
+
+
+def _older_years(html):
+    """The collapsed "Older years" section of the period picker."""
+    picker = _picker(html)
+    return picker[picker.index('class="picker-archive"'):]
+
+
 def test_dropdown_menu_present(client):
     with patch("app._get_home_stats", return_value=_HOME_STATS):
         resp = client.get("/")
-    assert b'class="dropdown"' in resp.data
+    assert b'<details class="dropdown"' in resp.data
     assert b'class="dropdown-menu"' in resp.data
+
+
+def test_picker_rows_have_four_quarter_columns(client):
+    html = _picker(client.get("/info").data.decode())
+    assert re.findall(r'<th scope="col">(Q\d)</th>', html) == ["Q1", "Q2", "Q3", "Q4"]
+    row_2024 = re.search(r'<th scope="row">2024</th>(.*?)</tr>', html, re.S).group(1)
+    assert re.findall(r'href="/inspections\?year=2024&q=(\d)"', row_2024) == ["1", "2", "3", "4"]
+
+
+def test_picker_quarters_without_data_are_empty_cells(client):
+    import app as app_module
+    app_module._stats_cache["data"].update(min_date=date(2010, 6, 1), max_date=date(2025, 2, 1))
+    html = _picker(client.get("/info").data.decode())
+    row_2025 = re.search(r'<th scope="row">2025</th>(.*?)</tr>', html, re.S).group(1)
+    assert row_2025.count('class="picker-cell is-empty"') == 3
+    row_2010 = re.search(r'<th scope="row">2010</th>(.*?)</tr>', html, re.S).group(1)
+    assert row_2010.count('class="picker-cell is-empty"') == 1
+
+
+def test_picker_older_years_collapsed_with_range_label(client):
+    html = client.get("/info").data.decode()
+    older = _older_years(html)
+    assert older.startswith('class="picker-archive">')
+    this_year = date.today().year
+    assert f"Older years (2001–{this_year - 4})" in older
+    assert 'href="/inspections?year=2001&q=1"' in older
+    assert f'href="/inspections?year={this_year - 3}&q=1"' not in older
+
+
+def test_picker_older_years_open_when_viewing_archived_quarter(client):
+    html = _render_page(client, url="/inspections?year=2005&q=3")
+    assert 'class="picker-archive" open>' in html
+    assert 'href="/inspections?year=2005&q=3" class="nav-btn picker-cell active" aria-current="page"' in html
+
+
+def test_picker_highlights_quarter_only_on_inspections_page(client):
+    assert "picker-cell active" not in _picker(client.get("/info").data.decode())
+    html = _render_page(client)
+    assert 'href="/inspections?year=2024&q=1" class="nav-btn picker-cell active" aria-current="page"' in html
+
+
+def _timeline(html):
+    """The sticky month/quarter timeline bar on the inspections page."""
+    start = html.index('<nav class="timeline"')
+    return html[start:html.index('</nav>', start)]
+
+
+def test_timeline_quarter_links_flank_months(client):
+    bar = _timeline(_render_page(client))
+    assert ('<a class="nav-btn quarter-link" href="/inspections?year=2023&q=4" rel="prev">'
+            '‹ Q4<span class="long"> 2023</span></a>') in bar
+    assert ('<a class="nav-btn quarter-link" href="/inspections?year=2024&q=2" rel="next">'
+            'Q2<span class="long"> 2024</span> ›</a>') in bar
+    assert bar.index('rel="prev"') < bar.index('class="nav-btn month-link"')
+    assert bar.rindex('class="nav-btn month-link"') < bar.index('rel="next"')
+
+
+def test_timeline_omits_prev_at_first_quarter(client):
+    bar = _timeline(_render_page(client, url="/inspections?year=2001&q=1"))
+    assert 'rel="prev"' not in bar
+    assert 'href="/inspections?year=2001&q=2" rel="next"' in bar
+
+
+def test_timeline_omits_next_at_latest_quarter(client):
+    bar = _timeline(_render_page(client, url="/inspections"))
+    assert 'rel="prev"' in bar
+    assert 'rel="next"' not in bar
 
 
 def test_dropdown_has_year_and_quarter_links(client):
@@ -143,7 +221,7 @@ def test_standalone_year_tabs_removed(client):
 
 def test_dropdown_present_on_dashboard(client):
     resp = client.get("/dashboard")
-    assert b'class="dropdown"' in resp.data
+    assert b'<details class="dropdown"' in resp.data
     assert b'class="dropdown-menu"' in resp.data
 
 
@@ -155,7 +233,7 @@ def test_dropdown_has_links_on_dashboard(client):
 
 def test_dropdown_present_on_info(client):
     resp = client.get("/info")
-    assert b'class="dropdown"' in resp.data
+    assert b'<details class="dropdown"' in resp.data
     assert b'class="dropdown-menu"' in resp.data
 
 
@@ -191,25 +269,6 @@ def test_index_nav_active_class(client):
     with patch("app.psycopg2.connect", return_value=_mock_db([])):
         resp = client.get("/inspections")
     assert b'class="nav-btn active">Inspections' in resp.data
-
-
-def test_dropdown_has_archive_item(client):
-    with patch("app._get_home_stats", return_value=_HOME_STATS):
-        resp = client.get("/")
-    assert b'archive-item' in resp.data
-    assert b'Archive' in resp.data
-
-
-def test_archive_contains_old_year_links(client):
-    with patch("app._get_home_stats", return_value=_HOME_STATS):
-        resp = client.get("/")
-    assert b'href="/inspections?year=2022&q=1"' in resp.data
-
-
-def test_recent_years_not_in_archive(client):
-    with patch("app._get_home_stats", return_value=_HOME_STATS):
-        resp = client.get("/")
-    assert b'href="/inspections?year=2023&q=4"' in resp.data
 
 
 def test_location_left_of_results(client):
@@ -314,7 +373,6 @@ def test_address_without_street_shows_dash(client):
 def test_heading_shows_quarter_and_date_range(client):
     html = _render_page(client)
     assert ('<h2 class="page-heading">DineSafe Inspections | Q1 2024'
-            '<span class="heading-sep"> | </span>'
             '<span class="heading-dates">January 1, 2024 - March 31, 2024</span></h2>') in html
 
 
@@ -324,7 +382,7 @@ def test_heading_end_date_is_today_for_current_quarter(client):
     start = date(today.year, 3 * q - 2, 1)
     with patch("app.psycopg2.connect", return_value=_mock_db([])):
         html = client.get(f"/inspections?year={today.year}&q={q}").data.decode()
-    expected = (f'DineSafe Inspections | Q{q} {today.year}<span class="heading-sep"> | </span>'
+    expected = (f'DineSafe Inspections | Q{q} {today.year}'
                 f'<span class="heading-dates">{start.strftime("%B %-d, %Y")} - {today.strftime("%B %-d, %Y")}</span>')
     assert f'<h2 class="page-heading">{expected}</h2>' in html
     assert f"<h2>{today.strftime('%A, %B %-d, %Y')}</h2>" in html
@@ -348,12 +406,21 @@ def test_inspections_older_months_collapsed_and_lazy(client):
     assert "January 1, 2024" not in html.split("</h2>", 1)[1]
 
 
-def test_inspections_contents_bar(client):
+def test_timeline_months_oldest_first_with_short_names(client):
+    bar = _timeline(_render_page(client))
+    links = re.findall(r'<a class="nav-btn month-link" href="#month-(\d{4}-\d{2})">'
+                       r'<span class="long">(\w+)</span><span class="short">(\w+)</span></a>', bar)
+    assert links == [("2024-01", "January", "Jan"), ("2024-02", "February", "Feb"),
+                     ("2024-03", "March", "Mar")]
+
+
+def test_timeline_has_single_expand_collapse_toggle(client):
     html = _render_page(client)
-    links = re.findall(r'<a class="nav-btn month-link" href="#month-(\d{4}-\d{2})">(\w+)</a>', html)
-    assert links == [("2024-03", "March"), ("2024-02", "February"), ("2024-01", "January")]
-    assert 'id="expand-all"' in html
-    assert 'id="collapse-all"' in html
+    bar = _timeline(html)
+    assert '<button type="button" class="toggle-all" id="toggle-all" aria-label="Expand all">' in bar
+    assert 'id="expand-all"' not in html
+    assert 'id="collapse-all"' not in html
+    assert 'class="contents"' not in html
 
 
 def test_month_fragment_renders_only_that_month(client):
