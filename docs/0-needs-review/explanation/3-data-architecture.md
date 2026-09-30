@@ -106,7 +106,7 @@ and import discards it. Two columns (`Inspection Observation`,
 | establishment_type       | TEXT             | Both eras                      |
 | establishment_address    | TEXT             | Both eras                      |
 | infraction_details       | TEXT             | Both eras                      |
-| inspection_observation   | TEXT             | Current only (NULL historical) |
+| infraction_category      | TEXT             | Current only (NULL historical) |
 | inspection_date          | DATE             | Both eras                      |
 | severity                 | TEXT             | Both eras                      |
 | action                   | TEXT             | Both eras                      |

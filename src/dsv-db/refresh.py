@@ -8,6 +8,7 @@ Detects whether the inspections table is empty:
 import csv
 import io
 import os
+import re
 import tempfile
 import zipfile
 from urllib.request import urlretrieve
@@ -50,7 +51,7 @@ INSPECTIONS_COLUMNS = [
     "establishment_type",
     "establishment_address",
     "infraction_details",
-    "inspection_observation",
+    "infraction_category",
     "inspection_date",
     "severity",
     "action",
@@ -62,6 +63,9 @@ INSPECTIONS_COLUMNS = [
     "unique_id",
     "establishment_status",
     "min_inspections_per_year",
+    "street",
+    "unit",
+    "postal_code",
 ]
 
 # Maps historical CSV headers → unified inspections column names.
@@ -93,7 +97,7 @@ RECENT_COLUMN_MAP = {
     "estName": "establishment_name",
     "address": "establishment_address",
     "typeDesc": "infraction_details",
-    "deficiencyDesc": "inspection_observation",
+    "deficiencyDesc": "infraction_category",
     "inspectionDate": "inspection_date",
     "inspectionStatus": "establishment_status",
     "severity": "severity",
@@ -116,6 +120,39 @@ def normalize(value):
     if value in ("None", ""):
         return None
     return value
+
+
+# Recent-feed addresses end in a postal code or the literal "None".
+_POSTAL_RE = re.compile(r"^(?P<rest>.*) (?:(?P<postal>[A-Z]\d[A-Z] \w+)|None)$")
+# A unit starts at the first "Word-" token (Unit-, Bldg-, Flr-, Rm-, ...).
+# Units without a marker can't be told apart from the street, so they stay in it.
+_UNIT_RE = re.compile(r"^(?P<street>[^,]*?),? (?P<unit>[A-Za-z]+-.*)$")
+
+
+def split_address(address):
+    """Split a DineSafe address into (street, unit, postal_code).
+
+    Handles the recent "{street} {unit} {postal}" format (with "None" for
+    missing parts) and the historical "{street}, {unit}" format.
+    """
+    if address is None:
+        return None, None, None
+    m = _POSTAL_RE.match(address)
+    street, postal = (m["rest"], m["postal"]) if m else (address, None)
+    street = street.removesuffix(" None")
+    u = _UNIT_RE.match(street)
+    if u:
+        return u["street"], u["unit"], postal
+    street, _, unit = street.partition(", ")
+    return street, unit or None, postal
+
+
+def count_unparsed_addresses(rows):
+    """Count recent-feed rows whose address doesn't end in a postal code or "None"."""
+    return sum(
+        1 for r in rows
+        if r["establishment_address"] and not _POSTAL_RE.match(r["establishment_address"])
+    )
 
 
 def normalize_date(value):
@@ -147,6 +184,7 @@ def map_row(row, column_map):
     for csv_col, db_col in column_map.items():
         mapped[db_col] = normalize(row.get(csv_col))
     mapped["inspection_date"] = normalize_date(mapped["inspection_date"])
+    mapped["street"], mapped["unit"], mapped["postal_code"] = split_address(mapped["establishment_address"])
     return mapped
 
 
@@ -275,13 +313,16 @@ def _fetch_recent_rows():
     source = recent_source(DSV_LOCAL_DATA_DIR)
     if DSV_LOCAL_DATA_DIR:
         print(f"Reading recent data from {source} ...")
-        return _read_csv_rows(source, RECENT_COLUMN_MAP)
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmp_path = os.path.join(tmpdir, "recent.csv")
-        print(f"Downloading recent data from {source} ...")
-        urlretrieve(source, tmp_path)
-        return _read_csv_rows(tmp_path, RECENT_COLUMN_MAP)
+        rows = _read_csv_rows(source, RECENT_COLUMN_MAP)
+    else:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = os.path.join(tmpdir, "recent.csv")
+            print(f"Downloading recent data from {source} ...")
+            urlretrieve(source, tmp_path)
+            rows = _read_csv_rows(tmp_path, RECENT_COLUMN_MAP)
+    # Non-zero means the upstream address format changed; the raw address is kept in street.
+    print(f"  Unparsed recent addresses: {count_unparsed_addresses(rows)}")
+    return rows
 
 
 def seed(conn):

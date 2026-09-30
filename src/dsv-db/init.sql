@@ -9,7 +9,7 @@ CREATE TABLE inspections (
     establishment_type          TEXT,
     establishment_address       TEXT,
     infraction_details          TEXT,
-    inspection_observation      TEXT,
+    infraction_category         TEXT,
     inspection_date             DATE,
     severity                    TEXT,
     action                      TEXT,
@@ -20,7 +20,11 @@ CREATE TABLE inspections (
     longitude                   DOUBLE PRECISION,
     unique_id                   TEXT,
     establishment_status        TEXT,
-    min_inspections_per_year    TEXT
+    min_inspections_per_year    TEXT,
+    -- Split from establishment_address at ingest by refresh.py
+    street                      TEXT,
+    unit                        TEXT,
+    postal_code                 TEXT
 );
 
 -- Every app, refresh, and Grafana query filters on inspection_date.

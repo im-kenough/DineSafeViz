@@ -26,7 +26,10 @@ def test_get_home_stats_fetches_and_caches_results():
         mock_datetime.now.return_value = now
         stats = app_module._get_home_stats()
 
-    assert stats == {"total_inspections": 12345, "years_of_data": 25}
+    assert stats == {
+        "total_inspections": 12345, "years_of_data": 25,
+        "min_date": date(2001, 1, 1), "max_date": date(2025, 12, 31),
+    }
     assert app_module._stats_cache["data"] == stats
     assert app_module._stats_cache["fetched_at"] == now
     assert mock_cur.execute.call_count == 1
@@ -57,11 +60,28 @@ def test_get_home_stats_refreshes_expired_cache():
         mock_datetime.now.return_value = now
         stats = app_module._get_home_stats()
 
-    assert stats == {"total_inspections": 54321, "years_of_data": 17}
+    assert stats["total_inspections"] == 54321
+    assert stats["years_of_data"] == 17
+
+
+def test_get_home_stats_does_not_cache_empty_table():
+    """An empty table (seed still running) must not be cached, so the next request picks up the seed."""
+    _reset_cache()
+    mock_conn, _ = _mock_stats_db(0, None, None)
+
+    with patch("app.psycopg2.connect", return_value=mock_conn):
+        stats = app_module._get_home_stats()
+
+    assert stats["total_inspections"] == 0
+    assert app_module._stats_cache["fetched_at"] is None
 
 
 def test_home_route_renders_stats(client):
-    with patch("app._get_home_stats", return_value={"total_inspections": 12345, "years_of_data": 25}):
+    stats = {
+        "total_inspections": 12345, "years_of_data": 25,
+        "min_date": date(2001, 1, 1), "max_date": date.today(),
+    }
+    with patch("app._get_home_stats", return_value=stats):
         resp = client.get("/")
 
     assert resp.status_code == 200

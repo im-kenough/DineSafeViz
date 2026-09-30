@@ -7,6 +7,8 @@ from refresh import (
     normalize,
     normalize_date,
     map_row,
+    split_address,
+    count_unparsed_addresses,
     min_inspection_date,
     recent_source,
     historical_source,
@@ -86,7 +88,7 @@ class TestMapHistoricalRow:
 
     def test_recent_only_columns_are_none(self):
         result = map_row(self.SAMPLE_ROW, HISTORICAL_COLUMN_MAP)
-        assert result["inspection_observation"] is None
+        assert result["infraction_category"] is None
         assert result["outcome_date"] is None
         assert result["unique_id"] is None
 
@@ -142,7 +144,7 @@ class TestMapRecentRow:
     def test_maps_infraction_and_observation(self):
         result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
         assert result["infraction_details"] == "FAIL TO ENSURE EQUIPMENT SURFACE SANITIZED"
-        assert result["inspection_observation"] == "05. MAINTENANCE / SANITATION"
+        assert result["infraction_category"] == "05. MAINTENANCE / SANITATION"
 
     def test_maps_severity(self):
         # Severity is now present in the recent feed (was historical-only before).
@@ -167,6 +169,70 @@ class TestMapRecentRow:
         result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
         for col in INSPECTIONS_COLUMNS:
             assert col in result, f"Missing column: {col}"
+
+
+class TestSplitAddress:
+    # Recent feed: "{street} {unit} {postal}" with "None" for missing parts.
+    def test_recent_no_unit(self):
+        assert split_address("1871 O'Connor Dr None M4A 1X1") == ("1871 O'Connor Dr", None, "M4A 1X1")
+
+    def test_recent_with_unit(self):
+        assert split_address("65 Front St W Unit-442 M5J 1E6") == ("65 Front St W", "Unit-442", "M5J 1E6")
+
+    def test_recent_no_unit_no_postal(self):
+        assert split_address("102 Fort York Blvd None None") == ("102 Fort York Blvd", None, None)
+
+    def test_recent_unit_with_spaces_and_no_postal(self):
+        assert split_address("41 Lebovic Ave Unit-A 110 None") == ("41 Lebovic Ave", "Unit-A 110", None)
+
+    def test_recent_unit_containing_commas(self):
+        assert split_address("23 Comay Rd Rm-211, 212, 213 M3J 2B5") == ("23 Comay Rd", "Rm-211, 212, 213", "M3J 2B5")
+
+    def test_recent_unit_without_marker_stays_in_street(self):
+        assert split_address("80 Western Battery Rd 4 M6K 3S1") == ("80 Western Battery Rd 4", None, "M6K 3S1")
+
+    def test_recent_legacy_comma_address(self):
+        assert split_address("4700 KEELE ST, Rm-006 None M3J 1P3") == ("4700 KEELE ST", "Rm-006", "M3J 1P3")
+
+    # Historical CSVs: "{street}, {unit}" or just "{street}", never a postal code.
+    def test_historical_with_unit(self):
+        assert split_address("266 EDDYSTONE AVE, Unit-0") == ("266 EDDYSTONE AVE", "Unit-0", None)
+
+    def test_historical_unit_without_marker(self):
+        assert split_address("301 FRONT ST W, CN TOWER") == ("301 FRONT ST W", "CN TOWER", None)
+
+    def test_historical_comma_wins_over_later_marker(self):
+        assert split_address("1235 WILSON AVE, Lower Level-Unit-4") == ("1235 WILSON AVE", "Lower Level-Unit-4", None)
+
+    def test_historical_street_only(self):
+        assert split_address("361 OAKWOOD AVE") == ("361 OAKWOOD AVE", None, None)
+
+    def test_none(self):
+        assert split_address(None) == (None, None, None)
+
+
+class TestMapRowSplitsAddress:
+    def test_recent_row_keeps_raw_and_splits(self):
+        result = map_row({"address": "65 Front St W Unit-442 M5J 1E6"}, RECENT_COLUMN_MAP)
+        assert result["establishment_address"] == "65 Front St W Unit-442 M5J 1E6"
+        assert (result["street"], result["unit"], result["postal_code"]) == ("65 Front St W", "Unit-442", "M5J 1E6")
+
+    def test_historical_row_splits(self):
+        result = map_row({"Establishment Address": "266 EDDYSTONE AVE, Unit-0"}, HISTORICAL_COLUMN_MAP)
+        assert (result["street"], result["unit"], result["postal_code"]) == ("266 EDDYSTONE AVE", "Unit-0", None)
+
+
+class TestCountUnparsedAddresses:
+    # Recent addresses always end in a postal code or "None"; anything else
+    # means the upstream format has drifted.
+    def test_counts_recent_addresses_without_postal_token(self):
+        rows = [
+            {"establishment_address": "65 Front St W Unit-442 M5J 1E6"},
+            {"establishment_address": "102 Fort York Blvd None None"},
+            {"establishment_address": "65 Front St W, Toronto ON"},
+            {"establishment_address": None},
+        ]
+        assert count_unparsed_addresses(rows) == 1
 
 
 class TestReadCsvRows:
