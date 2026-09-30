@@ -6,7 +6,6 @@ from Toronto's DineSafe program, grouped by inspection date with severity-based 
 import calendar
 import logging
 import os
-import re
 import threading
 import time
 import uuid
@@ -219,36 +218,6 @@ def inject_globals():
     }
 
 
-# Recent-feed addresses are "{street} {unit} {postal}" with "None" for missing
-# fields; the unit may contain spaces, so it stays on the street line.
-_ADDRESS_RE = re.compile(r"^(?P<street>.*?)(?: None)?(?: (?P<postal>[A-Z]\d[A-Z] \w+)| None)$")
-
-
-@app.template_filter("address_lines")
-def address_lines(address: str) -> List[str]:
-    """Split a DineSafe address into display lines: street, city, postal code.
-
-    Addresses that don't match the recent-feed format (e.g. historical rows,
-    which have no unit or postal code) are kept whole as the street line.
-
-    Args:
-        address: Raw establishment_address value.
-
-    Returns:
-        [street, "Toronto, ON", postal], without postal when it's missing,
-        or an empty list when there's no address.
-    """
-    if not address:
-        return []
-    m = _ADDRESS_RE.match(address)
-    if not m:
-        return [address, "Toronto, ON"]
-    lines = [m["street"], "Toronto, ON"]
-    if m["postal"]:
-        lines.append(m["postal"])
-    return lines
-
-
 def sort_rows(rows: List[Dict]) -> List[Dict]:
     """Sort inspection records by establishment status.
 
@@ -404,6 +373,7 @@ def index():
             cur.execute(
                 "SELECT inspection_date, establishment_status, action, infraction_details,"
                 "       establishment_name, establishment_address, establishment_type,"
+                "       street, unit, postal_code,"
                 "       outcome, outcome_date, amount_fined,"
                 "       establishment_id, severity,"
                 # inspection_observation is a misnomer; it holds the infraction category (deficiencyDesc)

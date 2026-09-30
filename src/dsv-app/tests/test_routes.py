@@ -13,7 +13,7 @@ def _mock_db(rows):
 
 def _row(name="Pasta Palace", address="99 King St W", est_type="Restaurant",
                status="Pass", details="Improper storage", severity="M - Minor",
-               category="Food storage"):
+               category="Food storage", street="99 King St W", unit=None, postal=None):
     """One row as returned by the /inspections route's RealDictCursor query."""
     return {
         "inspection_date": date(2024, 2, 14),
@@ -23,6 +23,9 @@ def _row(name="Pasta Palace", address="99 King St W", est_type="Restaurant",
         "establishment_name": name,
         "establishment_address": address,
         "establishment_type": est_type,
+        "street": street,
+        "unit": unit,
+        "postal_code": postal,
         "outcome": "Pass",
         "outcome_date": "2024-02-20",
         "amount_fined": "0.00",
@@ -258,11 +261,20 @@ def test_no_infraction_counts_without_infractions(client):
 
 
 def test_address_rendered_as_lines(client):
-    html = _render(client, [_row(address="102 BERKELEY ST None M5A 2W7")])
-    assert "<span>102 BERKELEY ST</span>" in html
-    assert "<span>Toronto, ON</span>" in html
-    assert "<span>M5A 2W7</span>" in html
-    assert "None" not in html
+    html = _render(client, [_row(street="102 BERKELEY ST", postal="M5A 2W7")])
+    assert "<span>102 BERKELEY ST</span><span>Toronto, ON</span><span>M5A 2W7</span>" in html
+
+
+def test_address_unit_on_street_line(client):
+    html = _render(client, [_row(street="65 Front St W", unit="Unit-442")])
+    assert "<span>65 Front St W Unit-442</span><span>Toronto, ON</span>" in html
+
+
+def test_address_without_street_shows_dash(client):
+    html = _render(client, [_row(street=None)])
+    location = html[html.index('class="est-location"'):html.index('class="est-results"')]
+    assert "<span>—</span>" in location
+    assert "Toronto, ON" not in location
 
 
 def test_heading_shows_quarter_and_date_range(client):

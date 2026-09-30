@@ -198,29 +198,3 @@ def test_build_days_infraction_ties_broken_by_category_then_details():
     ]
     infractions = build_days(rows, d, d)[0][1][0]["infractions"]
     assert [i["infraction_details"] for i in infractions] == ["z", "a", "b"]
-
-
-from app import address_lines
-
-
-def test_address_lines_drops_none_unit():
-    assert address_lines("102 BERKELEY ST None M5A 2W7") == ["102 BERKELEY ST", "Toronto, ON", "M5A 2W7"]
-
-
-def test_address_lines_keeps_unit_on_street_line():
-    assert address_lines("496 Yonge St Bldg-B M4Y 1X9") == ["496 Yonge St Bldg-B", "Toronto, ON", "M4Y 1X9"]
-    assert address_lines("10 Northtown Way 110 M2N 7L4") == ["10 Northtown Way 110", "Toronto, ON", "M2N 7L4"]
-    assert address_lines("2950 Birchmount Rd Unit-6A M1W 3G5") == ["2950 Birchmount Rd Unit-6A", "Toronto, ON", "M1W 3G5"]
-
-
-def test_address_lines_omits_missing_postal():
-    assert address_lines("2000 QUEEN ST E None None") == ["2000 QUEEN ST E", "Toronto, ON"]
-    assert address_lines("41 Lebovic Ave Unit-A 110 None") == ["41 Lebovic Ave Unit-A 110", "Toronto, ON"]
-
-
-def test_address_lines_historical_address_unchanged():
-    assert address_lines("361 OAKWOOD AVE") == ["361 OAKWOOD AVE", "Toronto, ON"]
-
-
-def test_address_lines_empty():
-    assert address_lines(None) == []
