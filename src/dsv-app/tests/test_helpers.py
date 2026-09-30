@@ -1,84 +1,123 @@
 from datetime import date
+from unittest.mock import MagicMock, patch
 
-from app import get_quarter_bounds, DATA_START
+import psycopg2
+
+import app as app_module
+from app import (
+    DATA_START, get_data_range, get_quarter_bounds, get_valid_quarters,
+    get_valid_years, parse_year_quarter,
+)
+
+# A DB range narrower than 2001..today: starts mid-Q2 2010, ends in Q1 2025.
+FIRST = date(2010, 6, 1)
+LAST = date(2025, 2, 1)
 
 
 def test_q1_full_quarter():
-    start, end = get_quarter_bounds(2024, 1)
+    start, end = get_quarter_bounds(2024, 1, FIRST)
     assert start == date(2024, 1, 1)
     assert end == date(2024, 3, 31)
 
 
 def test_q2_full_quarter():
-    start, end = get_quarter_bounds(2024, 2)
+    start, end = get_quarter_bounds(2024, 2, FIRST)
     assert start == date(2024, 4, 1)
     assert end == date(2024, 6, 30)
 
 
 def test_q3_full_quarter():
-    start, end = get_quarter_bounds(2024, 3)
+    start, end = get_quarter_bounds(2024, 3, FIRST)
     assert start == date(2024, 7, 1)
     assert end == date(2024, 9, 30)
 
 
 def test_q4_full_quarter():
-    start, end = get_quarter_bounds(2024, 4)
+    start, end = get_quarter_bounds(2024, 4, FIRST)
     assert start == date(2024, 10, 1)
     assert end == date(2024, 12, 31)
 
 
-def test_q4_2023_clips_to_data_start():
-    # Q4 2023 is Oct 1–Dec 31; DATA_START (2001-01-01) no longer clips
-    start, end = get_quarter_bounds(2023, 4)
-    assert start == date(2023, 10, 1)
-    assert end == date(2023, 12, 31)
+def test_first_quarter_start_clips_to_first_inspection():
+    start, end = get_quarter_bounds(2010, 2, FIRST)
+    assert start == FIRST
+    assert end == date(2010, 6, 30)
 
 
 def test_end_does_not_exceed_today():
-    # Q3 of a future year should clip end to today
     today = date.today()
-    start, end = get_quarter_bounds(today.year, (today.month - 1) // 3 + 1)
+    start, end = get_quarter_bounds(today.year, (today.month - 1) // 3 + 1, FIRST)
     assert end <= today
 
 
-from app import get_valid_years, get_valid_quarters, parse_year_quarter
+def test_valid_years_match_db_range():
+    assert get_valid_years(FIRST, LAST) == list(range(2010, 2026))
 
 
-def test_valid_years_includes_2001_and_current():
-    years = get_valid_years()
-    assert 2001 in years
-    assert date.today().year in years
+def test_valid_quarters_first_year_starts_at_first_quarter_with_data():
+    assert get_valid_quarters(2010, FIRST, LAST) == [2, 3, 4]
 
 
-def test_2023_all_four_quarters():
-    assert get_valid_quarters(2023) == [1, 2, 3, 4]
+def test_valid_quarters_last_year_ends_at_last_quarter_with_data():
+    assert get_valid_quarters(2025, FIRST, LAST) == [1]
 
 
-def test_2024_all_four_quarters():
-    assert get_valid_quarters(2024) == [1, 2, 3, 4]
+def test_valid_quarters_middle_year_all_four():
+    assert get_valid_quarters(2023, FIRST, LAST) == [1, 2, 3, 4]
+
+
+def test_valid_quarters_single_year_range():
+    assert get_valid_quarters(2024, date(2024, 4, 5), date(2024, 8, 1)) == [2, 3]
 
 
 def test_parse_valid_params():
-    year, q = parse_year_quarter({"year": "2024", "q": "2"})
-    assert year == 2024
-    assert q == 2
+    assert parse_year_quarter({"year": "2024", "q": "2"}, FIRST, LAST) == (2024, 2)
 
 
-def test_parse_invalid_year_returns_current():
-    year, q = parse_year_quarter({"year": "1900", "q": "1"})
-    assert year in get_valid_years()
+def test_parse_missing_params_defaults_to_latest_quarter_with_data():
+    assert parse_year_quarter({}, FIRST, LAST) == (2025, 1)
 
 
-def test_parse_q1_2023_is_valid():
-    # All of 2023 is loaded (#202); Q1 must not fall back to Q4
-    year, q = parse_year_quarter({"year": "2023", "q": "1"})
-    assert year == 2023
-    assert q == 1
+def test_parse_year_outside_db_range_defaults_to_latest():
+    assert parse_year_quarter({"year": "2005", "q": "1"}, FIRST, LAST) == (2025, 1)
+
+
+def test_parse_quarter_before_first_inspection_falls_back():
+    assert parse_year_quarter({"year": "2010", "q": "1"}, FIRST, LAST) == (2010, 4)
 
 
 def test_parse_non_numeric_params():
-    year, q = parse_year_quarter({"year": "abc", "q": "xyz"})
-    assert year in get_valid_years()
+    assert parse_year_quarter({"year": "abc", "q": "xyz"}, FIRST, LAST) == (2025, 1)
+
+
+def _stats_db(total, min_date, max_date):
+    conn = MagicMock()
+    conn.cursor.return_value.fetchone.return_value = (total, min_date, max_date)
+    return conn
+
+
+def _clear_cache():
+    app_module._stats_cache["data"] = None
+    app_module._stats_cache["fetched_at"] = None
+
+
+def test_data_range_comes_from_db():
+    _clear_cache()
+    with patch("app.psycopg2.connect", return_value=_stats_db(10, FIRST, LAST)):
+        assert get_data_range() == (FIRST, LAST)
+
+
+def test_data_range_falls_back_when_db_empty():
+    _clear_cache()
+    with patch("app.psycopg2.connect", return_value=_stats_db(0, None, None)):
+        assert get_data_range() == (DATA_START, date.today())
+
+
+def test_data_range_falls_back_when_db_unreachable_and_does_not_cache():
+    _clear_cache()
+    with patch("app.psycopg2.connect", side_effect=psycopg2.OperationalError("down")):
+        assert get_data_range() == (DATA_START, date.today())
+    assert app_module._stats_cache["fetched_at"] is None
 
 
 from app import sort_rows, build_days

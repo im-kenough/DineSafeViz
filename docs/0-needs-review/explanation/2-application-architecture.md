@@ -118,17 +118,22 @@ The Flask app no longer handles the analytics reverse proxy at
 
 The app groups inspections by date and sorts them by establishment status
 within each day (Closed > Conditional Pass > Pass, with unknown statuses
-sorting last). Year and quarter navigation covers 2001 to the present. The
-navigation uses a menu with flyout submenus. It shows the four most recent
-years directly and nests older years under an "Archive" section. The 2023
-navigation only shows Q4, because the recent CSV starts from Q4 2023 and
-historical data ends in 2022.
+sorting last). Year and quarter navigation covers the quarters between the
+earliest and latest `inspection_date` in the database, so it follows
+whatever range is loaded without a code change. If the database is
+unreachable or empty, navigation falls back to January 1, 2001 through
+today. The navigation uses a menu with flyout submenus. It shows the four
+most recent years directly and nests older years under an "Archive"
+section.
 
 ### Home page caching
 
 The home page queries aggregate stats (total inspections and years of
 data) from the database and caches the result in memory with a 5-day
 TTL to avoid repeated queries on a dataset that changes infrequently.
+The same cached query supplies the first and last inspection dates that
+drive the year and quarter navigation, so a newly loaded range can take
+up to 5 days to appear in the menu unless you restart `dsv-app`.
 
 ### Observability
 

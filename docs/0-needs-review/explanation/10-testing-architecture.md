@@ -15,9 +15,11 @@ needed to stub out side effects.
 Tests for pure date and data-formatting logic:
 
 - `get_quarter_bounds` — boundary calculations for all four quarters,
-  clipping to `DATA_START` and today's date
+  clipping to the first inspection date and today's date
 - `get_valid_years`, `get_valid_quarters` — valid year/quarter range
-  generation
+  generation from the database's first and last inspection dates
+- `get_data_range` — range read from the database, with the `DATA_START`
+  fallback when the database is empty or unreachable
 - `parse_year_quarter` — parameter validation and fallback behavior for
   invalid or out-of-range inputs
 - `sort_rows` — severity sort order (Crucial > Significant > Minor > NA)

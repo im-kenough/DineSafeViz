@@ -41,7 +41,10 @@ def _render(client, rows):
     return resp.data.decode()
 
 
-_HOME_STATS = {"total_inspections": 12345, "years_of_data": 25}
+_HOME_STATS = {
+    "total_inspections": 12345, "years_of_data": 25,
+    "min_date": date(2001, 1, 1), "max_date": date.today(),
+}
 
 
 def test_home_has_dashboard_link(client):
@@ -153,6 +156,18 @@ def test_dropdown_has_links_on_info(client):
     resp = client.get("/info")
     assert b'href="/inspections?year=2023&q=4"' in resp.data
     assert b'href="/inspections?year=2024&q=1"' in resp.data
+
+
+def test_nav_matches_db_range(client):
+    import app as app_module
+    app_module._stats_cache["data"].update(min_date=date(2010, 6, 1), max_date=date(2025, 2, 1))
+    html = client.get("/info").data.decode()
+    assert 'href="/inspections?year=2010&q=2"' in html
+    assert 'href="/inspections?year=2010&q=1"' not in html
+    assert 'href="/inspections?year=2025&q=1"' in html
+    assert 'href="/inspections?year=2025&q=2"' not in html
+    assert 'href="/inspections?year=2009' not in html
+    assert 'href="/inspections?year=2026' not in html
 
 
 def test_dashboard_nav_active_class(client):
