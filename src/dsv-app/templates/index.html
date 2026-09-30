@@ -1,80 +1,62 @@
 {% extends "base.html" %}
 {% block content %}
     <h2 class="page-heading">DineSafe Inspections | Q{{ selected_q }} {{ selected_year }}<span class="heading-sep"> | </span><span class="heading-dates">{{ start.strftime('%B %-d, %Y') }} - {{ end.strftime('%B %-d, %Y') }}</span></h2>
-    {% set status_class = {
-        'Closed':           'status-closed',
-        'Conditional Pass': 'status-conditional',
-        'Pass':             'status-pass'
-    } %}
+    <nav class="contents">
+        <span class="label">Contents</span>
+        {% for m_start, m_end in months %}<a class="nav-btn month-link" href="#month-{{ m_start.strftime('%Y-%m') }}">{{ m_start.strftime('%B') }}</a>{% endfor %}
+        <button type="button" class="nav-btn" id="expand-all">Expand all</button>
+        <button type="button" class="nav-btn" id="collapse-all">Collapse all</button>
+    </nav>
 
-    {% for day, establishments in days %}
-    <div class="day-box">
-        <h2>{{ day.strftime('%A, %B %-d, %Y') }}</h2>
-        {% for est in establishments %}
-
-        <!-- Shows all inspection details for an establishment -->
-        <div class="est-card {{ status_class.get(est.establishment_status, '') }}">
-            
-            <!-- Establishment name and location -->
-            <div class="est-location">
-                <strong>{{ est.establishment_name or '—' }}</strong>
-                {% if est.street %}<span>{{ est.street }}{% if est.unit %} {{ est.unit }}{% endif %}</span><span>Toronto, ON</span>{% if est.postal_code %}<span>{{ est.postal_code }}</span>{% endif %}{% else %}<span>—</span>{% endif %}
-                {% if est.establishment_type %}<span class="est-type">{{ est.establishment_type }}</span>{% endif %}
-                {% if est.infractions %}
-                {% set crucial = est.severity_counts['C - Crucial'] %}
-                {% set significant = est.severity_counts['S - Significant'] %}
-                {% set minor = est.severity_counts['M - Minor'] %}
-
-                <!-- Infraction count summary table -->
-                <br><br>
-                <table class="inf-counts">
-                    <caption><span class="label">Infractions</span> <strong>{{ est.infractions|length }}</strong></caption>
-                    <tr><th>Crucial</th><td>{{ crucial }}</td></tr>
-                    <tr><th>Significant</th><td>{{ significant }}</td></tr>
-                    <tr><th>Minor</th><td>{{ minor }}</td></tr>
-                    <tr><th>NA</th><td>{{ est.infractions|length - crucial - significant - minor }}</td></tr>
-                </table>
-                {% endif %}
-            </div>
-
-            <!-- Inspection results -->
-            <div class="est-results">
-
-                <!-- Over all inspection status -->
-                <div class="est-status"><span class="label">Inspection Status</span> <strong>{{ (est.establishment_status or '—')|upper }}</strong><br><br></div>
-                {% if est.infractions %}
-
-                <!-- Infractions table -->
-                <table class="infractions">
-                    <thead>
-                        <tr><th>Severity</th><th>Category of Infraction</th></tr>
-                    </thead>
-                    <tbody>
-                    {% for inf in est.infractions %}
-                        <tr class="inf-summary">
-                            <td>{{ inf.severity or '—' }}</td>
-                            <td>{{ inf.infraction_category or '—' }}</td>
-                        </tr>
-                        <tr class="inf-details">
-                            <td></td>
-                            <td>
-                                {{ inf.infraction_details }}
-                                {% if inf.action %}<div class="inf-meta">Action: {{ inf.action }}</div>{% endif %}
-                                {% if inf.outcome %}<div class="inf-meta">Outcome: {{ inf.outcome }}{% if inf.outcome_date %} ({{ inf.outcome_date }}){% endif %}</div>{% endif %}
-                                {% if inf.amount_fined %}<div class="inf-meta">Fined: ${{ inf.amount_fined }}</div>{% endif %}
-                            </td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <p class="no-data">No infractions</p>
-                {% endif %}
-            </div>
+    {% for m_start, m_end in months %}
+    {% set src = url_for('inspections_month', year=m_start.year, m=m_start.month) %}
+    <details class="month-box" id="month-{{ m_start.strftime('%Y-%m') }}" {% if loop.first %}open{% else %}data-src="{{ src }}"{% endif %}>
+        <summary>{{ m_start.strftime('%B %Y') }}</summary>
+        {% if loop.first %}
+        <div class="month-body">
+{% include "_days.html" %}
         </div>
         {% else %}
-        <p class="no-data">No data</p>
-        {% endfor %}
-    </div>
+        <div class="month-body"><p class="no-data"><a href="{{ src }}">Load {{ m_start.strftime('%B %Y') }}</a></p></div>
+        {% endif %}
+    </details>
     {% endfor %}
+    <script>
+    (function () {
+        var months = document.querySelectorAll('details.month-box');
+
+        // Fetch a collapsed month's day boxes the first time it is opened.
+        months.forEach(function (box) {
+            box.addEventListener('toggle', function () {
+                var src = box.dataset.src;
+                if (!box.open || !src) return;
+                delete box.dataset.src;
+                var body = box.querySelector('.month-body');
+                fetch(src).then(function (resp) {
+                    if (!resp.ok) throw new Error(resp.status);
+                    return resp.text();
+                }).then(function (html) {
+                    body.innerHTML = html;
+                }).catch(function () {
+                    box.dataset.src = src;
+                    body.innerHTML = '<p class="no-data">Could not load. <a href="' + src + '">Open this month</a></p>';
+                });
+            });
+        });
+
+        // Contents buttons open their month before the browser jumps to it.
+        document.querySelectorAll('.month-link').forEach(function (link) {
+            link.addEventListener('click', function () {
+                document.querySelector(link.getAttribute('href')).open = true;
+            });
+        });
+
+        document.getElementById('expand-all').addEventListener('click', function () {
+            months.forEach(function (box) { box.open = true; });
+        });
+        document.getElementById('collapse-all').addEventListener('click', function () {
+            months.forEach(function (box) { box.open = false; });
+        });
+    }());
+    </script>
 {% endblock %}
