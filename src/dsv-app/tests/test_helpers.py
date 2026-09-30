@@ -5,7 +5,7 @@ import psycopg2
 
 import app as app_module
 from app import (
-    DATA_START, get_data_range, get_quarter_bounds, get_quarter_months, get_valid_quarters,
+    DATA_START, get_adjacent_quarters, get_data_range, get_quarter_bounds, get_quarter_months, get_valid_quarters,
     get_valid_years, parse_year_quarter,
 )
 
@@ -87,6 +87,23 @@ def test_valid_quarters_middle_year_all_four():
 
 def test_valid_quarters_single_year_range():
     assert get_valid_quarters(2024, date(2024, 4, 5), date(2024, 8, 1)) == [2, 3]
+
+
+def test_adjacent_quarters_within_year():
+    assert get_adjacent_quarters(2023, 2, FIRST, LAST) == ((2023, 1), (2023, 3))
+
+
+def test_adjacent_quarters_cross_year_boundaries():
+    assert get_adjacent_quarters(2023, 1, FIRST, LAST) == ((2022, 4), (2023, 2))
+    assert get_adjacent_quarters(2023, 4, FIRST, LAST) == ((2023, 3), (2024, 1))
+
+
+def test_adjacent_quarters_none_before_first_quarter_with_data():
+    assert get_adjacent_quarters(2010, 2, FIRST, LAST) == (None, (2010, 3))
+
+
+def test_adjacent_quarters_none_after_last_quarter_with_data():
+    assert get_adjacent_quarters(2025, 1, FIRST, LAST) == ((2024, 4), None)
 
 
 def test_parse_valid_params():

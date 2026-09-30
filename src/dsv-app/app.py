@@ -13,7 +13,7 @@ import collections
 import itertools
 from contextlib import closing
 from datetime import date, datetime, timedelta
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -153,6 +153,23 @@ def get_valid_quarters(year: int, first: date, last: date) -> List[int]:
     lo = (first.month - 1) // 3 + 1 if year == first.year else 1
     hi = (last.month - 1) // 3 + 1 if year == last.year else 4
     return list(range(lo, hi + 1))
+
+
+def get_adjacent_quarters(
+    year: int, q: int, first: date, last: date
+) -> Tuple[Optional[Tuple[int, int]], Optional[Tuple[int, int]]]:
+    """Get the (year, quarter) before and after the given quarter.
+
+    Either side is None when it falls outside the quarters with data.
+
+    Returns:
+        A tuple of (previous, next), each a (year, quarter) pair or None.
+    """
+    prev = (year, q - 1) if q > 1 else (year - 1, 4)
+    nxt = (year, q + 1) if q < 4 else (year + 1, 1)
+    first_q = (first.year, (first.month - 1) // 3 + 1)
+    last_q = (last.year, (last.month - 1) // 3 + 1)
+    return (prev if prev >= first_q else None, nxt if nxt <= last_q else None)
 
 
 def parse_year_quarter(args: Dict[str, str], first: date, last: date) -> Tuple[int, int]:
@@ -443,6 +460,7 @@ def index():
     start, end = months[-1][0], months[0][1]
     latest_start, latest_end = months[0]
     rows = _fetch_inspections(latest_start, latest_end, "inspections")
+    prev_q, next_q = get_adjacent_quarters(year, q, first, last)
 
     return render_template(
         "index.html",
@@ -450,6 +468,8 @@ def index():
         months=months,
         start=start,
         end=end,
+        prev_q=prev_q,
+        next_q=next_q,
     )
 
 

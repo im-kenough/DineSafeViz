@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
     <h2 class="page-heading">DineSafe Inspections | Q{{ selected_q }} {{ selected_year }}<span class="heading-sep"> | </span><span class="heading-dates">{{ start.strftime('%B %-d, %Y') }} - {{ end.strftime('%B %-d, %Y') }}</span></h2>
+    <nav class="quarter-step">
+        {% if prev_q %}<a class="nav-btn" href="{{ url_for('index', year=prev_q[0], q=prev_q[1]) | safe }}" rel="prev">‹ Q{{ prev_q[1] }} {{ prev_q[0] }}</a>{% endif %}
+        {% if next_q %}<a class="nav-btn" href="{{ url_for('index', year=next_q[0], q=next_q[1]) | safe }}" rel="next">Q{{ next_q[1] }} {{ next_q[0] }} ›</a>{% endif %}
+    </nav>
     <nav class="contents">
         <span class="label">Contents</span>
         {% for m_start, m_end in months %}<a class="nav-btn month-link" href="#month-{{ m_start.strftime('%Y-%m') }}">{{ m_start.strftime('%B') }}</a>{% endfor %}

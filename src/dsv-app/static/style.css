@@ -102,8 +102,7 @@ h2.page-heading {
 
 /* ── tabs ───────────────────────────────────────────────── */
 .tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
-.tabs > a,
-.tabs > .dropdown > a {
+.tabs > a {
     display: block;
     text-align: center;
 }
@@ -220,58 +219,56 @@ footer {
 }
 
 /* ── inspections dropdown ───────────────────────────────── */
-.dropdown {
-    position: relative;
-    display: inline-block;
+.dropdown { position: relative; }
+.dropdown > summary {
+    display: block;
+    text-align: center;
+    cursor: pointer;
+    list-style: none;
 }
+.dropdown > summary::-webkit-details-marker { display: none; }
 
-.dropdown-menu,
-.flyout {
-    padding: 0.25rem;
+.dropdown-menu {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    left: 0;
+    z-index: 10;
+    max-height: min(70vh, 32rem);
+    overflow-y: auto;
+    padding: 0.5rem;
     background: var(--surface);
     border: 1px solid var(--accent);
     border-radius: 4px;
-    flex-direction: column;
-    gap: 0.25rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.dropdown-menu {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    z-index: 10;
-}
+/* year × quarter grid */
+.picker-grid { width: auto; border-collapse: separate; border-spacing: 0.25rem; }
+.picker-grid th,
+.picker-grid td { border: none; padding: 0; background: none; text-align: center; }
+.picker-grid th[scope="row"] { padding-right: 0.5rem; text-align: right; color: var(--text); }
+.picker-cell { display: block; padding: 0.35rem 0.6rem; }
+.picker-cell.is-empty { color: var(--border); }
 
-.dropdown:hover .dropdown-menu,
-.dropdown-menu.is-open { display: flex; }
-
-.dropdown-year {
-    position: relative;
-    cursor: pointer;
-}
-
-.dropdown-year > .flyout { display: none; }
-
-.archive-item {
+.picker-archive {
     margin-top: 0.25rem;
     padding-top: 0.5rem;
     border-top: 1px solid var(--border);
 }
-
-.dropdown-year:hover > .flyout,
-.flyout.is-open { display: flex; }
-
-.flyout {
-    position: absolute;
-    top: 0;
-    left: 100%;
+.picker-archive > summary {
+    cursor: pointer;
+    padding: 0.25rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    list-style: none;
 }
+.picker-archive > summary::-webkit-details-marker { display: none; }
+.picker-archive > summary::before { content: "▸ "; color: var(--accent); }
+.picker-archive[open] > summary::before { content: "▾ "; }
 
-.flyout a { display: block; }
-
-/* year→quarters flyouts (regular and archive) display horizontally */
-.dropdown-year:not(.archive-item) > .flyout { flex-direction: row; }
+/* ── previous / next quarter ────────────────────────────── */
+.quarter-step { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+.quarter-step a[rel="next"] { margin-left: auto; }
 
 /* ── mobile (≤ 600px: all phones in portrait) ───────────── */
 @media (max-width: 600px) {
@@ -280,9 +277,19 @@ footer {
         padding: 0 0.75rem;
     }
 
+    /* tabs share the first row; icon-only social links take the second */
+    .tabs { position: relative; }
+    .tabs > a,
+    .tabs > .dropdown { flex: 1 1 auto; }
+    .tabs .nav-btn { padding: 0.5rem 0.6rem; }
     .social-links { margin-left: 0; }
 
     .link-label { display: none; }
+
+    /* picker spans the nav width instead of hanging off the Inspections tab */
+    .dropdown { position: static; }
+    .dropdown-menu { right: 0; }
+    .picker-grid { width: 100%; }
 
     /* page heading date range drops to its own line */
     h2.page-heading { font-size: 1.15rem; }
@@ -295,17 +302,6 @@ footer {
     .infractions { table-layout: fixed; }
     .infractions th:first-child { width: 5.5rem; }
     .infractions th, .infractions td { padding: 0.3rem 0.4rem; }
-
-    /* flyout stacks below year row instead of floating right */
-    .flyout {
-        position: static;
-        margin-top: 0.25rem;
-        margin-left: 0.5rem;
-        border-top: none;
-        border-right: none;
-        border-bottom: none;
-        border-radius: 0;
-    }
 }
 
 /* ── tablet (601px – 1023px: iPad portrait, phone landscape) */

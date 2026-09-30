@@ -19,31 +19,37 @@
     </header>
     <nav class="tabs">
         <a href="{{ url_for('home') }}" class="nav-btn {{ 'active' if request.endpoint == 'home' else '' }}">Home</a>
-        <div class="dropdown">
-            <a href="{{ url_for('index') }}" class="nav-btn {{ 'active' if request.endpoint == 'index' else '' }}">Inspections ▾</a>
-            {% macro year_flyout(y, qs) %}
-                <div class="nav-btn dropdown-year">
-                    <span>{{ y }} ›</span>
-                    <div class="flyout">
-                        {% for q in qs %}
-                        <a href="{{ url_for('index', year=y, q=q) | safe }}"
-                           class="nav-btn {{ 'active' if y == selected_year and q == selected_q else '' }}">Q{{ q }}</a>
-                        {% endfor %}
-                    </div>
-                </div>
+        {% set on_index = request.endpoint == 'index' %}
+        <details class="dropdown">
+            <summary class="nav-btn {{ 'active' if on_index else '' }}">Inspections ▾</summary>
+            {# One row per year, one column per quarter; quarters without data are empty cells #}
+            {% macro year_rows(year_quarters) %}
+                {% for y, qs in year_quarters %}
+                <tr>
+                    <th scope="row">{{ y }}</th>
+                    {% for q in range(1, 5) %}
+                    {% set active = on_index and y == selected_year and q == selected_q %}
+                    <td>{% if q in qs %}<a href="{{ url_for('index', year=y, q=q) | safe }}" class="nav-btn picker-cell{{ ' active' if active }}"{{ ' aria-current="page"' | safe if active }}>Q{{ q }}</a>{% else %}<span class="picker-cell is-empty" aria-hidden="true">·</span>{% endif %}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
             {% endmacro %}
             <div class="dropdown-menu">
-                {% for y, qs in recent_year_quarters %}{{ year_flyout(y, qs) }}{% endfor %}
+                <table class="picker-grid">
+                    <thead><tr><th></th>{% for q in range(1, 5) %}<th scope="col">Q{{ q }}</th>{% endfor %}</tr></thead>
+                    <tbody>{{ year_rows(recent_year_quarters) }}</tbody>
+                </table>
                 {% if archive_year_quarters %}
-                <div class="nav-btn dropdown-year archive-item">
-                    <span>Archive ›</span>
-                    <div class="flyout">
-                        {% for y, qs in archive_year_quarters %}{{ year_flyout(y, qs) }}{% endfor %}
-                    </div>
-                </div>
+                {% set archive_open = on_index and selected_year in archive_year_quarters | map('first') %}
+                <details class="picker-archive"{{ ' open' if archive_open }}>
+                    <summary>Older years ({{ archive_year_quarters[-1][0] }}–{{ archive_year_quarters[0][0] }})</summary>
+                    <table class="picker-grid">
+                        <tbody>{{ year_rows(archive_year_quarters) }}</tbody>
+                    </table>
+                </details>
                 {% endif %}
             </div>
-        </div>
+        </details>
         <a href="{{ url_for('dashboard') }}" class="nav-btn {{ 'active' if request.endpoint == 'dashboard' else '' }}">Dashboard</a>
         <a href="{{ url_for('info') }}" class="nav-btn {{ 'active' if request.endpoint == 'info' else '' }}">Info</a>
         <div class="social-links">
@@ -60,45 +66,16 @@
     {% block content %}{% endblock %}
     <script>
     (function () {
-        var dropdown = document.querySelector('.dropdown');
+        // <details> handles open/close and keyboard; close it on outside click or Escape.
+        var dropdown = document.querySelector('details.dropdown');
         if (!dropdown) return;
-        var menu = dropdown.querySelector('.dropdown-menu');
-        var trigger = dropdown.querySelector('a.nav-btn');
-
-        // Toggle top-level dropdown; prevent the trigger link from navigating
-        trigger.addEventListener('click', function (e) {
-            e.preventDefault();
-            var opening = menu.classList.toggle('is-open');
-            if (opening) {
-                menu.querySelectorAll('.flyout.is-open').forEach(function (f) {
-                    f.classList.remove('is-open');
-                });
-            }
-        });
-
-        // Toggle year/archive flyouts at any nesting depth.
-        // Sibling-close is scoped to the immediate parent so nested archive
-        // interactions do not close ancestor flyouts.
-        menu.querySelectorAll('.dropdown-year').forEach(function (yr) {
-            yr.addEventListener('click', function (e) {
-                if (e.target.closest('a')) return;
-                e.stopPropagation();
-                var flyout = yr.querySelector('.flyout');
-                var opening = !flyout.classList.contains('is-open');
-                yr.parentElement.querySelectorAll(':scope > .dropdown-year > .flyout.is-open').forEach(function (f) {
-                    f.classList.remove('is-open');
-                });
-                if (opening) flyout.classList.add('is-open');
-            });
-        });
-
-        // Close everything on outside click
         document.addEventListener('click', function (e) {
-            if (!dropdown.contains(e.target)) {
-                menu.classList.remove('is-open');
-                menu.querySelectorAll('.flyout.is-open').forEach(function (f) {
-                    f.classList.remove('is-open');
-                });
+            if (!dropdown.contains(e.target)) dropdown.open = false;
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && dropdown.open) {
+                dropdown.open = false;
+                dropdown.querySelector('summary').focus();
             }
         });
     }());
