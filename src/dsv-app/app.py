@@ -6,7 +6,6 @@ from Toronto's DineSafe program, grouped by inspection date with severity-based 
 import calendar
 import logging
 import os
-import re
 import threading
 import time
 import uuid
@@ -17,7 +16,7 @@ from typing import Dict, List, Tuple
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from flask import Flask, g, render_template, request
+from flask import Flask, abort, g, render_template, request
 from prometheus_flask_exporter import PrometheusMetrics
 from prometheus_client import Counter, Histogram
 from pythonjsonlogger import jsonlogger
@@ -46,7 +45,8 @@ _stats_cache_hits = Counter("dsv_stats_cache_hits_total", "Stats cache hits")
 _stats_cache_misses = Counter("dsv_stats_cache_misses_total", "Stats cache misses")
 _inspection_rows_returned = Histogram(
     "dsv_inspection_query_rows",
-    "Inspection rows per /inspections request",
+    "Inspection rows per month query",
+    ["route"],
     buckets=(100, 500, 1000, 5000, 10000, 50000),
 )
 
@@ -111,6 +111,19 @@ def get_quarter_bounds(year: int, q: int, first: date) -> Tuple[date, date]:
     start = date(year, month_start, 1)
     end = date(year, month_end, calendar.monthrange(year, month_end)[1])
     return max(start, first), min(end, date.today())
+
+
+def get_quarter_months(year: int, q: int, first: date) -> List[Tuple[date, date]]:
+    """Split a quarter into per-month (start, end) ranges, newest first.
+
+    Each range is clipped to the quarter bounds from get_quarter_bounds.
+    """
+    start, end = get_quarter_bounds(year, q, first)
+    months = []
+    for m in range(end.month, start.month - 1, -1):
+        month_end = date(year, m, calendar.monthrange(year, m)[1])
+        months.append((max(date(year, m, 1), start), min(month_end, end)))
+    return months
 
 
 def get_valid_years(first: date, last: date) -> List[int]:
@@ -236,36 +249,6 @@ def inject_globals():
         "selected_year": year,
         "selected_q": q,
     }
-
-
-# Recent-feed addresses are "{street} {unit} {postal}" with "None" for missing
-# fields; the unit may contain spaces, so it stays on the street line.
-_ADDRESS_RE = re.compile(r"^(?P<street>.*?)(?: None)?(?: (?P<postal>[A-Z]\d[A-Z] \w+)| None)$")
-
-
-@app.template_filter("address_lines")
-def address_lines(address: str) -> List[str]:
-    """Split a DineSafe address into display lines: street, city, postal code.
-
-    Addresses that don't match the recent-feed format (e.g. historical rows,
-    which have no unit or postal code) are kept whole as the street line.
-
-    Args:
-        address: Raw establishment_address value.
-
-    Returns:
-        [street, "Toronto, ON", postal], without postal when it's missing,
-        or an empty list when there's no address.
-    """
-    if not address:
-        return []
-    m = _ADDRESS_RE.match(address)
-    if not m:
-        return [address, "Toronto, ON"]
-    lines = [m["street"], "Toronto, ON"]
-    if m["postal"]:
-        lines.append(m["postal"])
-    return lines
 
 
 def sort_rows(rows: List[Dict]) -> List[Dict]:
@@ -405,27 +388,11 @@ def home():
     return render_template("home.html", stats=_get_home_stats())
 
 
-@app.route("/inspections")
-def index():
-    """Render the main inspection visualization page.
-
-    Fetches inspections for the requested year/quarter, groups them by date,
-    and renders the index template with navigation options.
-
-    Query Parameters:
-        year (optional): The calendar year to display (defaults to current year).
-        q (optional): The quarter to display (defaults to the latest valid quarter).
-
-    Returns:
-        Rendered HTML template with inspections grouped by date.
-    """
-    first, last = get_data_range()
-    year, q = parse_year_quarter(request.args, first, last)
-    start, end = get_quarter_bounds(year, q, first)
-
+def _fetch_inspections(start: date, end: date, route: str) -> List[Dict]:
+    """Fetch inspection rows between start and end (inclusive), timed under route."""
     with closing(psycopg2.connect(**DB_CONFIG, connect_timeout=5)) as conn, \
             closing(conn.cursor(cursor_factory=RealDictCursor)) as cur:
-        with _db_query_duration.labels(route="inspections").time():
+        with _db_query_duration.labels(route=route).time():
             cur.execute(
                 "SELECT inspection_date, establishment_status, action, infraction_details,"
                 "       establishment_name, establishment_address, establishment_type,"
@@ -438,14 +405,67 @@ def index():
                 (start, end),
             )
             rows = cur.fetchall()
-        _inspection_rows_returned.observe(len(rows))
+        _inspection_rows_returned.labels(route=route).observe(len(rows))
+    return rows
+
+
+@app.route("/inspections")
+def index():
+    """Render the main inspection visualization page.
+
+    Renders one collapsible section per month of the requested year/quarter.
+    Only the latest month's inspections are queried and rendered; older
+    months are fetched from inspections_month when first expanded.
+
+    Query Parameters:
+        year (optional): The calendar year to display (defaults to current year).
+        q (optional): The quarter to display (defaults to the latest valid quarter).
+
+    Returns:
+        Rendered HTML template with the latest month's inspections grouped by date.
+    """
+    first, last = get_data_range()
+    year, q = parse_year_quarter(request.args, first, last)
+    months = get_quarter_months(year, q, first)
+    start, end = months[-1][0], months[0][1]
+    latest_start, latest_end = months[0]
+    rows = _fetch_inspections(latest_start, latest_end, "inspections")
 
     return render_template(
         "index.html",
-        days=build_days(rows, start, end),
+        days=build_days(rows, latest_start, latest_end),
+        months=months,
         start=start,
         end=end,
     )
+
+
+@app.route("/inspections/month")
+def inspections_month():
+    """Render one month's day boxes as an HTML fragment.
+
+    Query Parameters:
+        year: The calendar year.
+        m: The month number (1-12).
+
+    Returns:
+        The day boxes for that month, or 404 if the month is malformed or
+        outside the data range.
+    """
+    try:
+        year, m = int(request.args["year"]), int(request.args["m"])
+    except (KeyError, ValueError):
+        abort(404)
+    first, last = get_data_range()
+    q = (m - 1) // 3 + 1
+    if year not in get_valid_years(first, last) or q not in get_valid_quarters(year, first, last):
+        abort(404)
+    months = {s.month: (s, e) for s, e in get_quarter_months(year, q, first)}
+    if m not in months:
+        abort(404)
+    start, end = months[m]
+    rows = _fetch_inspections(start, end, "inspections_month")
+    return render_template("_days.html", days=build_days(rows, start, end))
 
 
 @app.route("/dashboard")

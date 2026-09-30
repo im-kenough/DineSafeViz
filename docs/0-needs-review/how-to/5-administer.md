@@ -127,7 +127,6 @@ To rename the column, follow these steps:
    docker compose exec dsv-db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT infraction_category, count(*) FROM inspections GROUP BY 1 ORDER BY 2 DESC LIMIT 5;"'
    ```
 
-
 ### Follow the container logs
 
 ```bash

@@ -99,13 +99,14 @@ graph LR
 
 ## Web app
 
-The Flask app at `src/dsv-app/app.py` serves four pages and three
-operational endpoints.
+The Flask app at `src/dsv-app/app.py` serves four pages, one page
+fragment, and three operational endpoints.
 
 | Route | Description |
 |---|---|
 | `GET /` | Home page with summary statistics (total inspections, years of data) |
 | `GET /inspections` | Inspection log, filterable by year and quarter |
+| `GET /inspections/month` | One month's inspections as an HTML fragment (`year`, `m`); returns 404 for a month outside the data range |
 | `GET /dashboard` | Embeds the Grafana dashboard via iframe |
 | `GET /info` | Background on the DineSafe dataset |
 | `GET /healthz` | Liveness probe — always returns `200 ok` |
@@ -126,6 +127,15 @@ unreachable or empty, navigation falls back to January 1, 2001 through
 today. The navigation uses a menu with flyout submenus. It shows the four
 most recent years directly and nests older years under an "Archive"
 section.
+
+The inspection log splits each quarter into one collapsible section per
+month, with a **Contents** bar that jumps to a month and **Expand all** and
+**Collapse all** buttons. To keep the page small, `/inspections` queries and
+renders only the latest month. Older months stay collapsed, and the browser
+fetches each one from `/inspections/month` the first time you open it. The
+fragment route rejects malformed or out-of-range months with a 404 instead
+of falling back to a default month. Without JavaScript, each collapsed
+month shows a link to its fragment.
 
 ### Home page caching
 
@@ -151,10 +161,10 @@ from within the Docker network. The app defines four custom metrics.
 
 | Metric | Type | Description |
 |---|---|---|
-| `dsv_db_query_duration_seconds` | Histogram | DB query latency, labeled by `route` |
+| `dsv_db_query_duration_seconds` | Histogram | DB query latency, labeled by `route` (`home`, `inspections`, `inspections_month`) |
 | `dsv_stats_cache_hits_total` | Counter | Home stats cache hits |
 | `dsv_stats_cache_misses_total` | Counter | Home stats cache misses |
-| `dsv_inspection_query_rows` | Histogram | Rows returned per `/inspections` request |
+| `dsv_inspection_query_rows` | Histogram | Rows returned per month query, labeled by `route` (`inspections`, `inspections_month`) |
 
 The `ConsoleSpanExporter` emits OpenTelemetry SDK traces to the console
 (local dev only). `FlaskInstrumentor` and `Psycopg2Instrumentor` are
