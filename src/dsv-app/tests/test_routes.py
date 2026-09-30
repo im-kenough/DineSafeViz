@@ -36,9 +36,16 @@ def _row(name="Pasta Palace", address="99 King St W", est_type="Restaurant",
 
 
 def _render(client, rows):
+    """Render the February 2024 month fragment, which holds _row()'s date."""
     with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
-        resp = client.get("/inspections?year=2024&q=1")
+        resp = client.get("/inspections/month?year=2024&m=2")
     return resp.data.decode()
+
+
+def _render_page(client, db=None):
+    """Render the Q1 2024 /inspections page."""
+    with patch("app.psycopg2.connect", return_value=db or _mock_db([])):
+        return client.get("/inspections?year=2024&q=1").data.decode()
 
 
 _HOME_STATS = {
@@ -293,7 +300,7 @@ def test_address_without_street_shows_dash(client):
 
 
 def test_heading_shows_quarter_and_date_range(client):
-    html = _render(client, [])
+    html = _render_page(client)
     assert ('<h2 class="page-heading">DineSafe Inspections | Q1 2024'
             '<span class="heading-sep"> | </span>'
             '<span class="heading-dates">January 1, 2024 - March 31, 2024</span></h2>') in html
@@ -309,3 +316,52 @@ def test_heading_end_date_is_today_for_current_quarter(client):
                 f'<span class="heading-dates">{start.strftime("%B %-d, %Y")} - {today.strftime("%B %-d, %Y")}</span>')
     assert f'<h2 class="page-heading">{expected}</h2>' in html
     assert f"<h2>{today.strftime('%A, %B %-d, %Y')}</h2>" in html
+
+
+def test_inspections_latest_month_open_and_inlined(client):
+    db = _mock_db([])
+    html = _render_page(client, db)
+    assert re.search(r'<details class="month-box" id="month-2024-03" open>', html)
+    assert "Sunday, March 31, 2024" in html
+    # Only the latest month is queried; older months are fetched on expand.
+    assert db.cursor.return_value.execute.call_args[0][1] == (date(2024, 3, 1), date(2024, 3, 31))
+
+
+def test_inspections_older_months_collapsed_and_lazy(client):
+    html = _render_page(client)
+    for m in ("01", "02"):
+        assert (f'<details class="month-box" id="month-2024-{m}" '
+                f'data-src="/inspections/month?year=2024&amp;m={int(m)}">') in html
+    assert "February 29, 2024" not in html
+    assert "January 1, 2024" not in html.split("</h2>", 1)[1]
+
+
+def test_inspections_contents_bar(client):
+    html = _render_page(client)
+    links = re.findall(r'<a class="nav-btn month-link" href="#month-(\d{4}-\d{2})">(\w+)</a>', html)
+    assert links == [("2024-03", "March"), ("2024-02", "February"), ("2024-01", "January")]
+    assert 'id="expand-all"' in html
+    assert 'id="collapse-all"' in html
+
+
+def test_month_fragment_renders_only_that_month(client):
+    db = _mock_db([_row(name="Risky Bistro")])
+    with patch("app.psycopg2.connect", return_value=db):
+        resp = client.get("/inspections/month?year=2024&m=2")
+    html = resp.data.decode()
+    assert resp.status_code == 200
+    assert "Thursday, February 29, 2024" in html
+    assert "Thursday, February 1, 2024" in html
+    assert "March" not in html and "January" not in html
+    assert "Risky Bistro" in html
+    assert "<html" not in html
+    assert db.cursor.return_value.execute.call_args[0][1] == (date(2024, 2, 1), date(2024, 2, 29))
+
+
+def test_month_fragment_bad_params_404(client):
+    next_year = date.today().year + 1
+    for qs in ("", "year=2024", "year=2024&m=13", "year=2024&m=0", "year=abc&m=2",
+               "year=2000&m=12", f"year={next_year}&m=1"):
+        with patch("app.psycopg2.connect", return_value=_mock_db([])):
+            resp = client.get(f"/inspections/month?{qs}")
+        assert resp.status_code == 404, qs

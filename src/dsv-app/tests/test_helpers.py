@@ -5,7 +5,7 @@ import psycopg2
 
 import app as app_module
 from app import (
-    DATA_START, get_data_range, get_quarter_bounds, get_valid_quarters,
+    DATA_START, get_data_range, get_quarter_bounds, get_quarter_months, get_valid_quarters,
     get_valid_years, parse_year_quarter,
 )
 
@@ -48,6 +48,25 @@ def test_end_does_not_exceed_today():
     today = date.today()
     start, end = get_quarter_bounds(today.year, (today.month - 1) // 3 + 1, FIRST)
     assert end <= today
+
+
+def test_quarter_months_newest_first():
+    assert get_quarter_months(2024, 1, FIRST) == [
+        (date(2024, 3, 1), date(2024, 3, 31)),
+        (date(2024, 2, 1), date(2024, 2, 29)),
+        (date(2024, 1, 1), date(2024, 1, 31)),
+    ]
+
+
+def test_quarter_months_clipped_to_first_inspection():
+    # FIRST is 2010-06-01, so Q2 2010 only has June.
+    assert get_quarter_months(2010, 2, FIRST) == [(FIRST, date(2010, 6, 30))]
+
+
+def test_quarter_months_stop_at_today():
+    today = date.today()
+    months = get_quarter_months(today.year, (today.month - 1) // 3 + 1, FIRST)
+    assert months[0] == (today.replace(day=1), today)
 
 
 def test_valid_years_match_db_range():
