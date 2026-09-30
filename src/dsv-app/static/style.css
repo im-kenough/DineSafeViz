@@ -141,10 +141,33 @@ th {
     color: var(--text-muted);
 }
 
-/* ── status rows ────────────────────────────────────────── */
-tr.status-closed      { background-color: var(--status-closed); }
-tr.status-conditional { background-color: var(--status-conditional); }
-tr.status-pass        { background-color: var(--status-pass); }
+/* ── establishment cards ────────────────────────────────── */
+.est-card {
+    display: grid;
+    grid-template-columns: minmax(12rem, 1fr) 2fr;
+    gap: 1rem;
+    border: 1px solid var(--border);
+    border-left: 6px solid var(--border);
+    border-radius: 6px;
+    padding: 0.6rem 0.9rem;
+    margin-bottom: 0.6rem;
+    font-size: clamp(0.8rem, 0.9vw, 1.05rem);
+}
+.est-card:last-child { margin-bottom: 0; }
+.est-location { display: flex; flex-direction: column; gap: 0.15rem; }
+.est-type, .inf-meta, .no-infractions, .label { color: var(--text-muted); }
+.label { font-weight: 600; margin-right: 0.35rem; }
+.est-status { margin-bottom: 0.4rem; }
+.infractions th:first-child { width: 9.5rem; }
+.infractions td { vertical-align: top; }
+.inf-summary td { font-weight: 600; border-bottom: none; }
+.inf-details td { border-top: none; padding-bottom: 0.5rem; }
+.no-infractions { margin: 0; font-style: italic; }
+
+/* ── status accents ─────────────────────────────────────── */
+.est-card.status-closed      { border-left-color: var(--status-closed); }
+.est-card.status-conditional { border-left-color: var(--status-conditional); }
+.est-card.status-pass        { border-left-color: var(--status-pass); }
 
 /* ── footer ─────────────────────────────────────────────── */
 footer {
@@ -238,6 +261,13 @@ footer {
     .link-label { display: none; }
 
     /* flyout stacks below year row instead of floating right */
+    /* establishment card stacks location above results */
+    .est-card { grid-template-columns: 1fr; gap: 0.4rem; padding: 0.5rem 0.6rem; }
+    /* narrow severity column so category/details get the width */
+    .infractions { table-layout: fixed; }
+    .infractions th:first-child { width: 5.5rem; }
+    .infractions th, .infractions td { padding: 0.3rem 0.4rem; }
+
     .flyout {
         position: static;
         margin-top: 0.25rem;

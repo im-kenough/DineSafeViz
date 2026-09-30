@@ -59,6 +59,11 @@ STATUS_ORDER = {
     "Conditional Pass": 1,
     "Pass": 2,
 }
+SEVERITY_ORDER = {
+    "C - Crucial": 0,
+    "S - Significant": 1,
+    "M - Minor": 2,
+}
 RECENT_YEARS = 4
 # The recent CSV only covers from Q4 2023 onward; historical data ends 2022.
 RECENT_DATA_START_YEAR = 2023
@@ -219,7 +224,8 @@ def sort_rows(rows: List[Dict]) -> List[Dict]:
     """Sort inspection records by establishment status.
 
     Uses STATUS_ORDER to rank inspections from most to least severe.
-    Unknown status values are sorted to the end (order value 5).
+    Unknown status values are sorted to the end (order value 5). Ties are
+    broken by name then address so the order is stable across page loads.
 
     Args:
         rows: List of inspection record dictionaries.
@@ -227,14 +233,47 @@ def sort_rows(rows: List[Dict]) -> List[Dict]:
     Returns:
         The same list sorted by status in ascending order (most severe first).
     """
-    return sorted(rows, key=lambda r: STATUS_ORDER.get(r.get("establishment_status"), 5))
+    return sorted(rows, key=lambda r: (
+        STATUS_ORDER.get(r.get("establishment_status"), 5),
+        r.get("establishment_name") or "",
+        r.get("establishment_address") or "",
+    ))
+
+
+def group_establishments(rows: List[Dict]) -> List[Dict]:
+    """Group one day's infraction rows into one entry per establishment.
+
+    The dataset has one row per infraction; an establishment's rows on a given
+    date form a single inspection with a single status. Rows with no
+    infraction details (clean passes) contribute no infractions.
+
+    Args:
+        rows: Inspection record dictionaries for a single date.
+
+    Returns:
+        A list of establishment dicts (establishment fields plus an
+        "infractions" list sorted most severe first, then by category and
+        details for a stable order), in input order.
+    """
+    groups = {}
+    for row in rows:
+        group = groups.setdefault(row["establishment_id"], {**row, "infractions": []})
+        if row.get("infraction_details"):
+            group["infractions"].append(row)
+    for group in groups.values():
+        group["infractions"].sort(key=lambda r: (
+            SEVERITY_ORDER.get(r.get("severity"), 3),
+            r.get("infraction_category") or "",
+            r.get("infraction_details") or "",
+        ))
+    return list(groups.values())
 
 
 def build_days(rows: List[Dict], start: date, end: date) -> List[Tuple[date, List[Dict]]]:
-    """Group inspections by date and return chronologically (newest first).
+    """Group inspections by date and establishment, newest date first.
 
     Creates one entry for every date in the range, even if no inspections occurred
-    on that date. Inspections on the same date are sorted by severity.
+    on that date. Establishments on the same date are sorted by status.
 
     Args:
         rows: List of inspection record dictionaries with "inspection_date" key.
@@ -243,7 +282,7 @@ def build_days(rows: List[Dict], start: date, end: date) -> List[Tuple[date, Lis
 
     Returns:
         A list of (date, inspections) tuples ordered from end to start (newest first).
-        Each tuple contains a date and a severity-sorted list of inspections for that date.
+        Each tuple contains a date and a status-sorted list of establishments for that date.
     """
     from collections import defaultdict
     by_date = defaultdict(list)
@@ -253,7 +292,7 @@ def build_days(rows: List[Dict], start: date, end: date) -> List[Tuple[date, Lis
     days = []
     d = end
     while d >= start:
-        days.append((d, sort_rows(by_date.get(d, []))))
+        days.append((d, sort_rows(group_establishments(by_date.get(d, [])))))
         d -= timedelta(days=1)
     return days
 
@@ -337,7 +376,8 @@ def index():
             cur.execute(
                 "SELECT inspection_date, establishment_status, action, infraction_details,"
                 "       establishment_name, establishment_address, establishment_type,"
-                "       outcome, outcome_date, amount_fined"
+                "       outcome, outcome_date, amount_fined,"
+                "       establishment_id, severity, inspection_observation"
                 " FROM inspections"
                 " WHERE inspection_date BETWEEN %s AND %s",
                 (start, end),
@@ -360,6 +400,10 @@ def index():
             "outcome": r[7],
             "outcome_date": r[8],
             "amount_fined": r[9],
+            "establishment_id": r[10],
+            "severity": r[11],
+            # Seeder stores the infraction category (typeDesc/deficiencyDesc swap) here
+            "infraction_category": r[12],
         }
         for r in raw_rows
     ]
