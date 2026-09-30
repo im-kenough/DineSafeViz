@@ -437,6 +437,8 @@ def index():
     return render_template(
         "index.html",
         days=build_days(rows, start, end),
+        start=start,
+        end=end,
     )
 
 

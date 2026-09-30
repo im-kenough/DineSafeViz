@@ -263,3 +263,22 @@ def test_address_rendered_as_lines(client):
     assert "<span>Toronto, ON</span>" in html
     assert "<span>M5A 2W7</span>" in html
     assert "None" not in html
+
+
+def test_heading_shows_quarter_and_date_range(client):
+    html = _render(client, [])
+    assert ('<h2 class="page-heading">DineSafe Inspections | Q1 2024'
+            '<span class="heading-sep"> | </span>'
+            '<span class="heading-dates">January 1, 2024 - March 31, 2024</span></h2>') in html
+
+
+def test_heading_end_date_is_today_for_current_quarter(client):
+    today = date.today()
+    q = (today.month - 1) // 3 + 1
+    start = date(today.year, 3 * q - 2, 1)
+    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+        html = client.get(f"/inspections?year={today.year}&q={q}").data.decode()
+    expected = (f'DineSafe Inspections | Q{q} {today.year}<span class="heading-sep"> | </span>'
+                f'<span class="heading-dates">{start.strftime("%B %-d, %Y")} - {today.strftime("%B %-d, %Y")}</span>')
+    assert f'<h2 class="page-heading">{expected}</h2>' in html
+    assert f"<h2>{today.strftime('%A, %B %-d, %Y')}</h2>" in html
