@@ -1,9 +1,6 @@
-import os
-import sys
 from datetime import date, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import app as app_module
 
 

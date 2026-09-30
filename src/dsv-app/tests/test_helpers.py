@@ -1,8 +1,4 @@
-import sys
-import os
 from datetime import date
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app import get_quarter_bounds, DATA_START
 
@@ -54,8 +50,8 @@ def test_valid_years_includes_2001_and_current():
     assert date.today().year in years
 
 
-def test_2023_only_q4():
-    assert get_valid_quarters(2023) == [4]
+def test_2023_all_four_quarters():
+    assert get_valid_quarters(2023) == [1, 2, 3, 4]
 
 
 def test_2024_all_four_quarters():
@@ -73,11 +69,11 @@ def test_parse_invalid_year_returns_current():
     assert year in get_valid_years()
 
 
-def test_parse_invalid_q_for_2023_returns_4():
-    # Only Q4 is valid for 2023; Q1 should fall back to Q4
+def test_parse_q1_2023_is_valid():
+    # All of 2023 is loaded (#202); Q1 must not fall back to Q4
     year, q = parse_year_quarter({"year": "2023", "q": "1"})
     assert year == 2023
-    assert q == 4
+    assert q == 1
 
 
 def test_parse_non_numeric_params():
@@ -111,10 +107,25 @@ def test_sort_rows_pass_last():
     assert result[1]["establishment_status"] == "Pass"
 
 
+def _row(d, est_id, status, **extra):
+    row = {
+        "inspection_date": d,
+        "establishment_id": est_id,
+        "establishment_status": status,
+        "establishment_name": f"Est {est_id}",
+        "establishment_address": "1 Main St",
+        "establishment_type": "Restaurant",
+        "infraction_details": None,
+        "severity": None,
+    }
+    row.update(extra)
+    return row
+
+
 def test_build_days_newest_first():
     rows = [
-        {"inspection_date": date(2024, 1, 2), "establishment_status": "Pass"},
-        {"inspection_date": date(2024, 1, 1), "establishment_status": "Closed"},
+        _row(date(2024, 1, 2), "1", "Pass"),
+        _row(date(2024, 1, 1), "2", "Closed"),
     ]
     start = date(2024, 1, 1)
     end = date(2024, 1, 3)
@@ -126,7 +137,7 @@ def test_build_days_newest_first():
 
 
 def test_build_days_no_data_day_is_empty_list():
-    rows = [{"inspection_date": date(2024, 1, 1), "establishment_status": "Pass"}]
+    rows = [_row(date(2024, 1, 1), "1", "Pass")]
     start = date(2024, 1, 1)
     end = date(2024, 1, 2)
     days = build_days(rows, start, end)
@@ -134,12 +145,82 @@ def test_build_days_no_data_day_is_empty_list():
     assert days[0][1] == []  # Jan 2 has no data
 
 
-def test_build_days_rows_sorted_within_day():
+def test_build_days_establishments_sorted_within_day():
     rows = [
-        {"inspection_date": date(2024, 1, 1), "establishment_status": "Pass"},
-        {"inspection_date": date(2024, 1, 1), "establishment_status": "Closed"},
+        _row(date(2024, 1, 1), "1", "Pass"),
+        _row(date(2024, 1, 1), "2", "Closed"),
     ]
     start = end = date(2024, 1, 1)
     days = build_days(rows, start, end)
     assert days[0][1][0]["establishment_status"] == "Closed"
     assert days[0][1][1]["establishment_status"] == "Pass"
+
+
+def test_build_days_groups_infractions_by_establishment():
+    d = date(2024, 1, 1)
+    rows = [
+        _row(d, "1", "Conditional Pass", infraction_details="Minor thing", severity="M - Minor"),
+        _row(d, "1", "Conditional Pass", infraction_details="Crucial thing", severity="C - Crucial"),
+        _row(d, "2", "Pass"),
+    ]
+    days = build_days(rows, d, d)
+    groups = days[0][1]
+    assert len(groups) == 2
+    first = groups[0]
+    assert first["establishment_name"] == "Est 1"
+    # infractions sorted most severe first
+    assert [i["infraction_details"] for i in first["infractions"]] == [
+        "Crucial thing", "Minor thing"
+    ]
+
+
+def test_build_days_clean_pass_has_no_infractions():
+    d = date(2024, 1, 1)
+    days = build_days([_row(d, "1", "Pass")], d, d)
+    assert days[0][1][0]["infractions"] == []
+
+
+def test_sort_rows_ties_broken_by_name():
+    rows = [
+        {"establishment_status": "Pass", "establishment_name": "Zed Cafe"},
+        {"establishment_status": "Pass", "establishment_name": None},
+        {"establishment_status": "Pass", "establishment_name": "Able Diner"},
+    ]
+    assert [r["establishment_name"] for r in sort_rows(rows)] == [None, "Able Diner", "Zed Cafe"]
+
+
+def test_build_days_infraction_ties_broken_by_category_then_details():
+    d = date(2024, 1, 1)
+    rows = [
+        _row(d, "1", "Pass", infraction_details="b", infraction_category="05", severity="M - Minor"),
+        _row(d, "1", "Pass", infraction_details="z", infraction_category="02", severity="M - Minor"),
+        _row(d, "1", "Pass", infraction_details="a", infraction_category="05", severity="M - Minor"),
+    ]
+    infractions = build_days(rows, d, d)[0][1][0]["infractions"]
+    assert [i["infraction_details"] for i in infractions] == ["z", "a", "b"]
+
+
+from app import address_lines
+
+
+def test_address_lines_drops_none_unit():
+    assert address_lines("102 BERKELEY ST None M5A 2W7") == ["102 BERKELEY ST", "Toronto, ON", "M5A 2W7"]
+
+
+def test_address_lines_keeps_unit_on_street_line():
+    assert address_lines("496 Yonge St Bldg-B M4Y 1X9") == ["496 Yonge St Bldg-B", "Toronto, ON", "M4Y 1X9"]
+    assert address_lines("10 Northtown Way 110 M2N 7L4") == ["10 Northtown Way 110", "Toronto, ON", "M2N 7L4"]
+    assert address_lines("2950 Birchmount Rd Unit-6A M1W 3G5") == ["2950 Birchmount Rd Unit-6A", "Toronto, ON", "M1W 3G5"]
+
+
+def test_address_lines_omits_missing_postal():
+    assert address_lines("2000 QUEEN ST E None None") == ["2000 QUEEN ST E", "Toronto, ON"]
+    assert address_lines("41 Lebovic Ave Unit-A 110 None") == ["41 Lebovic Ave Unit-A 110", "Toronto, ON"]
+
+
+def test_address_lines_historical_address_unchanged():
+    assert address_lines("361 OAKWOOD AVE") == ["361 OAKWOOD AVE", "Toronto, ON"]
+
+
+def test_address_lines_empty():
+    assert address_lines(None) == []

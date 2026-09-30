@@ -6,13 +6,17 @@ from Toronto's DineSafe program, grouped by inspection date with severity-based 
 import calendar
 import logging
 import os
+import re
 import threading
 import time
 import uuid
+import collections
+from contextlib import closing
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Tuple
 
 import psycopg2
+from psycopg2.extras import RealDictCursor
 from flask import Flask, g, render_template, request
 from prometheus_flask_exporter import PrometheusMetrics
 from prometheus_client import Counter, Histogram
@@ -59,9 +63,12 @@ STATUS_ORDER = {
     "Conditional Pass": 1,
     "Pass": 2,
 }
+SEVERITY_ORDER = {
+    "C - Crucial": 0,
+    "S - Significant": 1,
+    "M - Minor": 2,
+}
 RECENT_YEARS = 4
-# The recent CSV only covers from Q4 2023 onward; historical data ends 2022.
-RECENT_DATA_START_YEAR = 2023
 _stats_cache = {"data": None, "fetched_at": None}
 _stats_cache_lock = threading.Lock()
 _STATS_TTL = timedelta(days=5)
@@ -92,13 +99,13 @@ def get_valid_years() -> List[int]:
     Returns:
         A list of years for which DineSafe data is available.
     """
-    return list(range(2001, date.today().year + 1))
+    return list(range(DATA_START.year, date.today().year + 1))
 
 
 def get_valid_quarters(year: int) -> List[int]:
     """Get valid quarters for a given year based on data availability.
 
-    For the current year, only completed quarters are included. Data starts in Q4 2023.
+    For the current year, only completed quarters are included.
     For other years, all four quarters are valid.
 
     Args:
@@ -110,10 +117,7 @@ def get_valid_quarters(year: int) -> List[int]:
     today = date.today()
     # Calculate current quarter: month 1-3 = Q1, 4-6 = Q2, 7-9 = Q3, 10-12 = Q4
     current_q = (today.month - 1) // 3 + 1
-    if year == RECENT_DATA_START_YEAR:
-        # Historical data ends 2022; recent CSV only goes back to Q4 2023
-        return [4]
-    elif year == today.year:
+    if year == today.year:
         # For the current year, include only quarters up to (and including) the current quarter
         return list(range(1, current_q + 1))
     else:
@@ -178,10 +182,11 @@ def _before_request():
 def _after_request(response):
     start = getattr(g, "start_time", None)
     duration_ms = round((time.monotonic() - start) * 1000, 2) if start is not None else None
+    request_id = getattr(g, "request_id", None)
     _logger.info(
         "request",
         extra={
-            "request_id": getattr(g, "request_id", None),
+            "request_id": request_id,
             "route": request.endpoint,
             "method": request.method,
             "status": response.status_code,
@@ -190,7 +195,6 @@ def _after_request(response):
             "user_agent": request.user_agent.string,
         },
     )
-    request_id = getattr(g, "request_id", None)
     if request_id:
         response.headers["X-Request-ID"] = request_id
     return response
@@ -215,11 +219,42 @@ def inject_globals():
     }
 
 
+# Recent-feed addresses are "{street} {unit} {postal}" with "None" for missing
+# fields; the unit may contain spaces, so it stays on the street line.
+_ADDRESS_RE = re.compile(r"^(?P<street>.*?)(?: None)?(?: (?P<postal>[A-Z]\d[A-Z] \w+)| None)$")
+
+
+@app.template_filter("address_lines")
+def address_lines(address: str) -> List[str]:
+    """Split a DineSafe address into display lines: street, city, postal code.
+
+    Addresses that don't match the recent-feed format (e.g. historical rows,
+    which have no unit or postal code) are kept whole as the street line.
+
+    Args:
+        address: Raw establishment_address value.
+
+    Returns:
+        [street, "Toronto, ON", postal], without postal when it's missing,
+        or an empty list when there's no address.
+    """
+    if not address:
+        return []
+    m = _ADDRESS_RE.match(address)
+    if not m:
+        return [address, "Toronto, ON"]
+    lines = [m["street"], "Toronto, ON"]
+    if m["postal"]:
+        lines.append(m["postal"])
+    return lines
+
+
 def sort_rows(rows: List[Dict]) -> List[Dict]:
     """Sort inspection records by establishment status.
 
     Uses STATUS_ORDER to rank inspections from most to least severe.
-    Unknown status values are sorted to the end (order value 5).
+    Unknown status values are sorted to the end (order value 5). Ties are
+    broken by name then address so the order is stable across page loads.
 
     Args:
         rows: List of inspection record dictionaries.
@@ -227,14 +262,49 @@ def sort_rows(rows: List[Dict]) -> List[Dict]:
     Returns:
         The same list sorted by status in ascending order (most severe first).
     """
-    return sorted(rows, key=lambda r: STATUS_ORDER.get(r.get("establishment_status"), 5))
+    return sorted(rows, key=lambda r: (
+        STATUS_ORDER.get(r.get("establishment_status"), 5),
+        r.get("establishment_name") or "",
+        r.get("establishment_address") or "",
+    ))
+
+
+def group_establishments(rows: List[Dict]) -> List[Dict]:
+    """Group one day's infraction rows into one entry per establishment.
+
+    The dataset has one row per infraction; an establishment's rows on a given
+    date form a single inspection with a single status. Rows with no
+    infraction details (clean passes) contribute no infractions.
+
+    Args:
+        rows: Inspection record dictionaries for a single date.
+
+    Returns:
+        A list of establishment dicts (establishment fields plus an
+        "infractions" list sorted most severe first, then by category and
+        details for a stable order, and a "severity_counts" Counter of those
+        infractions), in input order.
+    """
+    groups = {}
+    for row in rows:
+        group = groups.setdefault(row["establishment_id"], {**row, "infractions": []})
+        if row.get("infraction_details"):
+            group["infractions"].append(row)
+    for group in groups.values():
+        group["infractions"].sort(key=lambda r: (
+            SEVERITY_ORDER.get(r.get("severity"), 3),
+            r.get("infraction_category") or "",
+            r.get("infraction_details") or "",
+        ))
+        group["severity_counts"] = collections.Counter(r.get("severity") for r in group["infractions"])
+    return list(groups.values())
 
 
 def build_days(rows: List[Dict], start: date, end: date) -> List[Tuple[date, List[Dict]]]:
-    """Group inspections by date and return chronologically (newest first).
+    """Group inspections by date and establishment, newest date first.
 
     Creates one entry for every date in the range, even if no inspections occurred
-    on that date. Inspections on the same date are sorted by severity.
+    on that date. Establishments on the same date are sorted by status.
 
     Args:
         rows: List of inspection record dictionaries with "inspection_date" key.
@@ -243,17 +313,16 @@ def build_days(rows: List[Dict], start: date, end: date) -> List[Tuple[date, Lis
 
     Returns:
         A list of (date, inspections) tuples ordered from end to start (newest first).
-        Each tuple contains a date and a severity-sorted list of inspections for that date.
+        Each tuple contains a date and a status-sorted list of establishments for that date.
     """
-    from collections import defaultdict
-    by_date = defaultdict(list)
+    by_date = collections.defaultdict(list)
     for row in rows:
         by_date[row["inspection_date"]].append(row)
 
     days = []
     d = end
     while d >= start:
-        days.append((d, sort_rows(by_date.get(d, []))))
+        days.append((d, sort_rows(group_establishments(by_date.get(d, [])))))
         d -= timedelta(days=1)
     return days
 
@@ -267,36 +336,35 @@ DB_CONFIG = {
 }
 
 
-def _get_home_stats() -> Dict[str, int]:
-    now = datetime.now()
-    if (
-        _stats_cache["fetched_at"] is not None
-        and now - _stats_cache["fetched_at"] <= _STATS_TTL
-    ):
+def _cached_stats(now: datetime):
+    """Return cached stats if still fresh (counting a hit), else None."""
+    fetched_at = _stats_cache["fetched_at"]
+    if fetched_at is not None and now - fetched_at <= _STATS_TTL:
         _stats_cache_hits.inc()
         return _stats_cache["data"]
+    return None
+
+
+def _get_home_stats() -> Dict[str, int]:
+    now = datetime.now()
+    cached = _cached_stats(now)
+    if cached is not None:
+        return cached
 
     # Serialize cache fills so concurrent gthread workers don't stampede the DB.
     with _stats_cache_lock:
-        if (
-            _stats_cache["fetched_at"] is not None
-            and now - _stats_cache["fetched_at"] <= _STATS_TTL
-        ):
-            _stats_cache_hits.inc()
-            return _stats_cache["data"]
+        cached = _cached_stats(now)
+        if cached is not None:
+            return cached
 
         _stats_cache_misses.inc()
-        conn = psycopg2.connect(**DB_CONFIG, connect_timeout=5)
-        try:
-            cur = conn.cursor()
+        with closing(psycopg2.connect(**DB_CONFIG, connect_timeout=5)) as conn, \
+                closing(conn.cursor()) as cur:
             with _db_query_duration.labels(route="home").time():
                 cur.execute(
                     "SELECT COUNT(*), MIN(inspection_date), MAX(inspection_date) FROM inspections"
                 )
                 total, min_date, max_date = cur.fetchone()
-            cur.close()
-        finally:
-            conn.close()
 
         years_of_data = 0
         if min_date is not None and max_date is not None:
@@ -330,43 +398,28 @@ def index():
     year, q = parse_year_quarter(request.args)
     start, end = get_quarter_bounds(year, q)
 
-    conn = psycopg2.connect(**DB_CONFIG, connect_timeout=5)
-    try:
-        cur = conn.cursor()
+    with closing(psycopg2.connect(**DB_CONFIG, connect_timeout=5)) as conn, \
+            closing(conn.cursor(cursor_factory=RealDictCursor)) as cur:
         with _db_query_duration.labels(route="inspections").time():
             cur.execute(
                 "SELECT inspection_date, establishment_status, action, infraction_details,"
                 "       establishment_name, establishment_address, establishment_type,"
-                "       outcome, outcome_date, amount_fined"
+                "       outcome, outcome_date, amount_fined,"
+                "       establishment_id, severity,"
+                # inspection_observation is a misnomer; it holds the infraction category (deficiencyDesc)
+                "       inspection_observation AS infraction_category"
                 " FROM inspections"
                 " WHERE inspection_date BETWEEN %s AND %s",
                 (start, end),
             )
-            raw_rows = cur.fetchall()
-        _inspection_rows_returned.observe(len(raw_rows))
-        cur.close()
-    finally:
-        conn.close()
-
-    rows = [
-        {
-            "inspection_date": r[0],
-            "establishment_status": r[1],
-            "action": r[2],
-            "infraction_details": r[3],
-            "establishment_name": r[4],
-            "establishment_address": r[5],
-            "establishment_type": r[6],
-            "outcome": r[7],
-            "outcome_date": r[8],
-            "amount_fined": r[9],
-        }
-        for r in raw_rows
-    ]
+            rows = cur.fetchall()
+        _inspection_rows_returned.observe(len(rows))
 
     return render_template(
         "index.html",
         days=build_days(rows, start, end),
+        start=start,
+        end=end,
     )
 
 
@@ -390,13 +443,9 @@ def healthz():
 @app.route("/readyz")
 def readyz():
     try:
-        conn = psycopg2.connect(**DB_CONFIG, connect_timeout=1)
-        try:
-            cur = conn.cursor()
+        with closing(psycopg2.connect(**DB_CONFIG, connect_timeout=1)) as conn, \
+                closing(conn.cursor()) as cur:
             cur.execute("SELECT 1")
-            cur.close()
-        finally:
-            conn.close()
         return "ok", 200
     except Exception:
         return "db unreachable", 503

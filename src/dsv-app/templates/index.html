@@ -1,50 +1,80 @@
 {% extends "base.html" %}
-{% block title %}DineSafeViz{% endblock %}
 {% block content %}
-    <h2 class="page-heading">DineSafe Inspections</h2>
+    <h2 class="page-heading">DineSafe Inspections | Q{{ selected_q }} {{ selected_year }}<span class="heading-sep"> | </span><span class="heading-dates">{{ start.strftime('%B %-d, %Y') }} - {{ end.strftime('%B %-d, %Y') }}</span></h2>
     {% set status_class = {
         'Closed':           'status-closed',
         'Conditional Pass': 'status-conditional',
         'Pass':             'status-pass'
     } %}
 
-    {% for day, rows in days %}
+    {% for day, establishments in days %}
     <div class="day-box">
         <h2>{{ day.strftime('%A, %B %-d, %Y') }}</h2>
-        {% if rows %}
-        <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Status</th>
-                    <th>Infraction Details</th>
-                    <th>Establishment</th>
-                    <th>Establishment Type</th>
-                    <th>Action</th>
-                    <th>Outcome</th>
-                    <th>Outcome Date</th>
-                    <th>Amount Fined</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in rows %}
-                <tr class="{{ status_class.get(row.establishment_status, '') }}">
-                    <td>{{ row.establishment_status or '—' }}</td>
-                    <td>{{ row.infraction_details or '—' }}</td>
-                    <td>{{ row.establishment_name or '—' }}<br>----------<br>{{ row.establishment_address or '—' }}</td>
-                    <td>{{ row.establishment_type or '—' }}</td>
-                    <td>{{ row.action or '—' }}</td>
-                    <td>{{ row.outcome or '—' }}</td>
-                    <td>{{ row.outcome_date or '—' }}</td>
-                    <td>{{ row.amount_fined or '—' }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        {% for est in establishments %}
+
+        <!-- Shows all inspection details for an establishment -->
+        <div class="est-card {{ status_class.get(est.establishment_status, '') }}">
+            
+            <!-- Establishment name and location -->
+            <div class="est-location">
+                <strong>{{ est.establishment_name or '—' }}</strong>
+                {% for line in est.establishment_address|address_lines %}<span>{{ line }}</span>{% else %}<span>—</span>{% endfor %}
+                {% if est.establishment_type %}<span class="est-type">{{ est.establishment_type }}</span>{% endif %}
+                {% if est.infractions %}
+                {% set crucial = est.severity_counts['C - Crucial'] %}
+                {% set significant = est.severity_counts['S - Significant'] %}
+                {% set minor = est.severity_counts['M - Minor'] %}
+
+                <!-- Infraction count summary table -->
+                <br><br>
+                <table class="inf-counts">
+                    <caption><span class="label">Infractions</span> <strong>{{ est.infractions|length }}</strong></caption>
+                    <tr><th>Crucial</th><td>{{ crucial }}</td></tr>
+                    <tr><th>Significant</th><td>{{ significant }}</td></tr>
+                    <tr><th>Minor</th><td>{{ minor }}</td></tr>
+                    <tr><th>NA</th><td>{{ est.infractions|length - crucial - significant - minor }}</td></tr>
+                </table>
+                {% endif %}
+            </div>
+
+            <!-- Inspection results -->
+            <div class="est-results">
+
+                <!-- Over all inspection status -->
+                <div class="est-status"><span class="label">Inspection Status</span> <strong>{{ (est.establishment_status or '—')|upper }}</strong><br><br></div>
+                {% if est.infractions %}
+
+                <!-- Infractions table -->
+                <table class="infractions">
+                    <thead>
+                        <tr><th>Severity</th><th>Category of Infraction</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for inf in est.infractions %}
+                        <tr class="inf-summary">
+                            <td>{{ inf.severity or '—' }}</td>
+                            <td>{{ inf.infraction_category or '—' }}</td>
+                        </tr>
+                        <tr class="inf-details">
+                            <td></td>
+                            <td>
+                                {{ inf.infraction_details }}
+                                {% if inf.action %}<div class="inf-meta">Action: {{ inf.action }}</div>{% endif %}
+                                {% if inf.outcome %}<div class="inf-meta">Outcome: {{ inf.outcome }}{% if inf.outcome_date %} ({{ inf.outcome_date }}){% endif %}</div>{% endif %}
+                                {% if inf.amount_fined %}<div class="inf-meta">Fined: ${{ inf.amount_fined }}</div>{% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="no-data">No infractions</p>
+                {% endif %}
+            </div>
         </div>
         {% else %}
         <p class="no-data">No data</p>
-        {% endif %}
+        {% endfor %}
     </div>
     {% endfor %}
 {% endblock %}

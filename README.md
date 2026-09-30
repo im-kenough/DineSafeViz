@@ -91,11 +91,6 @@ are stored in
 [secrets.yml](infra/ansible/vault/secrets.yml) and are injected into the `.env`
 file during deployment via IaC.
 
-### [Monitoring](docs/explanation/9-monitoring-architecture.md) (coming soon)
-
-Grafana dashboards monitor the VM health, web app metrics, and database
-metrics.
-
 ## Getting started
 
 - **[Install guide](docs/how-to/1-install/README.md):** instructions for
@@ -106,10 +101,3 @@ metrics.
 ## Roadmap
 
 See the [project roadmap](https://github.com/users/im-kenough/projects/11).
-
-## Evolution
-
-Watch how DineSafeViz evolved over time:
-
-- v x.y.z: dockerized app on a self-hosted VM, orchestrated with IaC.
-- v x.y.z: dockerized app on a local computer.

@@ -1,5 +1,13 @@
 name: dsv
 
+# Read-only app-role DB connection, shared by dsv-app and dsv-analytics.
+x-db-app-env: &db-app-env
+  DSV_DB_HOST: dsv-db
+  DSV_DB_PORT: ${DSV_DB_PORT}
+  DSV_DB_NAME: ${DSV_DB_NAME}
+  DSV_DB_USER: ${DSV_DB_APP_USER:-dinesafe_app}
+  DSV_DB_PASSWORD: ${DSV_DB_APP_PASSWORD:-dinesafe_app}
+
 services:
   dsv-nginx:
     image: nginx:1.31.3-alpine
@@ -15,12 +23,7 @@ services:
 
   dsv-app:
     build: ./src/dsv-app
-    environment:
-      DSV_DB_HOST: dsv-db
-      DSV_DB_PORT: ${DSV_DB_PORT}
-      DSV_DB_NAME: ${DSV_DB_NAME}
-      DSV_DB_USER: ${DSV_DB_APP_USER:-dinesafe_app}
-      DSV_DB_PASSWORD: ${DSV_DB_APP_PASSWORD:-dinesafe_app}
+    environment: *db-app-env
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
       interval: 5s
@@ -78,11 +81,7 @@ services:
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
       GF_USERS_VIEWERS_CAN_EDIT: "true"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/dinesafe.json
-      DSV_DB_HOST: dsv-db
-      DSV_DB_PORT: ${DSV_DB_PORT}
-      DSV_DB_NAME: ${DSV_DB_NAME}
-      DSV_DB_USER: ${DSV_DB_APP_USER:-dinesafe_app}
-      DSV_DB_PASSWORD: ${DSV_DB_APP_PASSWORD:-dinesafe_app}
+      <<: *db-app-env
     volumes:
       - ./src/dsv-analytics/provisioning:/etc/grafana/provisioning
       - dsv-analytics-data:/var/lib/grafana
