@@ -10,5 +10,5 @@ opentelemetry-instrumentation-flask==0.66b0
 opentelemetry-instrumentation-psycopg2==0.66b0
 opentelemetry-instrumentation-wsgi==0.66b0
 opentelemetry-sdk==1.45.0
-opentelemetry-semantic-conventions==0.65b0
+opentelemetry-semantic-conventions==0.66b0
 opentelemetry-util-http==0.66b0
