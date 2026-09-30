@@ -60,8 +60,6 @@ STATUS_ORDER = {
     "Pass": 2,
 }
 RECENT_YEARS = 4
-# The recent CSV only covers from Q4 2023 onward; historical data ends 2022.
-RECENT_DATA_START_YEAR = 2023
 _stats_cache = {"data": None, "fetched_at": None}
 _stats_cache_lock = threading.Lock()
 _STATS_TTL = timedelta(days=5)
@@ -98,7 +96,7 @@ def get_valid_years() -> List[int]:
 def get_valid_quarters(year: int) -> List[int]:
     """Get valid quarters for a given year based on data availability.
 
-    For the current year, only completed quarters are included. Data starts in Q4 2023.
+    For the current year, only completed quarters are included.
     For other years, all four quarters are valid.
 
     Args:
@@ -110,10 +108,7 @@ def get_valid_quarters(year: int) -> List[int]:
     today = date.today()
     # Calculate current quarter: month 1-3 = Q1, 4-6 = Q2, 7-9 = Q3, 10-12 = Q4
     current_q = (today.month - 1) // 3 + 1
-    if year == RECENT_DATA_START_YEAR:
-        # Historical data ends 2022; recent CSV only goes back to Q4 2023
-        return [4]
-    elif year == today.year:
+    if year == today.year:
         # For the current year, include only quarters up to (and including) the current quarter
         return list(range(1, current_q + 1))
     else:

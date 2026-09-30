@@ -54,8 +54,8 @@ def test_valid_years_includes_2001_and_current():
     assert date.today().year in years
 
 
-def test_2023_only_q4():
-    assert get_valid_quarters(2023) == [4]
+def test_2023_all_four_quarters():
+    assert get_valid_quarters(2023) == [1, 2, 3, 4]
 
 
 def test_2024_all_four_quarters():
@@ -73,11 +73,11 @@ def test_parse_invalid_year_returns_current():
     assert year in get_valid_years()
 
 
-def test_parse_invalid_q_for_2023_returns_4():
-    # Only Q4 is valid for 2023; Q1 should fall back to Q4
+def test_parse_q1_2023_is_valid():
+    # All of 2023 is loaded (#202); Q1 must not fall back to Q4
     year, q = parse_year_quarter({"year": "2023", "q": "1"})
     assert year == 2023
-    assert q == 4
+    assert q == 1
 
 
 def test_parse_non_numeric_params():

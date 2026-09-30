@@ -112,7 +112,7 @@ def test_dropdown_has_year_and_quarter_links(client):
     with patch("app._get_home_stats", return_value=_HOME_STATS):
         resp = client.get("/")
     assert b'href="/inspections?year=2023&q=4"' in resp.data
-    assert b'href="/inspections?year=2023&q=1"' not in resp.data
+    assert b'href="/inspections?year=2023&q=1"' in resp.data
     assert b'href="/inspections?year=2024&q=1"' in resp.data
     assert b'href="/inspections?year=2024&q=4"' in resp.data
 
