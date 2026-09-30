@@ -6,6 +6,7 @@ from Toronto's DineSafe program, grouped by inspection date with severity-based 
 import calendar
 import logging
 import os
+import re
 import threading
 import time
 import uuid
@@ -235,6 +236,36 @@ def inject_globals():
         "selected_year": year,
         "selected_q": q,
     }
+
+
+# Recent-feed addresses are "{street} {unit} {postal}" with "None" for missing
+# fields; the unit may contain spaces, so it stays on the street line.
+_ADDRESS_RE = re.compile(r"^(?P<street>.*?)(?: None)?(?: (?P<postal>[A-Z]\d[A-Z] \w+)| None)$")
+
+
+@app.template_filter("address_lines")
+def address_lines(address: str) -> List[str]:
+    """Split a DineSafe address into display lines: street, city, postal code.
+
+    Addresses that don't match the recent-feed format (e.g. historical rows,
+    which have no unit or postal code) are kept whole as the street line.
+
+    Args:
+        address: Raw establishment_address value.
+
+    Returns:
+        [street, "Toronto, ON", postal], without postal when it's missing,
+        or an empty list when there's no address.
+    """
+    if not address:
+        return []
+    m = _ADDRESS_RE.match(address)
+    if not m:
+        return [address, "Toronto, ON"]
+    lines = [m["street"], "Toronto, ON"]
+    if m["postal"]:
+        lines.append(m["postal"])
+    return lines
 
 
 def sort_rows(rows: List[Dict]) -> List[Dict]:
