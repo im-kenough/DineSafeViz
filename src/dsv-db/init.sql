@@ -23,6 +23,9 @@ CREATE TABLE inspections (
     min_inspections_per_year    TEXT
 );
 
+-- Every app, refresh, and Grafana query filters on inspection_date.
+CREATE INDEX inspections_inspection_date_idx ON inspections (inspection_date);
+
 GRANT CONNECT ON DATABASE dinesafe TO dinesafe_app;
 GRANT USAGE   ON SCHEMA public       TO dinesafe_app;
 GRANT SELECT ON TABLE inspections TO dinesafe_app; -- SELECT only: Flask app is read-only; dsv-init-db handles writes

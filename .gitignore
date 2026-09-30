@@ -1,4 +1,11 @@
 .claude/
+CLAUDE.md
+GEMINI.md
+
+**/superpowers/
+**/journal/
+
+*.csv#
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

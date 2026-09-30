@@ -250,31 +250,24 @@ def download_and_load_historical(conn, cutoff):
     cutoff is the earliest inspection_date in the recent CSV; historical
     rows on or after it are skipped to avoid double-counting.
     """
-    local_dir = historical_source(DSV_LOCAL_DATA_DIR)
-    if local_dir:
-        print(f"Reading historical data from {local_dir} ...")
-        for name in sorted(os.listdir(local_dir)):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        csv_dir = historical_source(DSV_LOCAL_DATA_DIR)
+        if csv_dir:
+            print(f"Reading historical data from {csv_dir} ...")
+            names = os.listdir(csv_dir)
+        else:
+            csv_dir = tmpdir
+            zip_path = os.path.join(tmpdir, "historical.zip")
+            print(f"Downloading historical data from {HISTORICAL_ZIP_URL} ...")
+            urlretrieve(HISTORICAL_ZIP_URL, zip_path)
+            with zipfile.ZipFile(zip_path) as zf:
+                zf.extractall(tmpdir)
+                names = zf.namelist()
+
+        for name in sorted(names):
             if not name.endswith(".csv"):
                 continue
-            _insert_historical_csv(conn, os.path.join(local_dir, name), name, cutoff)
-        return
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        zip_path = os.path.join(tmpdir, "historical.zip")
-        print(f"Downloading historical data from {HISTORICAL_ZIP_URL} ...")
-        urlretrieve(HISTORICAL_ZIP_URL, zip_path)
-
-        with zipfile.ZipFile(zip_path) as zf:
-            zf.extractall(tmpdir)
-            for name in sorted(zf.namelist()):
-                if not name.endswith(".csv"):
-                    continue
-                _insert_historical_csv(conn, os.path.join(tmpdir, name), name, cutoff)
-
-
-def _read_recent_csv(csv_path):
-    """Parse the recent Dinesafe CSV file into mapped rows."""
-    return _read_csv_rows(csv_path, RECENT_COLUMN_MAP)
+            _insert_historical_csv(conn, os.path.join(csv_dir, name), name, cutoff)
 
 
 def _fetch_recent_rows():
@@ -282,13 +275,13 @@ def _fetch_recent_rows():
     source = recent_source(DSV_LOCAL_DATA_DIR)
     if DSV_LOCAL_DATA_DIR:
         print(f"Reading recent data from {source} ...")
-        return _read_recent_csv(source)
+        return _read_csv_rows(source, RECENT_COLUMN_MAP)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = os.path.join(tmpdir, "recent.csv")
         print(f"Downloading recent data from {source} ...")
         urlretrieve(source, tmp_path)
-        return _read_recent_csv(tmp_path)
+        return _read_csv_rows(tmp_path, RECENT_COLUMN_MAP)
 
 
 def seed(conn):

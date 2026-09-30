@@ -11,6 +11,33 @@ def _mock_db(rows):
     return mock_conn
 
 
+def _row(name="Pasta Palace", address="99 King St W", est_type="Restaurant",
+               status="Pass", details="Improper storage", severity="M - Minor",
+               category="Food storage"):
+    """One row as returned by the /inspections route's RealDictCursor query."""
+    return {
+        "inspection_date": date(2024, 2, 14),
+        "establishment_status": status,
+        "action": "Notice to Comply",
+        "infraction_details": details,
+        "establishment_name": name,
+        "establishment_address": address,
+        "establishment_type": est_type,
+        "outcome": "Pass",
+        "outcome_date": "2024-02-20",
+        "amount_fined": "0.00",
+        "establishment_id": "10002",
+        "severity": severity,
+        "infraction_category": category,
+    }
+
+
+def _render(client, rows):
+    with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
+        resp = client.get("/inspections?year=2024&q=1")
+    return resp.data.decode()
+
+
 _HOME_STATS = {"total_inspections": 12345, "years_of_data": 25}
 
 
@@ -45,23 +72,14 @@ def test_route_renders_day_boxes(client):
 
 
 def test_route_shows_inspection_data(client):
-    rows = [(
-        date(2024, 2, 14),   # inspection_date
-        "Conditional Pass",  # establishment_status
-        "Court Order",       # action
-        "Rats observed",     # infraction_details
-        "Risky Bistro",      # establishment_name
-        "1 Main St",         # establishment_address
-        "Fast Food",         # establishment_type
-        "Pass",              # outcome
-        "2024-02-20",        # outcome_date
-        "500.00",            # amount_fined
-    )]
-    with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
-        resp = client.get("/inspections?year=2024&q=1")
-    assert b"Risky Bistro" in resp.data
-    assert b"Conditional Pass" in resp.data
-    assert b"Rats observed" in resp.data
+    html = _render(client, [_row(name="Risky Bistro", status="Conditional Pass",
+                                       details="Rats observed", severity="C - Crucial",
+                                       category="Pest control")])
+    assert "Risky Bistro" in html
+    assert "CONDITIONAL PASS" in html
+    assert "Rats observed" in html
+    assert "Pest control" in html
+    assert "C - Crucial" in html
 
 
 def test_route_invalid_params_returns_200(client):
@@ -77,21 +95,7 @@ def test_route_no_data_day_shows_no_data_text(client):
 
 
 def test_status_class_on_row(client):
-    rows = [(
-        date(2024, 2, 14),   # inspection_date
-        "Conditional Pass",  # establishment_status
-        "Court Order",       # action
-        "Rats observed",     # infraction_details
-        "Risky Bistro",      # establishment_name
-        "1 Main St",         # establishment_address
-        "Fast Food",         # establishment_type
-        "Pass",              # outcome
-        "2024-02-20",        # outcome_date
-        "500.00",            # amount_fined
-    )]
-    with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
-        resp = client.get("/inspections?year=2024&q=1")
-    assert b'class="status-conditional"' in resp.data
+    assert 'class="est-card status-conditional"' in _render(client, [_row(status="Conditional Pass")])
 
 
 def test_footer_content(client):
@@ -112,7 +116,7 @@ def test_dropdown_has_year_and_quarter_links(client):
     with patch("app._get_home_stats", return_value=_HOME_STATS):
         resp = client.get("/")
     assert b'href="/inspections?year=2023&q=4"' in resp.data
-    assert b'href="/inspections?year=2023&q=1"' not in resp.data
+    assert b'href="/inspections?year=2023&q=1"' in resp.data
     assert b'href="/inspections?year=2024&q=1"' in resp.data
     assert b'href="/inspections?year=2024&q=4"' in resp.data
 
@@ -183,67 +187,98 @@ def test_recent_years_not_in_archive(client):
     assert b'href="/inspections?year=2023&q=4"' in resp.data
 
 
-def test_column_headers_in_order(client):
-    rows = [(
-        date(2024, 2, 14),
-        "Pass",
-        "Notice to Comply",
-        "Improper storage",
-        "Test Place",
-        "1 Main St",
-        "Restaurant",
-        "Pass",
-        "2024-02-20",
-        "0.00",
-    )]
-    with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
-        resp = client.get("/inspections?year=2024&q=1")
-    html = resp.data.decode()
-    headers = re.findall(r'<th[^>]*>([^<]+)</th>', html)
-    assert "Status" in headers
-    assert "Infraction Details" in headers
-    assert "Establishment" in headers
-    assert "Establishment Type" in headers
-    assert "Action" in headers
-    status_idx = headers.index("Status")
-    infraction_idx = headers.index("Infraction Details")
-    establishment_idx = headers.index("Establishment")
-    est_type_idx = headers.index("Establishment Type")
-    action_idx = headers.index("Action")
-    assert status_idx < infraction_idx < establishment_idx < est_type_idx < action_idx
+def test_location_left_of_results(client):
+    html = _render(client, [_row()])
+    assert html.index('class="est-location"') < html.index('class="est-results"')
 
 
 def test_establishment_type_rendered(client):
-    rows = [(
-        date(2024, 2, 14),
-        "Pass",
-        "Notice to Comply",
-        "Improper storage",
-        "Pasta Palace",
-        "99 King St W",
-        "UNIQUE_EST_TYPE_XYZ",  # establishment_type
-        "Pass",
-        "2024-02-20",
-        "0.00",
-    )]
-    with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
-        resp = client.get("/inspections?year=2024&q=1")
-    assert b"UNIQUE_EST_TYPE_XYZ" in resp.data
+    assert "UNIQUE_EST_TYPE_XYZ" in _render(client, [_row(est_type="UNIQUE_EST_TYPE_XYZ")])
 
 
-def test_establishment_cell_contains_name_and_address(client):
-    rows = [(
-        date(2024, 2, 14),
-        "Pass",
-        "Notice to Comply",
-        "Improper storage",
-        "Pasta Palace",
-        "99 King St W",
-        "Restaurant",
-        "Pass",
-        "2024-02-20",
-        "0.00",
-    )]
-    with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
-        resp = client.get("/inspections?year=2024&q=1")
-    assert b"Pasta Palace<br>----------<br>99 King St W" in resp.data
+def test_location_contains_name_and_address(client):
+    html = _render(client, [_row()])
+    location = html[html.index('class="est-location"'):html.index('class="est-results"')]
+    assert "Pasta Palace" in location
+    assert "99 King St W" in location
+
+
+def test_multiple_infractions_share_one_card(client):
+    assert _render(client, [_row(), _row()]).count('class="est-card') == 1
+
+
+def _results_html(client, rows):
+    html = _render(client, rows)
+    return html[html.index('class="est-results"'):]
+
+
+def test_results_have_column_headers(client):
+    headers = re.findall(r'<th[^>]*>([^<]+)</th>', _results_html(client, [_row()]))
+    assert headers == ["Severity", "Category of Infraction"]
+
+
+def test_severity_and_category_share_a_row(client):
+    results = _results_html(client, [_row()])
+    cells = re.findall(r'<tr class="inf-summary">\s*<td>([^<]+)</td>\s*<td>([^<]+)</td>', results)
+    assert cells == [("M - Minor", "Food storage")]
+
+
+def test_details_in_category_column_beneath_category(client):
+    results = _results_html(client, [_row()])
+    details = re.findall(r'<tr class="inf-details">\s*<td></td>\s*<td>\s*([^<]+?)\s*<', results)
+    assert details == ["Improper storage"]
+    assert results.index("Food storage") < results.index("Improper storage")
+
+
+def test_details_has_no_label(client):
+    assert "Details" not in _results_html(client, [_row()])
+
+
+def test_inspection_status_uppercase_and_formatted_like_name(client):
+    results = _results_html(client, [_row()])
+    assert '<span class="label">Inspection Status</span> <strong>PASS</strong>' in results
+
+
+def test_infraction_counts_under_address(client):
+    html = _render(client, [
+        _row(severity="C - Crucial"),
+        _row(severity="M - Minor", details="Dirty floor"),
+        _row(severity="M - Minor", details="No thermometer"),
+        _row(severity="NA", details="Other"),
+    ])
+    location = html[html.index('class="est-location"'):html.index('class="est-results"')]
+    assert '<span class="label">Infractions</span> <strong>4</strong>' in location
+    assert location.index("99 King St W") < location.index('<span class="label">Infractions</span> <strong>4</strong>')
+    counts = re.findall(r'<th>([^<]+)</th>\s*<td>(\d+)</td>', location)
+    assert counts == [("Crucial", "1"), ("Significant", "0"), ("Minor", "2"), ("NA", "1")]
+
+
+def test_no_infraction_counts_without_infractions(client):
+    assert '<span class="label">Infractions</span>' not in _render(client, [_row(details=None, severity=None)])
+
+
+def test_address_rendered_as_lines(client):
+    html = _render(client, [_row(address="102 BERKELEY ST None M5A 2W7")])
+    assert "<span>102 BERKELEY ST</span>" in html
+    assert "<span>Toronto, ON</span>" in html
+    assert "<span>M5A 2W7</span>" in html
+    assert "None" not in html
+
+
+def test_heading_shows_quarter_and_date_range(client):
+    html = _render(client, [])
+    assert ('<h2 class="page-heading">DineSafe Inspections | Q1 2024'
+            '<span class="heading-sep"> | </span>'
+            '<span class="heading-dates">January 1, 2024 - March 31, 2024</span></h2>') in html
+
+
+def test_heading_end_date_is_today_for_current_quarter(client):
+    today = date.today()
+    q = (today.month - 1) // 3 + 1
+    start = date(today.year, 3 * q - 2, 1)
+    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+        html = client.get(f"/inspections?year={today.year}&q={q}").data.decode()
+    expected = (f'DineSafe Inspections | Q{q} {today.year}<span class="heading-sep"> | </span>'
+                f'<span class="heading-dates">{start.strftime("%B %-d, %Y")} - {today.strftime("%B %-d, %Y")}</span>')
+    assert f'<h2 class="page-heading">{expected}</h2>' in html
+    assert f"<h2>{today.strftime('%A, %B %-d, %Y')}</h2>" in html

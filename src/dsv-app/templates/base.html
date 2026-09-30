@@ -21,8 +21,7 @@
         <a href="{{ url_for('home') }}" class="nav-btn {{ 'active' if request.endpoint == 'home' else '' }}">Home</a>
         <div class="dropdown">
             <a href="{{ url_for('index') }}" class="nav-btn {{ 'active' if request.endpoint == 'index' else '' }}">Inspections ▾</a>
-            <div class="dropdown-menu">
-                {% for y, qs in recent_year_quarters %}
+            {% macro year_flyout(y, qs) %}
                 <div class="nav-btn dropdown-year">
                     <span>{{ y }} ›</span>
                     <div class="flyout">
@@ -32,22 +31,14 @@
                         {% endfor %}
                     </div>
                 </div>
-                {% endfor %}
+            {% endmacro %}
+            <div class="dropdown-menu">
+                {% for y, qs in recent_year_quarters %}{{ year_flyout(y, qs) }}{% endfor %}
                 {% if archive_year_quarters %}
                 <div class="nav-btn dropdown-year archive-item">
                     <span>Archive ›</span>
                     <div class="flyout">
-                        {% for y, qs in archive_year_quarters %}
-                        <div class="nav-btn dropdown-year">
-                            <span>{{ y }} ›</span>
-                            <div class="flyout">
-                                {% for q in qs %}
-                                <a href="{{ url_for('index', year=y, q=q) | safe }}"
-                                   class="nav-btn {{ 'active' if y == selected_year and q == selected_q else '' }}">Q{{ q }}</a>
-                                {% endfor %}
-                            </div>
-                        </div>
-                        {% endfor %}
+                        {% for y, qs in archive_year_quarters %}{{ year_flyout(y, qs) }}{% endfor %}
                     </div>
                 </div>
                 {% endif %}
