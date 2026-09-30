@@ -237,3 +237,21 @@ def test_details_has_no_label(client):
 def test_inspection_status_uppercase_and_formatted_like_name(client):
     results = _results_html(client, [_row_tuple()])
     assert '<span class="label">Inspection Status</span> <strong>PASS</strong>' in results
+
+
+def test_infraction_counts_under_address(client):
+    html = _render(client, [
+        _row_tuple(severity="C - Crucial"),
+        _row_tuple(severity="M - Minor", details="Dirty floor"),
+        _row_tuple(severity="M - Minor", details="No thermometer"),
+        _row_tuple(severity="NA", details="Other"),
+    ])
+    location = html[html.index('class="est-location"'):html.index('class="est-results"')]
+    assert '<span class="label">Infractions</span> <strong>4</strong>' in location
+    assert location.index("99 King St W") < location.index('<span class="label">Infractions</span> <strong>4</strong>')
+    counts = re.findall(r'<th>([^<]+)</th>\s*<td>(\d+)</td>', location)
+    assert counts == [("Crucial", "1"), ("Significant", "0"), ("Minor", "2"), ("NA", "1")]
+
+
+def test_no_infraction_counts_without_infractions(client):
+    assert '<span class="label">Infractions</span>' not in _render(client, [_row_tuple(details=None, severity=None)])

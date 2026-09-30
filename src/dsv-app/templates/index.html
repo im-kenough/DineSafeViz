@@ -12,15 +12,40 @@
     <div class="day-box">
         <h2>{{ day.strftime('%A, %B %-d, %Y') }}</h2>
         {% for est in establishments %}
+
+        <!-- Shows all inspection details for an establishment -->
         <div class="est-card {{ status_class.get(est.establishment_status, '') }}">
+            
+            <!-- Establishment name and location -->
             <div class="est-location">
                 <strong>{{ est.establishment_name or '—' }}</strong>
                 <span>{{ est.establishment_address or '—' }}</span>
                 {% if est.establishment_type %}<span class="est-type">{{ est.establishment_type }}</span>{% endif %}
-            </div>
-            <div class="est-results">
-                <div class="est-status"><span class="label">Inspection Status</span> <strong>{{ (est.establishment_status or '—')|upper }}</strong></div>
                 {% if est.infractions %}
+                {% set crucial = est.infractions|selectattr('severity', 'equalto', 'C - Crucial')|list|length %}
+                {% set significant = est.infractions|selectattr('severity', 'equalto', 'S - Significant')|list|length %}
+                {% set minor = est.infractions|selectattr('severity', 'equalto', 'M - Minor')|list|length %}
+
+                <!-- Infraction count summary table -->
+                <br><br>
+                <table class="inf-counts">
+                    <caption><span class="label">Infractions</span> <strong>{{ est.infractions|length }}</strong></caption>
+                    <tr><th>Crucial</th><td>{{ crucial }}</td></tr>
+                    <tr><th>Significant</th><td>{{ significant }}</td></tr>
+                    <tr><th>Minor</th><td>{{ minor }}</td></tr>
+                    <tr><th>NA</th><td>{{ est.infractions|length - crucial - significant - minor }}</td></tr>
+                </table>
+                {% endif %}
+            </div>
+
+            <!-- Inspection results -->
+            <div class="est-results">
+
+                <!-- Over all inspection status -->
+                <div class="est-status"><span class="label">Inspection Status</span> <strong>{{ (est.establishment_status or '—')|upper }}</strong><br><br></div>
+                {% if est.infractions %}
+
+                <!-- Infractions table -->
                 <table class="infractions">
                     <thead>
                         <tr><th>Severity</th><th>Category of Infraction</th></tr>
