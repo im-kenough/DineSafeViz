@@ -250,9 +250,21 @@ def test_severity_and_category_share_a_row(client):
 
 def test_details_in_category_column_beneath_category(client):
     results = _results_html(client, [_row()])
-    details = re.findall(r'<tr class="inf-details">\s*<td></td>\s*<td>\s*([^<]+?)\s*<', results)
+    details = re.findall(r'<tr class="inf-details">\s*<td></td>\s*<td>\s*<ul>\s*<li>\s*([^<]+?)\s*<', results)
     assert details == ["Improper storage"]
     assert results.index("Food storage") < results.index("Improper storage")
+
+
+def test_same_severity_and_category_share_one_summary_row(client):
+    results = _results_html(client, [
+        _row(details="Dirty floor"),
+        _row(details="No thermometer"),
+        _row(severity="C - Crucial", details="Hot food too cold"),
+    ])
+    summaries = re.findall(r'<tr class="inf-summary">\s*<td>([^<]+)</td>\s*<td>([^<]+)</td>', results)
+    assert summaries == [("C - Crucial", "Food storage"), ("M - Minor", "Food storage")]
+    items = re.findall(r'<li>\s*([^<]+?)\s*<', results)
+    assert items == ["Hot food too cold", "Dirty floor", "No thermometer"]
 
 
 def test_details_has_no_label(client):

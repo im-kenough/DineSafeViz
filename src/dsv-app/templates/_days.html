@@ -47,18 +47,24 @@
                         <tr><th>Severity</th><th>Category of Infraction</th></tr>
                     </thead>
                     <tbody>
-                    {% for inf in est.infractions %}
+                    {% for grp in est.infraction_groups %}
                         <tr class="inf-summary">
-                            <td>{{ inf.severity or '—' }}</td>
-                            <td>{{ inf.infraction_category or '—' }}</td>
+                            <td>{{ grp.severity or '—' }}</td>
+                            <td>{{ grp.category or '—' }}</td>
                         </tr>
                         <tr class="inf-details">
                             <td></td>
                             <td>
-                                {{ inf.infraction_details }}
-                                {% if inf.action %}<div class="inf-meta">Action: {{ inf.action }}</div>{% endif %}
-                                {% if inf.outcome %}<div class="inf-meta">Outcome: {{ inf.outcome }}{% if inf.outcome_date %} ({{ inf.outcome_date }}){% endif %}</div>{% endif %}
-                                {% if inf.amount_fined %}<div class="inf-meta">Fined: ${{ inf.amount_fined }}</div>{% endif %}
+                                <ul>
+                                {% for inf in grp.infractions %}
+                                    <li>
+                                        {{ inf.infraction_details }}
+                                        {% if inf.action %}<div class="inf-meta">Action: {{ inf.action }}</div>{% endif %}
+                                        {% if inf.outcome %}<div class="inf-meta">Outcome: {{ inf.outcome }}{% if inf.outcome_date %} ({{ inf.outcome_date }}){% endif %}</div>{% endif %}
+                                        {% if inf.amount_fined %}<div class="inf-meta">Fined: ${{ inf.amount_fined }}</div>{% endif %}
+                                    </li>
+                                {% endfor %}
+                                </ul>
                             </td>
                         </tr>
                     {% endfor %}
