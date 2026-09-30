@@ -124,18 +124,28 @@ sorting last). Year and quarter navigation covers the quarters between the
 earliest and latest `inspection_date` in the database, so it follows
 whatever range is loaded without a code change. If the database is
 unreachable or empty, navigation falls back to January 1, 2001 through
-today. The navigation uses a menu with flyout submenus. It shows the four
-most recent years directly and nests older years under an "Archive"
-section.
+today. The **Inspections** menu opens a single panel with one row per year
+and one column per quarter, so any quarter is one click away. It shows the
+four most recent years directly, and a collapsed **Older years** section
+holds the rest. That section opens automatically when you're viewing an
+older quarter. The panel uses a native `<details>` element, so it works
+with the keyboard and without hover.
 
 The inspection log splits each quarter into one collapsible section per
-month, with a **Contents** bar that jumps to a month and **Expand all** and
-**Collapse all** buttons. To keep the page small, `/inspections` queries and
-renders only the latest month. Older months stay collapsed, and the browser
-fetches each one from `/inspections/month` the first time you open it. The
-fragment route rejects malformed or out-of-range months with a 404 instead
-of falling back to a default month. Without JavaScript, each collapsed
-month shows a link to its fragment.
+month. A sticky timeline bar stays at the top of the page as you scroll. It
+reads oldest to newest: a link to the previous quarter, the quarter's
+months, and a link to the next quarter. The bar highlights the month you're
+scrolled to, and one **Expand all** button switches to **Collapse all** when
+every month is open. On narrow screens, the bar shortens month names and
+drops years from the quarter links so it fits on one line. The quarter
+links disappear at the edges of the data range.
+
+To keep the page small, `/inspections` queries and renders only the latest
+month. Older months stay collapsed, and the browser fetches each one from
+`/inspections/month` the first time you open it. The fragment route rejects
+malformed or out-of-range months with a 404 instead of falling back to a
+default month. Without JavaScript, each collapsed month shows a link to its
+fragment.
 
 ### Home page caching
 

@@ -64,8 +64,11 @@ A pytest `client` fixture creates a Flask test client with
 - Graceful handling of invalid query parameters (returns 200 with
   defaults)
 - "No data" text displayed for empty result sets
-- Navigation elements: dropdown menus, year/quarter links, active nav
-  classes, archive section, footer content
+- Navigation elements: the year × quarter picker grid, empty cells for
+  quarters without data, the collapsed **Older years** section, active nav
+  classes, and footer content
+- Inspections timeline bar: month order, previous and next quarter links
+  at the data range edges, and the single expand/collapse toggle
 - Dropdown and nav consistency across all pages (home, dashboard, info)
 
 ### Home page rendering (`src/dsv-app/tests/test_home.py`)

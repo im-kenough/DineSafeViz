@@ -1,15 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
     <h2 class="page-heading">DineSafe Inspections | Q{{ selected_q }} {{ selected_year }}<span class="heading-sep"> | </span><span class="heading-dates">{{ start.strftime('%B %-d, %Y') }} - {{ end.strftime('%B %-d, %Y') }}</span></h2>
-    <nav class="quarter-step">
-        {% if prev_q %}<a class="nav-btn" href="{{ url_for('index', year=prev_q[0], q=prev_q[1]) | safe }}" rel="prev">‹ Q{{ prev_q[1] }} {{ prev_q[0] }}</a>{% endif %}
-        {% if next_q %}<a class="nav-btn" href="{{ url_for('index', year=next_q[0], q=next_q[1]) | safe }}" rel="next">Q{{ next_q[1] }} {{ next_q[0] }} ›</a>{% endif %}
-    </nav>
-    <nav class="contents">
-        <span class="label">Contents</span>
-        {% for m_start, m_end in months %}<a class="nav-btn month-link" href="#month-{{ m_start.strftime('%Y-%m') }}">{{ m_start.strftime('%B') }}</a>{% endfor %}
-        <button type="button" class="nav-btn" id="expand-all">Expand all</button>
-        <button type="button" class="nav-btn" id="collapse-all">Collapse all</button>
+    {# Timeline reads oldest to newest: previous quarter, this quarter's months, next quarter #}
+    <nav class="timeline" aria-label="Browse by quarter and month">
+        {% if prev_q %}<a class="nav-btn quarter-link" href="{{ url_for('index', year=prev_q[0], q=prev_q[1]) | safe }}" rel="prev">‹ Q{{ prev_q[1] }}<span class="long"> {{ prev_q[0] }}</span></a>{% endif %}
+        <div class="timeline-months">
+            {% for m_start, m_end in months | reverse %}<a class="nav-btn month-link" href="#month-{{ m_start.strftime('%Y-%m') }}"><span class="long">{{ m_start.strftime('%B') }}</span><span class="short">{{ m_start.strftime('%b') }}</span></a>{% endfor %}
+        </div>
+        {% if next_q %}<a class="nav-btn quarter-link" href="{{ url_for('index', year=next_q[0], q=next_q[1]) | safe }}" rel="next">Q{{ next_q[1] }}<span class="long"> {{ next_q[0] }}</span> ›</a>{% endif %}
+        <button type="button" class="toggle-all" id="toggle-all" aria-label="Expand all"><span class="toggle-icon" aria-hidden="true">⊞</span><span class="long">Expand all</span></button>
     </nav>
 
     {% for m_start, m_end in months %}
@@ -28,6 +27,12 @@
     <script>
     (function () {
         var months = document.querySelectorAll('details.month-box');
+        // Month the user just jumped to; re-scrolled to once its content loads,
+        // since the browser jumps before the page is tall enough to reach it.
+        var pendingJump = null;
+        ['wheel', 'touchstart', 'keydown'].forEach(function (type) {
+            window.addEventListener(type, function () { pendingJump = null; }, { passive: true });
+        });
 
         // Fetch a collapsed month's day boxes the first time it is opened.
         months.forEach(function (box) {
@@ -41,6 +46,10 @@
                     return resp.text();
                 }).then(function (html) {
                     body.innerHTML = html;
+                    if (pendingJump === box) {
+                        pendingJump = null;
+                        box.scrollIntoView();
+                    }
                 }).catch(function () {
                     box.dataset.src = src;
                     body.innerHTML = '<p class="no-data">Could not load. <a href="' + src + '">Open this month</a></p>';
@@ -48,19 +57,54 @@
             });
         });
 
-        // Contents buttons open their month before the browser jumps to it.
-        document.querySelectorAll('.month-link').forEach(function (link) {
+        // Timeline month links open their month before the browser jumps to it.
+        var links = document.querySelectorAll('.month-link');
+        links.forEach(function (link) {
             link.addEventListener('click', function () {
-                document.querySelector(link.getAttribute('href')).open = true;
+                var box = document.querySelector(link.getAttribute('href'));
+                if (box.dataset.src) pendingJump = box;
+                box.open = true;
             });
         });
 
-        document.getElementById('expand-all').addEventListener('click', function () {
-            months.forEach(function (box) { box.open = true; });
+        // One toggle: expands all unless every month is already open.
+        var toggle = document.getElementById('toggle-all');
+        function allOpen() {
+            return Array.prototype.every.call(months, function (box) { return box.open; });
+        }
+        function syncToggle() {
+            var label = allOpen() ? 'Collapse all' : 'Expand all';
+            toggle.setAttribute('aria-label', label);
+            toggle.querySelector('.long').textContent = label;
+            toggle.querySelector('.toggle-icon').textContent = allOpen() ? '⊟' : '⊞';
+        }
+        toggle.addEventListener('click', function () {
+            var open = !allOpen();
+            months.forEach(function (box) { box.open = open; });
         });
-        document.getElementById('collapse-all').addEventListener('click', function () {
-            months.forEach(function (box) { box.open = false; });
-        });
+        months.forEach(function (box) { box.addEventListener('toggle', syncToggle); });
+
+        // Highlight the month currently under the sticky bar. The line matches
+        // the month's scroll-margin-top, where timeline jumps land.
+        var ticking = false;
+        var edge = parseFloat(getComputedStyle(months[0]).scrollMarginTop) + 1;
+        function markCurrent() {
+            ticking = false;
+            var current = months[0];
+            months.forEach(function (box) {
+                if (box.getBoundingClientRect().top <= edge) current = box;
+            });
+            links.forEach(function (link) {
+                var on = link.getAttribute('href') === '#' + current.id;
+                link.classList.toggle('current', on);
+                if (on) link.setAttribute('aria-current', 'location');
+                else link.removeAttribute('aria-current');
+            });
+        }
+        window.addEventListener('scroll', function () {
+            if (!ticking) { ticking = true; requestAnimationFrame(markCurrent); }
+        }, { passive: true });
+        markCurrent();
     }());
     </script>
 {% endblock %}

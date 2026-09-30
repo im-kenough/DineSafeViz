@@ -176,27 +176,34 @@ def test_picker_highlights_quarter_only_on_inspections_page(client):
     assert 'href="/inspections?year=2024&q=1" class="nav-btn picker-cell active" aria-current="page"' in html
 
 
-def test_inspections_quarter_step_links(client):
-    html = _render_page(client)
-    step = html[html.index('class="quarter-step"'):html.index('class="contents"')]
-    assert '<a class="nav-btn" href="/inspections?year=2023&q=4" rel="prev">‹ Q4 2023</a>' in step
-    assert '<a class="nav-btn" href="/inspections?year=2024&q=2" rel="next">Q2 2024 ›</a>' in step
+def _timeline(html):
+    """The sticky month/quarter timeline bar on the inspections page."""
+    start = html.index('<nav class="timeline"')
+    return html[start:html.index('</nav>', start)]
 
 
-def test_inspections_quarter_step_omits_prev_at_first_quarter(client):
+def test_timeline_quarter_links_flank_months(client):
+    bar = _timeline(_render_page(client))
+    assert ('<a class="nav-btn quarter-link" href="/inspections?year=2023&q=4" rel="prev">'
+            '‹ Q4<span class="long"> 2023</span></a>') in bar
+    assert ('<a class="nav-btn quarter-link" href="/inspections?year=2024&q=2" rel="next">'
+            'Q2<span class="long"> 2024</span> ›</a>') in bar
+    assert bar.index('rel="prev"') < bar.index('class="nav-btn month-link"')
+    assert bar.rindex('class="nav-btn month-link"') < bar.index('rel="next"')
+
+
+def test_timeline_omits_prev_at_first_quarter(client):
     with patch("app.psycopg2.connect", return_value=_mock_db([])):
-        html = client.get("/inspections?year=2001&q=1").data.decode()
-    step = html[html.index('class="quarter-step"'):html.index('class="contents"')]
-    assert 'rel="prev"' not in step
-    assert 'href="/inspections?year=2001&q=2" rel="next"' in step
+        bar = _timeline(client.get("/inspections?year=2001&q=1").data.decode())
+    assert 'rel="prev"' not in bar
+    assert 'href="/inspections?year=2001&q=2" rel="next"' in bar
 
 
-def test_inspections_quarter_step_omits_next_at_latest_quarter(client):
+def test_timeline_omits_next_at_latest_quarter(client):
     with patch("app.psycopg2.connect", return_value=_mock_db([])):
-        html = client.get("/inspections").data.decode()
-    step = html[html.index('class="quarter-step"'):html.index('class="contents"')]
-    assert 'rel="prev"' in step
-    assert 'rel="next"' not in step
+        bar = _timeline(client.get("/inspections").data.decode())
+    assert 'rel="prev"' in bar
+    assert 'rel="next"' not in bar
 
 
 def test_dropdown_has_year_and_quarter_links(client):
@@ -403,12 +410,21 @@ def test_inspections_older_months_collapsed_and_lazy(client):
     assert "January 1, 2024" not in html.split("</h2>", 1)[1]
 
 
-def test_inspections_contents_bar(client):
+def test_timeline_months_oldest_first_with_short_names(client):
+    bar = _timeline(_render_page(client))
+    links = re.findall(r'<a class="nav-btn month-link" href="#month-(\d{4}-\d{2})">'
+                       r'<span class="long">(\w+)</span><span class="short">(\w+)</span></a>', bar)
+    assert links == [("2024-01", "January", "Jan"), ("2024-02", "February", "Feb"),
+                     ("2024-03", "March", "Mar")]
+
+
+def test_timeline_has_single_expand_collapse_toggle(client):
     html = _render_page(client)
-    links = re.findall(r'<a class="nav-btn month-link" href="#month-(\d{4}-\d{2})">(\w+)</a>', html)
-    assert links == [("2024-03", "March"), ("2024-02", "February"), ("2024-01", "January")]
-    assert 'id="expand-all"' in html
-    assert 'id="collapse-all"' in html
+    bar = _timeline(html)
+    assert '<button type="button" class="toggle-all" id="toggle-all" aria-label="Expand all">' in bar
+    assert 'id="expand-all"' not in html
+    assert 'id="collapse-all"' not in html
+    assert 'class="contents"' not in html
 
 
 def test_month_fragment_renders_only_that_month(client):
