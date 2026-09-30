@@ -183,6 +183,8 @@ th {
 .infractions td { vertical-align: top; }
 .inf-summary td { font-weight: 600; border-bottom: none; }
 .inf-details td { border-top: none; padding-bottom: 0.5rem; }
+.inf-details ul { margin: 0; padding-left: 1rem; list-style-type: "- "; }
+.inf-details li + li { margin-top: 0.3rem; }
 .inf-counts { margin-top: 0.4rem; width: auto; align-self: flex-start; }
 .inf-counts caption { text-align: left; padding-bottom: 0.2rem; }
 .inf-counts th, .inf-counts td { padding: 0.15rem 0.4rem; }

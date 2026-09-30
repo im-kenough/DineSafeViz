@@ -10,6 +10,7 @@ import threading
 import time
 import uuid
 import collections
+import itertools
 from contextlib import closing
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Tuple
@@ -285,7 +286,8 @@ def group_establishments(rows: List[Dict]) -> List[Dict]:
         A list of establishment dicts (establishment fields plus an
         "infractions" list sorted most severe first, then by category and
         details for a stable order, and a "severity_counts" Counter of those
-        infractions), in input order.
+        infractions, and an "infraction_groups" list of those infractions
+        grouped by severity and category), in input order.
     """
     groups = {}
     for row in rows:
@@ -299,6 +301,13 @@ def group_establishments(rows: List[Dict]) -> List[Dict]:
             r.get("infraction_details") or "",
         ))
         group["severity_counts"] = collections.Counter(r.get("severity") for r in group["infractions"])
+        # Sorted by severity then category, so groupby sees each pair contiguously.
+        group["infraction_groups"] = [
+            {"severity": severity, "category": category, "infractions": list(items)}
+            for (severity, category), items in itertools.groupby(
+                group["infractions"], key=lambda r: (r.get("severity"), r.get("infraction_category"))
+            )
+        ]
     return list(groups.values())
 
 
