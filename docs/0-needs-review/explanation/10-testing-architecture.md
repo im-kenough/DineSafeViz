@@ -97,9 +97,10 @@ sense but provide runtime health verification:
 - **PostgreSQL:** `pg_isready` check with 5-second interval and 5 retries.
   Other services use `depends_on: condition: service_healthy` to gate
   startup on a healthy database.
-- **Grafana readiness:** The `dsv-init-analytics` and `init-grafana`
-  init containers poll the Grafana health API before applying dashboard
-  permissions.
+- **Grafana:** `wget` against `/analytics/api/health` with a 5-second
+  interval and 5 retries. Grafana returns 503 when its database check fails.
+  `dsv-nginx` and `dsv-init-analytics` wait for `service_healthy` before
+  starting.
 
 ## Dependency scanning
 

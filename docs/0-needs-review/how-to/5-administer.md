@@ -72,8 +72,8 @@ page is empty from step 1 until the seed in step 2 finishes.
    docker compose up --build -d && docker container logs -f dsv-dsv-init-db-1
    ```
 
-3. Restart the web app. The home page caches its counts for five days, and
-   they might have been cached while the table was empty.
+3. Restart the web app. The home page caches its counts for five days, so
+   it might still show the counts from before the reseed.
 
    ```bash
    docker compose restart dsv-app

@@ -91,8 +91,9 @@ graph LR
   future schema migration use. See [data architecture — data
   ingestion](3-data-architecture.md#data-ingestion) for details.
 
-- **`dsv-init-analytics`** — `curlimages/curl:latest`. Waits for
-  Grafana to become healthy, then grants Viewer-role access to the
+- **`dsv-init-analytics`** — `curlimages/curl:latest`. Starts once the
+  `dsv-analytics` healthcheck (`/analytics/api/health`) reports healthy,
+  then grants Viewer-role access to the
   provisioned dashboard via the Grafana API. Required because Grafana
   11 RBAC doesn't grant anonymous viewers dashboard access by default.
 
@@ -133,7 +134,9 @@ data) from the database and caches the result in memory with a 5-day
 TTL to avoid repeated queries on a dataset that changes infrequently.
 The same cached query supplies the first and last inspection dates that
 drive the year and quarter navigation, so a newly loaded range can take
-up to 5 days to appear in the menu unless you restart `dsv-app`.
+up to 5 days to appear in the menu unless you restart `dsv-app`. An empty
+`inspections` table isn't cached, so on a first deploy the home page shows
+real counts as soon as the seed commits.
 
 ### Observability
 

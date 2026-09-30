@@ -362,6 +362,9 @@ def _get_home_stats() -> Dict:
             "total_inspections": total, "years_of_data": years_of_data,
             "min_date": min_date, "max_date": max_date,
         }
+        # Empty table means the first seed hasn't committed yet; don't cache it.
+        if total == 0:
+            return stats
         _stats_cache["data"] = stats
         _stats_cache["fetched_at"] = now
         return stats
