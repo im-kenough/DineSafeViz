@@ -9,7 +9,7 @@ CREATE TABLE inspections (
     establishment_type          TEXT,
     establishment_address       TEXT,
     infraction_details          TEXT,
-    inspection_observation      TEXT,
+    infraction_category         TEXT,
     inspection_date             DATE,
     severity                    TEXT,
     action                      TEXT,

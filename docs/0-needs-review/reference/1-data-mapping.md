@@ -48,7 +48,7 @@ and `observation` are parsed but discarded on import — see the note above
 | inspectionDate | inspection_date | |
 | observation | *(discarded)* | Generic sentence ("One or more minor infractions were observed…"); `deficiencyDesc` is used instead, see below |
 | typeDesc | infraction_details | Specific infraction cited (for example, "FAIL TO ENSURE EQUIPMENT SURFACE SANITIZED…") |
-| deficiencyDesc | inspection_observation | Infraction category (for example, "05. MAINTENANCE / SANITATION") — chosen over `observation` for consistency with the historical era's `Infraction Details` granularity |
+| deficiencyDesc | infraction_category | Infraction category (for example, "05. MAINTENANCE / SANITATION") — chosen over `observation` for consistency with the historical era's `Infraction Details` granularity |
 | severity | severity | S - Significant, M - Minor, C - Crucial |
 | OutcomeDate | outcome_date | |
 | OutcomeDesc | outcome | |
@@ -312,7 +312,7 @@ below are as measured against the live dataset on 2026-07-24
 | 5 | establishment_type         | TEXT             | 100%       | **NULL always** — no equivalent in the current feed |
 | 6 | establishment_address      | TEXT             | 100%       | 100%   |
 | 7 | infraction_details         | TEXT             | ~62% (clean inspections have none) | ~63% |
-| 8 | inspection_observation     | TEXT             | NULL always | ~63% |
+| 8 | infraction_category        | TEXT             | NULL always | ~63% |
 | 9 | inspection_date            | DATE             | 100%       | 100%   |
 | 10| severity                   | TEXT             | ~62%       | ~63%   |
 | 11| action                     | TEXT             | ~62%       | **NULL always** — the City dropped this field from the feed in 2026 |

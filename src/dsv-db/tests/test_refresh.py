@@ -88,7 +88,7 @@ class TestMapHistoricalRow:
 
     def test_recent_only_columns_are_none(self):
         result = map_row(self.SAMPLE_ROW, HISTORICAL_COLUMN_MAP)
-        assert result["inspection_observation"] is None
+        assert result["infraction_category"] is None
         assert result["outcome_date"] is None
         assert result["unique_id"] is None
 
@@ -144,7 +144,7 @@ class TestMapRecentRow:
     def test_maps_infraction_and_observation(self):
         result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
         assert result["infraction_details"] == "FAIL TO ENSURE EQUIPMENT SURFACE SANITIZED"
-        assert result["inspection_observation"] == "05. MAINTENANCE / SANITATION"
+        assert result["infraction_category"] == "05. MAINTENANCE / SANITATION"
 
     def test_maps_severity(self):
         # Severity is now present in the recent feed (was historical-only before).

@@ -93,6 +93,40 @@ Each daily refresh logs `Unparsed recent addresses: N`. A value above `0`
 means the upstream address format changed. Those rows keep the full address
 in `street`, so the page still displays it.
 
+### Rename the infraction category column
+
+The `infraction_category` column holds the recent feed's `deficiencyDesc`
+value, for example `05. MAINTENANCE / SANITATION`. Databases created before
+this change call it `inspection_observation`. `init.sql` only runs on an empty
+`dsv-db-data` volume, so you must rename the column by hand. Until you do, the
+new web app fails on `/inspections`, the daily refresh fails, and three
+analytics dashboard panels show errors.
+
+The rename only changes the column name. It keeps the data, roles, and
+grants, so you don't need to reseed.
+
+To rename the column, follow these steps:
+
+1. Rename the column. Run this right before you deploy, because the old web
+   app fails on `/inspections` from this point until the new one is running.
+
+   ```bash
+   docker compose exec dsv-db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ALTER TABLE inspections RENAME COLUMN inspection_observation TO infraction_category;"'
+   ```
+
+2. Rebuild and redeploy.
+
+   ```bash
+   docker compose up --build -d
+   ```
+
+3. Check the result. The query returns the most common infraction
+   categories.
+
+   ```bash
+   docker compose exec dsv-db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT infraction_category, count(*) FROM inspections GROUP BY 1 ORDER BY 2 DESC LIMIT 5;"'
+   ```
+
 ### Follow the container logs
 
 ```bash

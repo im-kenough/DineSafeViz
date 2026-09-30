@@ -376,8 +376,7 @@ def index():
                 "       street, unit, postal_code,"
                 "       outcome, outcome_date, amount_fined,"
                 "       establishment_id, severity,"
-                # inspection_observation is a misnomer; it holds the infraction category (deficiencyDesc)
-                "       inspection_observation AS infraction_category"
+                "       infraction_category"
                 " FROM inspections"
                 " WHERE inspection_date BETWEEN %s AND %s",
                 (start, end),
