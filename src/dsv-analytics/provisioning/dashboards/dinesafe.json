@@ -1432,7 +1432,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(inspection_observation, 'Unknown') AS \"Observation\", COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(infraction_category, 'Unknown') AS \"Infraction Category\", COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1453,7 +1453,7 @@
           }
         }
       ],
-      "title": "Closed - by Inspection Observations",
+      "title": "Closed - by Infraction Category",
       "type": "barchart"
     },
     {
@@ -1893,7 +1893,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(inspection_observation, 'Unknown') AS \"Observation\", COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(infraction_category, 'Unknown') AS \"Infraction Category\", COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1914,7 +1914,7 @@
           }
         }
       ],
-      "title": "Conditional Pass - by Inspection Observations",
+      "title": "Conditional Pass - by Infraction Category",
       "type": "barchart"
     },
     {
@@ -2354,7 +2354,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(inspection_observation, 'Unknown') AS \"Observation\", COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(infraction_category, 'Unknown') AS \"Infraction Category\", COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2375,7 +2375,7 @@
           }
         }
       ],
-      "title": "Pass - by Inspection Observations",
+      "title": "Pass - by Infraction Category",
       "type": "barchart"
     }
   ],

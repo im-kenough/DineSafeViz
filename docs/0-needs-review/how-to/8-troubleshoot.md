@@ -61,6 +61,10 @@ Match the log output to one of these common issues.
   free disk space.
 - **Database initialization timeout:** If the database takes longer than
   expected to initialize, check the `dsv-init-db` logs.
+- **`container ... has no healthcheck configured`:** This error appears when
+  `docker compose start` reuses a container created before its healthcheck
+  was added to `docker-compose.yml`. Run `docker compose up -d` instead, which
+  recreates the container with the current configuration.
 
 ## Database does not initialize
 
@@ -78,6 +82,37 @@ docker compose up -d
 
 This command removes the existing database volume and restarts from scratch.
 The `-v` flag removes named volumes.
+
+## Home page shows 0 inspections
+
+The home page shows 0 inspections and 0 years of data while the
+`inspections` table is empty. On a first deploy, this is normal until
+`dsv-init-db` finishes the seed. The web app doesn't cache an empty result,
+so the real counts appear on the next page load after the seed commits. You
+don't need to restart `dsv-app`.
+
+If the counts stay at 0, the seed failed. The seed runs in a single
+transaction, so a failure leaves the table empty rather than partly loaded.
+The site keeps running with zero counts, and the year and quarter menus fall
+back to 2001 through today.
+
+### Fix
+
+Check whether the seed completed.
+
+```bash
+docker compose ps -a dsv-init-db
+docker compose logs dsv-init-db
+```
+
+A successful seed exits with code `0` and logs `Seed complete.` If the logs
+show a download error, the Toronto Open Data portal was unreachable. Either
+retry when the portal is back, or seed from the offline copy by setting
+`DSV_LOCAL_DATA_DIR=/data` in `.env`. Then rerun the seed.
+
+```bash
+docker compose up dsv-init-db
+```
 
 ## Cannot connect to the database
 
@@ -102,10 +137,12 @@ The Grafana dashboard might take 30 seconds to initialize.
 
 ### Fix
 
-Wait a moment, and then refresh your browser. If it still does not load,
-check the logs.
+Wait a moment, and then refresh your browser. `dsv-analytics` has a
+healthcheck, and `dsv-nginx` doesn't start until it reports `healthy`. If the
+dashboard still does not load, check the health status and the logs.
 
 ```bash
+docker compose ps dsv-analytics
 docker compose logs dsv-analytics
 docker compose logs dsv-init-analytics
 ```

@@ -56,6 +56,7 @@ trace.set_tracer_provider(_otel_provider)
 FlaskInstrumentor().instrument_app(app)
 Psycopg2Instrumentor().instrument()
 
+# Fallback range start, used only when the DB is unreachable or empty
 DATA_START = date(2001, 1, 1)
 _QUARTER_MONTHS = {1: (1, 3), 2: (4, 6), 3: (7, 9), 4: (10, 12)}
 STATUS_ORDER = {
@@ -74,14 +75,34 @@ _stats_cache_lock = threading.Lock()
 _STATS_TTL = timedelta(days=5)
 
 
-def get_quarter_bounds(year: int, q: int) -> Tuple[date, date]:
+def get_data_range() -> Tuple[date, date]:
+    """Get the first and last inspection dates loaded in the database.
+
+    Uses the cached home stats query. Falls back to DATA_START..today when the
+    DB is unreachable (not cached, so the next request retries) or empty.
+
+    Returns:
+        A tuple of (first_date, last_date).
+    """
+    try:
+        stats = _get_home_stats()
+    except psycopg2.Error:
+        _logger.warning("data range unavailable, using fallback", exc_info=True)
+        return DATA_START, date.today()
+    if stats["min_date"] is None:
+        return DATA_START, date.today()
+    return stats["min_date"], stats["max_date"]
+
+
+def get_quarter_bounds(year: int, q: int, first: date) -> Tuple[date, date]:
     """Get the start and end dates for a given year and quarter.
 
-    The returned dates are clipped to the data availability range (DATA_START to today).
+    The returned dates are clipped to the first inspection date and today.
 
     Args:
         year: The calendar year (e.g., 2023).
         q: The quarter number (1-4, where 1 = Q1 Jan-Mar, 4 = Q4 Oct-Dec).
+        first: The first inspection date in the database.
 
     Returns:
         A tuple of (start_date, end_date) for the quarter, clipped to valid range.
@@ -89,68 +110,65 @@ def get_quarter_bounds(year: int, q: int) -> Tuple[date, date]:
     month_start, month_end = _QUARTER_MONTHS[q]
     start = date(year, month_start, 1)
     end = date(year, month_end, calendar.monthrange(year, month_end)[1])
-    # Clip to available data range: earliest inspection (DATA_START) to today
-    return max(start, DATA_START), min(end, date.today())
+    return max(start, first), min(end, date.today())
 
 
-def get_valid_years() -> List[int]:
-    """Get all years from data start to the current year.
+def get_valid_years(first: date, last: date) -> List[int]:
+    """Get all years from the first to the last inspection date.
 
     Returns:
         A list of years for which DineSafe data is available.
     """
-    return list(range(DATA_START.year, date.today().year + 1))
+    return list(range(first.year, last.year + 1))
 
 
-def get_valid_quarters(year: int) -> List[int]:
+def get_valid_quarters(year: int, first: date, last: date) -> List[int]:
     """Get valid quarters for a given year based on data availability.
 
-    For the current year, only completed quarters are included.
-    For other years, all four quarters are valid.
+    The first and last years are trimmed to the quarters that contain the
+    first and last inspection dates. Other years have all four quarters.
 
     Args:
         year: The calendar year to query.
+        first: The first inspection date in the database.
+        last: The last inspection date in the database.
 
     Returns:
         A list of valid quarter numbers (1-4) for the given year.
     """
-    today = date.today()
-    # Calculate current quarter: month 1-3 = Q1, 4-6 = Q2, 7-9 = Q3, 10-12 = Q4
-    current_q = (today.month - 1) // 3 + 1
-    if year == today.year:
-        # For the current year, include only quarters up to (and including) the current quarter
-        return list(range(1, current_q + 1))
-    else:
-        # For past years, all quarters are available
-        return [1, 2, 3, 4]
+    lo = (first.month - 1) // 3 + 1 if year == first.year else 1
+    hi = (last.month - 1) // 3 + 1 if year == last.year else 4
+    return list(range(lo, hi + 1))
 
 
-def parse_year_quarter(args: Dict[str, str]) -> Tuple[int, int]:
+def parse_year_quarter(args: Dict[str, str], first: date, last: date) -> Tuple[int, int]:
     """Parse and validate year and quarter from request arguments.
 
-    Handles invalid or missing values by defaulting to the current year/quarter.
-    Invalid values (out of range, non-integer) are silently replaced with defaults.
+    Handles invalid or missing values by defaulting to the latest year/quarter
+    with data. Invalid values (out of range, non-integer) are silently replaced
+    with defaults.
 
     Args:
         args: Dictionary of request arguments (typically from Flask request.args).
+        first: The first inspection date in the database.
+        last: The last inspection date in the database.
 
     Returns:
         A tuple of (year, quarter) with validated values.
     """
-    today = date.today()
-    current_year = today.year
-    valid_years = get_valid_years()
+    valid_years = get_valid_years(first, last)
+    latest_year = valid_years[-1]
 
-    # Parse and validate year, default to current year
+    # Parse and validate year, default to the latest year with data
     try:
-        year = int(args["year"]) if "year" in args else current_year
+        year = int(args["year"]) if "year" in args else latest_year
     except (ValueError, TypeError):
-        year = current_year
+        year = latest_year
     if year not in valid_years:
-        year = current_year
+        year = latest_year
 
     # Parse and validate quarter, default to the latest valid quarter for that year
-    valid_qs = get_valid_quarters(year)
+    valid_qs = get_valid_quarters(year, first, last)
     try:
         q = int(args["q"]) if "q" in args else valid_qs[-1]
     except (ValueError, TypeError):
@@ -203,10 +221,11 @@ def _after_request(response):
 @app.context_processor
 def inject_globals():
     """Inject global variables into all templates."""
-    year, q = parse_year_quarter(request.args)
-    years = get_valid_years()
+    first, last = get_data_range()
+    year, q = parse_year_quarter(request.args, first, last)
+    years = get_valid_years(first, last)
     year_quarters = [
-        (y, get_valid_quarters(y))
+        (y, get_valid_quarters(y, first, last))
         for y in sorted(years, reverse=True)
     ]
     return {
@@ -345,7 +364,7 @@ def _cached_stats(now: datetime):
     return None
 
 
-def _get_home_stats() -> Dict[str, int]:
+def _get_home_stats() -> Dict:
     now = datetime.now()
     cached = _cached_stats(now)
     if cached is not None:
@@ -370,9 +389,14 @@ def _get_home_stats() -> Dict[str, int]:
         if min_date is not None and max_date is not None:
             years_of_data = max_date.year - min_date.year + 1
 
-        stats = {"total_inspections": total, "years_of_data": years_of_data}
-        _stats_cache["data"] = stats
-        _stats_cache["fetched_at"] = now
+        stats = {
+            "total_inspections": total, "years_of_data": years_of_data,
+            "min_date": min_date, "max_date": max_date,
+        }
+        # Empty table means the first seed hasn't committed yet; don't cache it.
+        if total:
+            _stats_cache["data"] = stats
+            _stats_cache["fetched_at"] = now
         return stats
 
 
@@ -395,8 +419,9 @@ def index():
     Returns:
         Rendered HTML template with inspections grouped by date.
     """
-    year, q = parse_year_quarter(request.args)
-    start, end = get_quarter_bounds(year, q)
+    first, last = get_data_range()
+    year, q = parse_year_quarter(request.args, first, last)
+    start, end = get_quarter_bounds(year, q, first)
 
     with closing(psycopg2.connect(**DB_CONFIG, connect_timeout=5)) as conn, \
             closing(conn.cursor(cursor_factory=RealDictCursor)) as cur:
@@ -404,10 +429,10 @@ def index():
             cur.execute(
                 "SELECT inspection_date, establishment_status, action, infraction_details,"
                 "       establishment_name, establishment_address, establishment_type,"
+                "       street, unit, postal_code,"
                 "       outcome, outcome_date, amount_fined,"
                 "       establishment_id, severity,"
-                # inspection_observation is a misnomer; it holds the infraction category (deficiencyDesc)
-                "       inspection_observation AS infraction_category"
+                "       infraction_category"
                 " FROM inspections"
                 " WHERE inspection_date BETWEEN %s AND %s",
                 (start, end),
