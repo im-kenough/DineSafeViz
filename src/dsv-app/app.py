@@ -10,10 +10,13 @@ import re
 import threading
 import time
 import uuid
+import collections
+from contextlib import closing
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Tuple
 
 import psycopg2
+from psycopg2.extras import RealDictCursor
 from flask import Flask, g, render_template, request
 from prometheus_flask_exporter import PrometheusMetrics
 from prometheus_client import Counter, Histogram
@@ -96,7 +99,7 @@ def get_valid_years() -> List[int]:
     Returns:
         A list of years for which DineSafe data is available.
     """
-    return list(range(2001, date.today().year + 1))
+    return list(range(DATA_START.year, date.today().year + 1))
 
 
 def get_valid_quarters(year: int) -> List[int]:
@@ -179,10 +182,11 @@ def _before_request():
 def _after_request(response):
     start = getattr(g, "start_time", None)
     duration_ms = round((time.monotonic() - start) * 1000, 2) if start is not None else None
+    request_id = getattr(g, "request_id", None)
     _logger.info(
         "request",
         extra={
-            "request_id": getattr(g, "request_id", None),
+            "request_id": request_id,
             "route": request.endpoint,
             "method": request.method,
             "status": response.status_code,
@@ -191,7 +195,6 @@ def _after_request(response):
             "user_agent": request.user_agent.string,
         },
     )
-    request_id = getattr(g, "request_id", None)
     if request_id:
         response.headers["X-Request-ID"] = request_id
     return response
@@ -279,7 +282,8 @@ def group_establishments(rows: List[Dict]) -> List[Dict]:
     Returns:
         A list of establishment dicts (establishment fields plus an
         "infractions" list sorted most severe first, then by category and
-        details for a stable order), in input order.
+        details for a stable order, and a "severity_counts" Counter of those
+        infractions), in input order.
     """
     groups = {}
     for row in rows:
@@ -292,6 +296,7 @@ def group_establishments(rows: List[Dict]) -> List[Dict]:
             r.get("infraction_category") or "",
             r.get("infraction_details") or "",
         ))
+        group["severity_counts"] = collections.Counter(r.get("severity") for r in group["infractions"])
     return list(groups.values())
 
 
@@ -310,8 +315,7 @@ def build_days(rows: List[Dict], start: date, end: date) -> List[Tuple[date, Lis
         A list of (date, inspections) tuples ordered from end to start (newest first).
         Each tuple contains a date and a status-sorted list of establishments for that date.
     """
-    from collections import defaultdict
-    by_date = defaultdict(list)
+    by_date = collections.defaultdict(list)
     for row in rows:
         by_date[row["inspection_date"]].append(row)
 
@@ -332,36 +336,35 @@ DB_CONFIG = {
 }
 
 
-def _get_home_stats() -> Dict[str, int]:
-    now = datetime.now()
-    if (
-        _stats_cache["fetched_at"] is not None
-        and now - _stats_cache["fetched_at"] <= _STATS_TTL
-    ):
+def _cached_stats(now: datetime):
+    """Return cached stats if still fresh (counting a hit), else None."""
+    fetched_at = _stats_cache["fetched_at"]
+    if fetched_at is not None and now - fetched_at <= _STATS_TTL:
         _stats_cache_hits.inc()
         return _stats_cache["data"]
+    return None
+
+
+def _get_home_stats() -> Dict[str, int]:
+    now = datetime.now()
+    cached = _cached_stats(now)
+    if cached is not None:
+        return cached
 
     # Serialize cache fills so concurrent gthread workers don't stampede the DB.
     with _stats_cache_lock:
-        if (
-            _stats_cache["fetched_at"] is not None
-            and now - _stats_cache["fetched_at"] <= _STATS_TTL
-        ):
-            _stats_cache_hits.inc()
-            return _stats_cache["data"]
+        cached = _cached_stats(now)
+        if cached is not None:
+            return cached
 
         _stats_cache_misses.inc()
-        conn = psycopg2.connect(**DB_CONFIG, connect_timeout=5)
-        try:
-            cur = conn.cursor()
+        with closing(psycopg2.connect(**DB_CONFIG, connect_timeout=5)) as conn, \
+                closing(conn.cursor()) as cur:
             with _db_query_duration.labels(route="home").time():
                 cur.execute(
                     "SELECT COUNT(*), MIN(inspection_date), MAX(inspection_date) FROM inspections"
                 )
                 total, min_date, max_date = cur.fetchone()
-            cur.close()
-        finally:
-            conn.close()
 
         years_of_data = 0
         if min_date is not None and max_date is not None:
@@ -395,44 +398,22 @@ def index():
     year, q = parse_year_quarter(request.args)
     start, end = get_quarter_bounds(year, q)
 
-    conn = psycopg2.connect(**DB_CONFIG, connect_timeout=5)
-    try:
-        cur = conn.cursor()
+    with closing(psycopg2.connect(**DB_CONFIG, connect_timeout=5)) as conn, \
+            closing(conn.cursor(cursor_factory=RealDictCursor)) as cur:
         with _db_query_duration.labels(route="inspections").time():
             cur.execute(
                 "SELECT inspection_date, establishment_status, action, infraction_details,"
                 "       establishment_name, establishment_address, establishment_type,"
                 "       outcome, outcome_date, amount_fined,"
-                "       establishment_id, severity, inspection_observation"
+                "       establishment_id, severity,"
+                # inspection_observation is a misnomer; it holds the infraction category (deficiencyDesc)
+                "       inspection_observation AS infraction_category"
                 " FROM inspections"
                 " WHERE inspection_date BETWEEN %s AND %s",
                 (start, end),
             )
-            raw_rows = cur.fetchall()
-        _inspection_rows_returned.observe(len(raw_rows))
-        cur.close()
-    finally:
-        conn.close()
-
-    rows = [
-        {
-            "inspection_date": r[0],
-            "establishment_status": r[1],
-            "action": r[2],
-            "infraction_details": r[3],
-            "establishment_name": r[4],
-            "establishment_address": r[5],
-            "establishment_type": r[6],
-            "outcome": r[7],
-            "outcome_date": r[8],
-            "amount_fined": r[9],
-            "establishment_id": r[10],
-            "severity": r[11],
-            # inspection_observation is a misnomer; it holds the infraction category (deficiencyDesc)
-            "infraction_category": r[12],
-        }
-        for r in raw_rows
-    ]
+            rows = cur.fetchall()
+        _inspection_rows_returned.observe(len(rows))
 
     return render_template(
         "index.html",
@@ -462,13 +443,9 @@ def healthz():
 @app.route("/readyz")
 def readyz():
     try:
-        conn = psycopg2.connect(**DB_CONFIG, connect_timeout=1)
-        try:
-            cur = conn.cursor()
+        with closing(psycopg2.connect(**DB_CONFIG, connect_timeout=1)) as conn, \
+                closing(conn.cursor()) as cur:
             cur.execute("SELECT 1")
-            cur.close()
-        finally:
-            conn.close()
         return "ok", 200
     except Exception:
         return "db unreachable", 503

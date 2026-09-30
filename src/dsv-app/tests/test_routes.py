@@ -11,25 +11,25 @@ def _mock_db(rows):
     return mock_conn
 
 
-def _row_tuple(name="Pasta Palace", address="99 King St W", est_type="Restaurant",
+def _row(name="Pasta Palace", address="99 King St W", est_type="Restaurant",
                status="Pass", details="Improper storage", severity="M - Minor",
                category="Food storage"):
-    """One row in the SELECT column order used by the /inspections route."""
-    return (
-        date(2024, 2, 14),
-        status,
-        "Notice to Comply",
-        details,
-        name,
-        address,
-        est_type,
-        "Pass",
-        "2024-02-20",
-        "0.00",
-        "10002",
-        severity,
-        category,
-    )
+    """One row as returned by the /inspections route's RealDictCursor query."""
+    return {
+        "inspection_date": date(2024, 2, 14),
+        "establishment_status": status,
+        "action": "Notice to Comply",
+        "infraction_details": details,
+        "establishment_name": name,
+        "establishment_address": address,
+        "establishment_type": est_type,
+        "outcome": "Pass",
+        "outcome_date": "2024-02-20",
+        "amount_fined": "0.00",
+        "establishment_id": "10002",
+        "severity": severity,
+        "infraction_category": category,
+    }
 
 
 def _render(client, rows):
@@ -72,7 +72,7 @@ def test_route_renders_day_boxes(client):
 
 
 def test_route_shows_inspection_data(client):
-    html = _render(client, [_row_tuple(name="Risky Bistro", status="Conditional Pass",
+    html = _render(client, [_row(name="Risky Bistro", status="Conditional Pass",
                                        details="Rats observed", severity="C - Crucial",
                                        category="Pest control")])
     assert "Risky Bistro" in html
@@ -95,7 +95,7 @@ def test_route_no_data_day_shows_no_data_text(client):
 
 
 def test_status_class_on_row(client):
-    assert 'class="est-card status-conditional"' in _render(client, [_row_tuple(status="Conditional Pass")])
+    assert 'class="est-card status-conditional"' in _render(client, [_row(status="Conditional Pass")])
 
 
 def test_footer_content(client):
@@ -188,23 +188,23 @@ def test_recent_years_not_in_archive(client):
 
 
 def test_location_left_of_results(client):
-    html = _render(client, [_row_tuple()])
+    html = _render(client, [_row()])
     assert html.index('class="est-location"') < html.index('class="est-results"')
 
 
 def test_establishment_type_rendered(client):
-    assert "UNIQUE_EST_TYPE_XYZ" in _render(client, [_row_tuple(est_type="UNIQUE_EST_TYPE_XYZ")])
+    assert "UNIQUE_EST_TYPE_XYZ" in _render(client, [_row(est_type="UNIQUE_EST_TYPE_XYZ")])
 
 
 def test_location_contains_name_and_address(client):
-    html = _render(client, [_row_tuple()])
+    html = _render(client, [_row()])
     location = html[html.index('class="est-location"'):html.index('class="est-results"')]
     assert "Pasta Palace" in location
     assert "99 King St W" in location
 
 
 def test_multiple_infractions_share_one_card(client):
-    assert _render(client, [_row_tuple(), _row_tuple()]).count('class="est-card') == 1
+    assert _render(client, [_row(), _row()]).count('class="est-card') == 1
 
 
 def _results_html(client, rows):
@@ -213,38 +213,38 @@ def _results_html(client, rows):
 
 
 def test_results_have_column_headers(client):
-    headers = re.findall(r'<th[^>]*>([^<]+)</th>', _results_html(client, [_row_tuple()]))
+    headers = re.findall(r'<th[^>]*>([^<]+)</th>', _results_html(client, [_row()]))
     assert headers == ["Severity", "Category of Infraction"]
 
 
 def test_severity_and_category_share_a_row(client):
-    results = _results_html(client, [_row_tuple()])
+    results = _results_html(client, [_row()])
     cells = re.findall(r'<tr class="inf-summary">\s*<td>([^<]+)</td>\s*<td>([^<]+)</td>', results)
     assert cells == [("M - Minor", "Food storage")]
 
 
 def test_details_in_category_column_beneath_category(client):
-    results = _results_html(client, [_row_tuple()])
+    results = _results_html(client, [_row()])
     details = re.findall(r'<tr class="inf-details">\s*<td></td>\s*<td>\s*([^<]+?)\s*<', results)
     assert details == ["Improper storage"]
     assert results.index("Food storage") < results.index("Improper storage")
 
 
 def test_details_has_no_label(client):
-    assert "Details" not in _results_html(client, [_row_tuple()])
+    assert "Details" not in _results_html(client, [_row()])
 
 
 def test_inspection_status_uppercase_and_formatted_like_name(client):
-    results = _results_html(client, [_row_tuple()])
+    results = _results_html(client, [_row()])
     assert '<span class="label">Inspection Status</span> <strong>PASS</strong>' in results
 
 
 def test_infraction_counts_under_address(client):
     html = _render(client, [
-        _row_tuple(severity="C - Crucial"),
-        _row_tuple(severity="M - Minor", details="Dirty floor"),
-        _row_tuple(severity="M - Minor", details="No thermometer"),
-        _row_tuple(severity="NA", details="Other"),
+        _row(severity="C - Crucial"),
+        _row(severity="M - Minor", details="Dirty floor"),
+        _row(severity="M - Minor", details="No thermometer"),
+        _row(severity="NA", details="Other"),
     ])
     location = html[html.index('class="est-location"'):html.index('class="est-results"')]
     assert '<span class="label">Infractions</span> <strong>4</strong>' in location
@@ -254,11 +254,11 @@ def test_infraction_counts_under_address(client):
 
 
 def test_no_infraction_counts_without_infractions(client):
-    assert '<span class="label">Infractions</span>' not in _render(client, [_row_tuple(details=None, severity=None)])
+    assert '<span class="label">Infractions</span>' not in _render(client, [_row(details=None, severity=None)])
 
 
 def test_address_rendered_as_lines(client):
-    html = _render(client, [_row_tuple(address="102 BERKELEY ST None M5A 2W7")])
+    html = _render(client, [_row(address="102 BERKELEY ST None M5A 2W7")])
     assert "<span>102 BERKELEY ST</span>" in html
     assert "<span>Toronto, ON</span>" in html
     assert "<span>M5A 2W7</span>" in html

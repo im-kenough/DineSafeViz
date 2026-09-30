@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% block title %}DineSafeViz{% endblock %}
 {% block content %}
     <h2 class="page-heading">DineSafe Inspections | Q{{ selected_q }} {{ selected_year }}<span class="heading-sep"> | </span><span class="heading-dates">{{ start.strftime('%B %-d, %Y') }} - {{ end.strftime('%B %-d, %Y') }}</span></h2>
     {% set status_class = {
@@ -22,9 +21,9 @@
                 {% for line in est.establishment_address|address_lines %}<span>{{ line }}</span>{% else %}<span>—</span>{% endfor %}
                 {% if est.establishment_type %}<span class="est-type">{{ est.establishment_type }}</span>{% endif %}
                 {% if est.infractions %}
-                {% set crucial = est.infractions|selectattr('severity', 'equalto', 'C - Crucial')|list|length %}
-                {% set significant = est.infractions|selectattr('severity', 'equalto', 'S - Significant')|list|length %}
-                {% set minor = est.infractions|selectattr('severity', 'equalto', 'M - Minor')|list|length %}
+                {% set crucial = est.severity_counts['C - Crucial'] %}
+                {% set significant = est.severity_counts['S - Significant'] %}
+                {% set minor = est.severity_counts['M - Minor'] %}
 
                 <!-- Infraction count summary table -->
                 <br><br>

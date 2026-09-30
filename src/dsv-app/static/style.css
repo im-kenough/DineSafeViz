@@ -201,18 +201,22 @@ footer {
     display: inline-block;
 }
 
-.dropdown-menu {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    z-index: 10;
+.dropdown-menu,
+.flyout {
     padding: 0.25rem;
     background: var(--surface);
     border: 1px solid var(--accent);
     border-radius: 4px;
     flex-direction: column;
     gap: 0.25rem;
+}
+
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 10;
 }
 
 .dropdown:hover .dropdown-menu,
@@ -238,12 +242,6 @@ footer {
     position: absolute;
     top: 0;
     left: 100%;
-    padding: 0.25rem;
-    background: var(--surface);
-    border: 1px solid var(--accent);
-    border-radius: 4px;
-    flex-direction: column;
-    gap: 0.25rem;
 }
 
 .flyout a { display: block; }
