@@ -401,9 +401,11 @@ def _get_home_stats() -> Dict:
                 closing(conn.cursor()) as cur:
             with _db_query_duration.labels(route="home").time():
                 # One row per infraction, so count distinct inspections, not rows.
+                # An inspection is an (establishment, date) pair: recent rows have
+                # no inspection_id. The Grafana dashboard counts the same way.
                 cur.execute(
-                    "SELECT COUNT(DISTINCT inspection_id), MIN(inspection_date), MAX(inspection_date)"
-                    " FROM inspections"
+                    "SELECT COUNT(*), MIN(inspection_date), MAX(inspection_date)"
+                    " FROM (SELECT DISTINCT establishment_id, inspection_date FROM inspections) v"
                 )
                 total, min_date, max_date = cur.fetchone()
 
