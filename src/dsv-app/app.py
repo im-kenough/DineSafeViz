@@ -85,12 +85,8 @@ def get_data_range() -> Tuple[date, date]:
     Returns:
         A tuple of (first_date, last_date).
     """
-    try:
-        stats = _get_home_stats()
-    except psycopg2.Error:
-        _logger.warning("data range unavailable, using fallback", exc_info=True)
-        return DATA_START, date.today()
-    if stats["min_date"] is None:
+    stats = _get_home_stats_or_none()
+    if stats is None or stats["min_date"] is None:
         return DATA_START, date.today()
     return stats["min_date"], stats["max_date"]
 
@@ -426,6 +422,15 @@ def _get_home_stats() -> Dict:
         return stats
 
 
+def _get_home_stats_or_none() -> Optional[Dict]:
+    """Return the home stats, or None (logged) when the DB is unreachable."""
+    try:
+        return _get_home_stats()
+    except psycopg2.Error:
+        _logger.warning("home stats unavailable", exc_info=True)
+        return None
+
+
 @app.route("/")
 def home():
     return render_template("home.html", stats=_get_home_stats())
@@ -523,7 +528,7 @@ def dashboard():
 @app.route("/info")
 def info():
     """Render the information page about DineSafe and the dataset."""
-    return render_template("info.html")
+    return render_template("info.html", stats=_get_home_stats_or_none())
 
 
 @app.route("/healthz")

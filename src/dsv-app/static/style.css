@@ -38,9 +38,11 @@
     --text-muted:      #7a8094;
     --accent:          #4a7aff;
 
-    --status-closed:      rgba(220,  38,  38, 0.6);
-    --status-conditional: rgba(234,  88,  12, 0.6);
-    --status-pass:        rgba( 22, 163,  74, 0.6);
+    /* official DineSafe sign colours (sampled from static/imgs);
+       mirrored in dsv-analytics/provisioning/dashboards/dinesafe.json */
+    --dinesafe-red:    #F04B45;
+    --dinesafe-yellow: #FBEF45;
+    --dinesafe-green:  #00875F;
 }
 
 /* ── base ───────────────────────────────────────────────── */
@@ -227,9 +229,9 @@ th {
 .inf-counts td { text-align: right; }
 
 /* ── status accents ─────────────────────────────────────── */
-.est-card.status-closed      { border-left-color: var(--status-closed); }
-.est-card.status-conditional { border-left-color: var(--status-conditional); }
-.est-card.status-pass        { border-left-color: var(--status-pass); }
+.status-closed,      .sev-crucial     { border-left-color: var(--dinesafe-red); }
+.status-conditional, .sev-significant { border-left-color: var(--dinesafe-yellow); }
+.status-pass,        .sev-minor       { border-left-color: var(--dinesafe-green); }
 
 /* ── footer ─────────────────────────────────────────────── */
 footer {
