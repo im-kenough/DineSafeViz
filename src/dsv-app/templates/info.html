@@ -24,9 +24,6 @@
             font-size: 1.1rem;
         }
         .info-stats {
-            color: var(--text-muted);
-        }
-        .info-stats strong {
             color: var(--text);
         }
         .info-card {
@@ -62,6 +59,21 @@
         .info-facts + ul {
             margin-top: 0.75rem;
         }
+        .info-outcome {
+            display: flex;
+            align-items: flex-start;
+            gap: 1.5rem;
+        }
+        .info-outcome-body {
+            flex: 1;
+            min-width: 0;
+        }
+        .info-sign {
+            flex: none;
+            width: 148px;
+            height: auto;
+            border-radius: 4px;
+        }
         .info-subhead {
             margin: 1rem 0 0;
             color: var(--accent);
@@ -93,6 +105,13 @@
             }
             .info-facts dd {
                 margin-bottom: 0.4rem;
+            }
+            .info-outcome {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            .info-sign {
+                width: 120px;
             }
         }
     </style>
@@ -192,51 +211,63 @@
             and how much and what kind of food is served.
         </p>
 
-        <section class="day-box info-card sev-minor">
-            <h3>Pass</h3>
-            <dl class="info-facts">
-                <dt>Issued when</dt>
-                <dd>The inspector finds no infractions, or only minor ones.</dd>
-            </dl>
-            <p>
-                If the same minor infractions show up at the next inspection, the inspector may issue a ticket.
-                Fines range from $55 to $465, depending on severity.
-            </p>
+        <section class="day-box info-card info-outcome sev-minor">
+            <img class="info-sign" src="{{ url_for('static', filename='imgs/dinesafepasslrg.png') }}"
+                 alt="Green DineSafe PASS notice" width="148" height="192" loading="lazy">
+            <div class="info-outcome-body">
+                <h3>Pass</h3>
+                <dl class="info-facts">
+                    <dt>Issued when</dt>
+                    <dd>The inspector finds no infractions, or only minor ones.</dd>
+                </dl>
+                <p>
+                    If the same minor infractions show up at the next inspection, the inspector may issue a ticket.
+                    Fines range from $55 to $465, depending on severity.
+                </p>
+            </div>
         </section>
 
-        <section class="day-box info-card sev-significant">
-            <h3>Conditional Pass</h3>
-            <dl class="info-facts">
-                <dt>Issued when</dt>
-                <dd>The inspector finds one or more significant infractions.</dd>
-            </dl>
-            <p>The inspector follows up with up to two re-inspections:</p>
-            <ol>
-                <li>
-                    <strong>First re-inspection (within 24–48 hours):</strong>
-                    If the issues are fixed and nothing worse than a minor infraction is found, the establishment gets a Pass.
-                    If they aren't fixed, a ticket is issued and a second re-inspection is scheduled.
-                </li>
-                <li>
-                    <strong>Second re-inspection:</strong>
-                    If the issues still aren't fixed, the operator gets a court summons and may be referred to
-                    Toronto's Municipal Licensing and Standards Division.
-                </li>
-            </ol>
+        <section class="day-box info-card info-outcome sev-significant">
+            <img class="info-sign" src="{{ url_for('static', filename='imgs/dinesafeconditionallrg.png') }}"
+                 alt="Yellow DineSafe CONDITIONAL PASS notice" width="148" height="192" loading="lazy">
+            <div class="info-outcome-body">
+                <h3>Conditional Pass</h3>
+                <dl class="info-facts">
+                    <dt>Issued when</dt>
+                    <dd>The inspector finds one or more significant infractions.</dd>
+                </dl>
+                <p>The inspector follows up with up to two re-inspections:</p>
+                <ol>
+                    <li>
+                        <strong>First re-inspection (within 24–48 hours):</strong>
+                        If the issues are fixed and nothing worse than a minor infraction is found, the establishment gets a Pass.
+                        If they aren't fixed, a ticket is issued and a second re-inspection is scheduled.
+                    </li>
+                    <li>
+                        <strong>Second re-inspection:</strong>
+                        If the issues still aren't fixed, the operator gets a court summons and may be referred to
+                        Toronto's Municipal Licensing and Standards Division.
+                    </li>
+                </ol>
+            </div>
         </section>
 
-        <section class="day-box info-card sev-crucial">
-            <h3>Closed</h3>
-            <dl class="info-facts">
-                <dt>Issued when</dt>
-                <dd>A crucial infraction isn't fixed on the spot. An establishment can only be closed when a health hazard is present.</dd>
-            </dl>
-            <ul>
-                <li>An <strong>Order to Close</strong> is issued, and the hazard must be removed.</li>
-                <li>An inspector visits daily to check that the establishment stays closed. Breaking the order brings more charges.</li>
-                <li>The establishment can <strong>reopen with a Pass</strong> once every infraction in the order, plus any other significant or crucial ones, is fixed.</li>
-                <li>Repeat or new crucial infractions can mean a court summons and a referral to the Licensing Tribunal.</li>
-            </ul>
+        <section class="day-box info-card info-outcome sev-crucial">
+            <img class="info-sign" src="{{ url_for('static', filename='imgs/dinesafeclosedlrg.png') }}"
+                 alt="Red DineSafe CLOSED notice" width="148" height="192" loading="lazy">
+            <div class="info-outcome-body">
+                <h3>Closed</h3>
+                <dl class="info-facts">
+                    <dt>Issued when</dt>
+                    <dd>A crucial infraction isn't fixed on the spot. An establishment can only be closed when a health hazard is present.</dd>
+                </dl>
+                <ul>
+                    <li>An <strong>Order to Close</strong> is issued, and the hazard must be removed.</li>
+                    <li>An inspector visits daily to check that the establishment stays closed. Breaking the order brings more charges.</li>
+                    <li>The establishment can <strong>reopen with a Pass</strong> once every infraction in the order, plus any other significant or crucial ones, is fixed.</li>
+                    <li>Repeat or new crucial infractions can mean a court summons and a referral to the Licensing Tribunal.</li>
+                </ul>
+            </div>
         </section>
 
         <h2>Data Dictionary</h2>
