@@ -280,8 +280,6 @@ class TestMapRowNormalizesDate:
 
 
 class TestDropOldIdDuplicates:
-    # Nov 2023 - Nov 2025: the recent feed lists some inspections twice, under
-    # the old numeric estId and under the new estId whose oldEstId points back.
     @staticmethod
     def row(est_id, old_id, date):
         return {"establishment_id": est_id, "old_establishment_id": old_id, "inspection_date": date}

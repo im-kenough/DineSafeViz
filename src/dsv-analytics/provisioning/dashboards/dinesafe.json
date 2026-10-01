@@ -87,7 +87,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Total\"\nFROM inspections\nWHERE $__timeFilter(inspection_date);",
+          "rawSql": "SELECT COUNT(*) AS \"Total\"\nFROM (\n  SELECT DISTINCT establishment_id, inspection_date\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n) v;",
           "refId": "A"
         }
       ],
@@ -147,7 +147,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Pass\"\nFROM inspections\nWHERE establishment_status = 'Pass' AND $__timeFilter(inspection_date);",
+          "rawSql": "SELECT COUNT(*) AS \"Pass\"\nFROM (\n  SELECT DISTINCT establishment_id, inspection_date\n  FROM inspections\n  WHERE establishment_status = 'Pass' AND $__timeFilter(inspection_date)\n) v;",
           "refId": "A"
         }
       ],
@@ -207,7 +207,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date))::numeric AS total,\n    COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) FILTER (WHERE establishment_status = 'Pass')::numeric AS matched\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE(matched / NULLIF(total, 0), 0) AS \"Pass %\"\nFROM counts;",
+          "rawSql": "SELECT COALESCE(COUNT(*) FILTER (WHERE establishment_status = 'Pass')::numeric / NULLIF(COUNT(*), 0), 0) AS \"Pass %\"\nFROM (\n  SELECT DISTINCT establishment_id, inspection_date, establishment_status\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n) v;",
           "refId": "A"
         }
       ],
@@ -267,7 +267,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Conditional Pass\"\nFROM inspections\nWHERE establishment_status = 'Conditional Pass' AND $__timeFilter(inspection_date);",
+          "rawSql": "SELECT COUNT(*) AS \"Conditional Pass\"\nFROM (\n  SELECT DISTINCT establishment_id, inspection_date\n  FROM inspections\n  WHERE establishment_status = 'Conditional Pass' AND $__timeFilter(inspection_date)\n) v;",
           "refId": "A"
         }
       ],
@@ -327,7 +327,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date))::numeric AS total,\n    COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) FILTER (WHERE establishment_status = 'Conditional Pass')::numeric AS matched\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE(matched / NULLIF(total, 0), 0) AS \"Conditional Pass %\"\nFROM counts;",
+          "rawSql": "SELECT COALESCE(COUNT(*) FILTER (WHERE establishment_status = 'Conditional Pass')::numeric / NULLIF(COUNT(*), 0), 0) AS \"Conditional Pass %\"\nFROM (\n  SELECT DISTINCT establishment_id, inspection_date, establishment_status\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n) v;",
           "refId": "A"
         }
       ],
@@ -387,7 +387,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Closed\"\nFROM inspections\nWHERE establishment_status = 'Closed' AND $__timeFilter(inspection_date);",
+          "rawSql": "SELECT COUNT(*) AS \"Closed\"\nFROM (\n  SELECT DISTINCT establishment_id, inspection_date\n  FROM inspections\n  WHERE establishment_status = 'Closed' AND $__timeFilter(inspection_date)\n) v;",
           "refId": "A"
         }
       ],
@@ -447,7 +447,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date))::numeric AS total,\n    COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) FILTER (WHERE establishment_status = 'Closed')::numeric AS matched\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE(matched / NULLIF(total, 0), 0) AS \"Closed %\"\nFROM counts;",
+          "rawSql": "SELECT COALESCE(COUNT(*) FILTER (WHERE establishment_status = 'Closed')::numeric / NULLIF(COUNT(*), 0), 0) AS \"Closed %\"\nFROM (\n  SELECT DISTINCT establishment_id, inspection_date, establishment_status\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n) v;",
           "refId": "A"
         }
       ],
@@ -536,7 +536,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT $__timeGroupAlias(inspection_date, $__interval), COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 1;",
+          "rawSql": "SELECT $__timeGroupAlias(inspection_date, $__interval), COUNT(*) AS \"Inspections\"\nFROM (\n  SELECT DISTINCT establishment_id, inspection_date\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n) v\nGROUP BY 1\nORDER BY 1;",
           "refId": "A"
         }
       ],
@@ -622,7 +622,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT to_char(inspection_date, 'Dy') AS \"Day\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE $__timeFilter(inspection_date)\nGROUP BY EXTRACT(dow FROM inspection_date), 1\nORDER BY EXTRACT(dow FROM inspection_date);",
+          "rawSql": "SELECT to_char(inspection_date, 'Dy') AS \"Day\", COUNT(*) AS \"Inspections\"\nFROM (\n  SELECT DISTINCT establishment_id, inspection_date\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n) v\nGROUP BY EXTRACT(dow FROM inspection_date), 1\nORDER BY EXTRACT(dow FROM inspection_date);",
           "refId": "A"
         }
       ],
@@ -648,16 +648,10 @@
           },
           "id": 12,
           "options": {
-            "code": {
-              "language": "plaintext",
-              "showLineNumbers": false,
-              "showMiniMap": false
-            },
             "content": "**Note:** Establishment type is only available for inspections up to **2023-12-31**. Historical data has no *Closed* results.",
             "mode": "markdown"
           },
           "pluginVersion": "11.6.0",
-          "title": "",
           "type": "text"
         },
         {
@@ -740,7 +734,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT establishment_type AS \"Establishment Type\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Pass' AND establishment_type IS NOT NULL AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+              "rawSql": "SELECT establishment_type AS \"Establishment Type\", COUNT(*) AS \"Inspections\"\nFROM (\n  SELECT DISTINCT establishment_type, establishment_id, inspection_date\n  FROM inspections\n  WHERE establishment_status = 'Pass' AND establishment_type IS NOT NULL AND $__timeFilter(inspection_date)\n) v\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
               "refId": "A"
             }
           ],
@@ -827,7 +821,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT establishment_type AS \"Establishment Type\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Conditional Pass' AND establishment_type IS NOT NULL AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+              "rawSql": "SELECT establishment_type AS \"Establishment Type\", COUNT(*) AS \"Inspections\"\nFROM (\n  SELECT DISTINCT establishment_type, establishment_id, inspection_date\n  FROM inspections\n  WHERE establishment_status = 'Conditional Pass' AND establishment_type IS NOT NULL AND $__timeFilter(inspection_date)\n) v\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
               "refId": "A"
             }
           ],
@@ -914,7 +908,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT establishment_type AS \"Establishment Type\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Closed' AND establishment_type IS NOT NULL AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+              "rawSql": "SELECT establishment_type AS \"Establishment Type\", COUNT(*) AS \"Inspections\"\nFROM (\n  SELECT DISTINCT establishment_type, establishment_id, inspection_date\n  FROM inspections\n  WHERE establishment_status = 'Closed' AND establishment_type IS NOT NULL AND $__timeFilter(inspection_date)\n) v\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
               "refId": "A"
             }
           ],
@@ -1017,7 +1011,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(infraction_category, infraction_details) AS \"Infraction\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Closed' AND severity = 'C - Crucial' AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+          "rawSql": "SELECT infraction AS \"Infraction\", COUNT(*) AS \"Inspections\"\nFROM (\n  SELECT DISTINCT COALESCE(infraction_category, infraction_details) AS infraction, establishment_id, inspection_date\n  FROM inspections\n  WHERE establishment_status = 'Closed' AND severity = 'C - Crucial' AND $__timeFilter(inspection_date)\n) v\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
           "refId": "A"
         }
       ],
@@ -1103,7 +1097,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(infraction_category, infraction_details) AS \"Infraction\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Closed' AND severity = 'S - Significant' AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+          "rawSql": "SELECT infraction AS \"Infraction\", COUNT(*) AS \"Inspections\"\nFROM (\n  SELECT DISTINCT COALESCE(infraction_category, infraction_details) AS infraction, establishment_id, inspection_date\n  FROM inspections\n  WHERE establishment_status = 'Closed' AND severity = 'S - Significant' AND $__timeFilter(inspection_date)\n) v\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
           "refId": "A"
         }
       ],
@@ -1189,7 +1183,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(infraction_category, infraction_details) AS \"Infraction\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Closed' AND severity = 'M - Minor' AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+          "rawSql": "SELECT infraction AS \"Infraction\", COUNT(*) AS \"Inspections\"\nFROM (\n  SELECT DISTINCT COALESCE(infraction_category, infraction_details) AS infraction, establishment_id, inspection_date\n  FROM inspections\n  WHERE establishment_status = 'Closed' AND severity = 'M - Minor' AND $__timeFilter(inspection_date)\n) v\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
           "refId": "A"
         }
       ],
@@ -1288,7 +1282,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(infraction_category, infraction_details) AS \"Infraction\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Conditional Pass' AND severity = 'C - Crucial' AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+          "rawSql": "SELECT infraction AS \"Infraction\", COUNT(*) AS \"Inspections\"\nFROM (\n  SELECT DISTINCT COALESCE(infraction_category, infraction_details) AS infraction, establishment_id, inspection_date\n  FROM inspections\n  WHERE establishment_status = 'Conditional Pass' AND severity = 'C - Crucial' AND $__timeFilter(inspection_date)\n) v\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
           "refId": "A"
         }
       ],
@@ -1374,7 +1368,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(infraction_category, infraction_details) AS \"Infraction\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Conditional Pass' AND severity = 'S - Significant' AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+          "rawSql": "SELECT infraction AS \"Infraction\", COUNT(*) AS \"Inspections\"\nFROM (\n  SELECT DISTINCT COALESCE(infraction_category, infraction_details) AS infraction, establishment_id, inspection_date\n  FROM inspections\n  WHERE establishment_status = 'Conditional Pass' AND severity = 'S - Significant' AND $__timeFilter(inspection_date)\n) v\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
           "refId": "A"
         }
       ],
@@ -1460,7 +1454,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(infraction_category, infraction_details) AS \"Infraction\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Conditional Pass' AND severity = 'M - Minor' AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+          "rawSql": "SELECT infraction AS \"Infraction\", COUNT(*) AS \"Inspections\"\nFROM (\n  SELECT DISTINCT COALESCE(infraction_category, infraction_details) AS infraction, establishment_id, inspection_date\n  FROM inspections\n  WHERE establishment_status = 'Conditional Pass' AND severity = 'M - Minor' AND $__timeFilter(inspection_date)\n) v\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
           "refId": "A"
         }
       ],
@@ -1559,7 +1553,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(infraction_category, infraction_details) AS \"Infraction\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Pass' AND severity = 'S - Significant' AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+          "rawSql": "SELECT infraction AS \"Infraction\", COUNT(*) AS \"Inspections\"\nFROM (\n  SELECT DISTINCT COALESCE(infraction_category, infraction_details) AS infraction, establishment_id, inspection_date\n  FROM inspections\n  WHERE establishment_status = 'Pass' AND severity = 'S - Significant' AND $__timeFilter(inspection_date)\n) v\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
           "refId": "A"
         }
       ],
@@ -1645,7 +1639,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(infraction_category, infraction_details) AS \"Infraction\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Pass' AND severity = 'M - Minor' AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+          "rawSql": "SELECT infraction AS \"Infraction\", COUNT(*) AS \"Inspections\"\nFROM (\n  SELECT DISTINCT COALESCE(infraction_category, infraction_details) AS infraction, establishment_id, inspection_date\n  FROM inspections\n  WHERE establishment_status = 'Pass' AND severity = 'M - Minor' AND $__timeFilter(inspection_date)\n) v\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
           "refId": "A"
         }
       ],

@@ -33,7 +33,7 @@ def test_get_home_stats_fetches_and_caches_results():
     assert app_module._stats_cache["data"] == stats
     assert app_module._stats_cache["fetched_at"] == now
     assert mock_cur.execute.call_count == 1
-    assert "COUNT(DISTINCT inspection_id)" in mock_cur.execute.call_args.args[0]
+    assert "SELECT DISTINCT establishment_id, inspection_date" in mock_cur.execute.call_args.args[0]
     mock_conn.close.assert_called_once()
     mock_cur.close.assert_called_once()
 
