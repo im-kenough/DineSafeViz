@@ -13,6 +13,7 @@ from refresh import (
     recent_source,
     historical_source,
     exclude_on_or_after,
+    drop_old_id_duplicates,
     _read_csv_rows,
     RECENT_CSV_URL,
     HISTORICAL_COLUMN_MAP,
@@ -135,6 +136,13 @@ class TestMapRecentRow:
     def test_discards_id(self):
         result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
         assert "_id" not in result
+
+    def test_keeps_old_establishment_id_for_dedup(self):
+        # Not an inspections column: map_row must still carry it so
+        # drop_old_id_duplicates can read it before bulk_insert drops it.
+        result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
+        assert result["old_establishment_id"] == "10752656"
+        assert "old_establishment_id" not in INSPECTIONS_COLUMNS
 
     def test_maps_recent_only_columns(self):
         result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
@@ -276,6 +284,26 @@ class TestMapRowNormalizesDate:
         row = {"Inspection Date": "01/03/2023"}
         result = map_row(row, HISTORICAL_COLUMN_MAP)
         assert result["inspection_date"] == "2023-01-03"
+
+
+class TestDropOldIdDuplicates:
+    @staticmethod
+    def row(est_id, old_id, date):
+        return {"establishment_id": est_id, "old_establishment_id": old_id, "inspection_date": date}
+
+    def test_drops_old_id_row_when_new_id_has_same_inspection(self):
+        new = self.row("001Vo000013Qna7IAC", "10820991", "2025-08-18")
+        old = self.row("10820991", "10820991", "2025-08-18")
+        assert drop_old_id_duplicates([old, new]) == [new]
+
+    def test_keeps_old_id_row_on_a_different_date(self):
+        new = self.row("001Vo000013Qna7IAC", "10820991", "2025-08-18")
+        old = self.row("10820991", "10820991", "2024-02-01")
+        assert drop_old_id_duplicates([old, new]) == [old, new]
+
+    def test_keeps_new_id_row_without_old_id(self):
+        new = self.row("001Vo000013QjdPIAS", None, "2026-04-21")
+        assert drop_old_id_duplicates([new]) == [new]
 
 
 class TestExcludeOnOrAfter:
