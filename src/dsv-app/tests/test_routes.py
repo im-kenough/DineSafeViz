@@ -2,6 +2,8 @@ import re
 from datetime import date
 from unittest.mock import patch, MagicMock
 
+import psycopg2
+
 
 def _mock_db(rows):
     mock_conn = MagicMock()
@@ -64,12 +66,20 @@ def test_home_has_dashboard_link(client):
 
 
 def test_info_page(client):
-    resp = client.get("/info")
+    with patch("app._get_home_stats", return_value=_HOME_STATS):
+        resp = client.get("/info")
     assert resp.status_code == 200
     assert b"DineSafeViz Info" in resp.data
-    assert b"Data Dictionary" in resp.data
-    assert b"<table>" in resp.data
-    assert b"Establishment ID" in resp.data
+    assert b"25 years" in resp.data
+    assert b"12,345 inspections" in resp.data
+
+
+def test_info_page_renders_without_db(client):
+    with patch("app._get_home_stats", side_effect=psycopg2.OperationalError):
+        resp = client.get("/info")
+    assert resp.status_code == 200
+    assert b"Types of infractions" in resp.data
+    assert b"The dataset covers" not in resp.data
 
 
 def test_route_returns_200(client):
