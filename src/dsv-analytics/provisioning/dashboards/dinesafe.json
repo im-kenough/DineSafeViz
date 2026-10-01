@@ -39,17 +39,17 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
+      "description": "Inspections in the selected date range. One inspection = one establishment on one date (multiple infraction rows are deduplicated).",
       "fieldConfig": {
         "defaults": {
+          "color": {
+            "fixedColor": "#4a7aff",
+            "mode": "fixed"
+          },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#4a7aff"
-              }
-            ]
-          }
+          "noValue": "0",
+          "decimals": 0,
+          "unit": "locale"
         },
         "overrides": []
       },
@@ -87,25 +87,8 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) AS \"Total\" FROM inspections WHERE $__timeFilter(inspection_date);",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
+          "rawSql": "SELECT COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Total\"\nFROM inspections\nWHERE $__timeFilter(inspection_date);",
+          "refId": "A"
         }
       ],
       "title": "Total Inspections",
@@ -113,20 +96,20 @@
     },
     {
       "datasource": {
-        "type": "grafana-postgresql-datasource"
+        "type": "grafana-postgresql-datasource",
+        "uid": "dinesafe-postgres"
       },
-      "description": "A Pass notice will be issued when only minor or no infractions are observed during an inspection.\n\nIf minor infractions are repeated at the next inspection, the Public Health Inspector may issue a ticket to obtain compliance. Fines range from $55 to $465 depending on the severity of the infraction.\n\nMinor infraction type:\n- Infractions that present a minimal health risk\n- These items must be corrected by the next inspection\n\nExamples:\n- Walls, floors or other non-food contact surfaces or equipment need cleaning or repair (e.g., cracked or missing floor tiles, cracked or peeling paint not directly over food preparation area)\n- Inadequate ventilation and lighting systems\n- Hair constraints not worn",
+      "description": "Inspections with a Pass result. Issued when only minor or no infractions are found.",
       "fieldConfig": {
         "defaults": {
+          "color": {
+            "fixedColor": "#00875F",
+            "mode": "fixed"
+          },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#00875F"
-              }
-            ]
-          }
+          "noValue": "0",
+          "decimals": 0,
+          "unit": "locale"
         },
         "overrides": []
       },
@@ -164,25 +147,8 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND $__timeFilter(inspection_date);",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
+          "rawSql": "SELECT COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Pass\"\nFROM inspections\nWHERE establishment_status = 'Pass' AND $__timeFilter(inspection_date);",
+          "refId": "A"
         }
       ],
       "title": "Pass",
@@ -193,15 +159,16 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
-      "description": "A Pass notice will be issued when only minor or no infractions are observed during an inspection.\n\nIf minor infractions are repeated at the next inspection, the Public Health Inspector may issue a ticket to obtain compliance. Fines range from $55 to $465 depending on the severity of the infraction.\n\nMinor infraction type:\n- Infractions that present a minimal health risk\n- These items must be corrected by the next inspection\n\nExamples:\n- Walls, floors or other non-food contact surfaces or equipment need cleaning or repair (e.g., cracked or missing floor tiles, cracked or peeling paint not directly over food preparation area)\n- Inadequate ventilation and lighting systems\n- Hair constraints not worn",
+      "description": "Pass inspections / Total Inspections.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "fixedColor": "#00875F",
             "mode": "fixed"
           },
-          "decimals": 1,
           "mappings": [],
+          "noValue": "0",
+          "decimals": 1,
           "unit": "percentunit"
         },
         "overrides": []
@@ -240,25 +207,8 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(*)::numeric AS total,\n    COUNT(*) FILTER (WHERE establishment_status = 'Pass')::numeric AS pass\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE(pass / NULLIF(total, 0), 0) AS \"Pass %\"\nFROM counts;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
+          "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date))::numeric AS total,\n    COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) FILTER (WHERE establishment_status = 'Pass')::numeric AS matched\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE(matched / NULLIF(total, 0), 0) AS \"Pass %\"\nFROM counts;",
+          "refId": "A"
         }
       ],
       "title": "Pass %",
@@ -266,20 +216,20 @@
     },
     {
       "datasource": {
-        "type": "grafana-postgresql-datasource"
+        "type": "grafana-postgresql-datasource",
+        "uid": "dinesafe-postgres"
       },
-      "description": "A conditional pass notice will be issued when one or more significant infractions are observed during an inspection.\n\nSignificant infraction types:\n- Infractions that present a potential health hazard\n- These items must be corrected within 24-48 hours or legal action may be taken\n- These items indirectly involve food, through handling, preparation, storage and/or service\n\nExamples:\n- Food contact surfaces or equipment require cleaning or repair\n- Repair of refrigeration and mechanical dish washing equipment required\n- Accurate indicating thermometers not provided\n- Lack of hand wash basin with the necessary supplies\n- Garbage not stored in a sanitary manner\n- Improper cleaning and sanitizing of equipment and utensils\n- Washroom cleanliness not maintained, supplies not provided",
+      "description": "Inspections with a Conditional Pass result. Issued when one or more significant infractions are found.",
       "fieldConfig": {
         "defaults": {
+          "color": {
+            "fixedColor": "#FBEF45",
+            "mode": "fixed"
+          },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#FBEF45"
-              }
-            ]
-          }
+          "noValue": "0",
+          "decimals": 0,
+          "unit": "locale"
         },
         "overrides": []
       },
@@ -317,25 +267,8 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND $__timeFilter(inspection_date);",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
+          "rawSql": "SELECT COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Conditional Pass\"\nFROM inspections\nWHERE establishment_status = 'Conditional Pass' AND $__timeFilter(inspection_date);",
+          "refId": "A"
         }
       ],
       "title": "Conditional Pass",
@@ -346,15 +279,16 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
-      "description": "A conditional pass notice will be issued when one or more significant infractions are observed during an inspection.\n\nSignificant infraction types:\n- Infractions that present a potential health hazard\n- These items must be corrected within 24-48 hours or legal action may be taken\n- These items indirectly involve food, through handling, preparation, storage and/or service\n\nExamples:\n- Food contact surfaces or equipment require cleaning or repair\n- Repair of refrigeration and mechanical dish washing equipment required\n- Accurate indicating thermometers not provided\n- Lack of hand wash basin with the necessary supplies\n- Garbage not stored in a sanitary manner\n- Improper cleaning and sanitizing of equipment and utensils\n- Washroom cleanliness not maintained, supplies not provided",
+      "description": "Conditional Pass inspections / Total Inspections.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "fixedColor": "#FBEF45",
             "mode": "fixed"
           },
-          "decimals": 1,
           "mappings": [],
+          "noValue": "0",
+          "decimals": 1,
           "unit": "percentunit"
         },
         "overrides": []
@@ -393,25 +327,8 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(*)::numeric AS total,\n    COUNT(*) FILTER (WHERE establishment_status = 'Conditional Pass')::numeric AS conditional_pass\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE(conditional_pass / NULLIF(total, 0), 0) AS \"Conditional Pass %\"\nFROM counts;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
+          "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date))::numeric AS total,\n    COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) FILTER (WHERE establishment_status = 'Conditional Pass')::numeric AS matched\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE(matched / NULLIF(total, 0), 0) AS \"Conditional Pass %\"\nFROM counts;",
+          "refId": "A"
         }
       ],
       "title": "Conditional Pass %",
@@ -419,20 +336,20 @@
     },
     {
       "datasource": {
-        "type": "grafana-postgresql-datasource"
+        "type": "grafana-postgresql-datasource",
+        "uid": "dinesafe-postgres"
       },
-      "description": "A closed notice will be issued when one or more crucial infractions observed during an inspection are not corrected immediately. A food establishment can only be closed when a health hazard is present.\n\nCrucial infraction type:\n- Infractions that present an immediate health hazard\n- These items directly involve food, such as contamination, time-temperature abuse or lack of safe (potable) water or any other condition that is a health hazard\n- These items must be corrected immediately or an Order to Close the premises can be issued and/or immediate action must be taken to remove or eliminate the health hazard\n- Enforcement action will be taken\n\nExamples:\n- No hot and cold running water under pressure in food preparation area or where utensils are washed\n- Rodent or insect infestation without effective method of pest control\n- Inadequate refrigeration\n- Sewage back-up\n- Lack of safe potable water\n- Food contaminated or adulterated",
+      "description": "Inspections with a Closed result. Issued when crucial infractions are not corrected immediately.",
       "fieldConfig": {
         "defaults": {
+          "color": {
+            "fixedColor": "#F04B45",
+            "mode": "fixed"
+          },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#F04B45"
-              }
-            ]
-          }
+          "noValue": "0",
+          "decimals": 0,
+          "unit": "locale"
         },
         "overrides": []
       },
@@ -470,25 +387,8 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND $__timeFilter(inspection_date);",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
+          "rawSql": "SELECT COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Closed\"\nFROM inspections\nWHERE establishment_status = 'Closed' AND $__timeFilter(inspection_date);",
+          "refId": "A"
         }
       ],
       "title": "Closed",
@@ -499,15 +399,16 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
-      "description": "A closed notice will be issued when one or more crucial infractions observed during an inspection are not corrected immediately. A food establishment can only be closed when a health hazard is present.\n\nCrucial infraction type:\n- Infractions that present an immediate health hazard\n- These items directly involve food, such as contamination, time-temperature abuse or lack of safe (potable) water or any other condition that is a health hazard\n- These items must be corrected immediately or an Order to Close the premises can be issued and/or immediate action must be taken to remove or eliminate the health hazard\n- Enforcement action will be taken\n\nExamples:\n- No hot and cold running water under pressure in food preparation area or where utensils are washed\n- Rodent or insect infestation without effective method of pest control\n- Inadequate refrigeration\n- Sewage back-up\n- Lack of safe potable water\n- Food contaminated or adulterated",
+      "description": "Closed inspections / Total Inspections.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "fixedColor": "#F04B45",
             "mode": "fixed"
           },
-          "decimals": 1,
           "mappings": [],
+          "noValue": "0",
+          "decimals": 1,
           "unit": "percentunit"
         },
         "overrides": []
@@ -546,25 +447,8 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(*)::numeric AS total,\n    COUNT(*) FILTER (WHERE establishment_status = 'Closed')::numeric AS closed\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE(closed / NULLIF(total, 0), 0) AS \"Closed %\"\nFROM counts;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
+          "rawSql": "WITH counts AS (\n  SELECT\n    COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date))::numeric AS total,\n    COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) FILTER (WHERE establishment_status = 'Closed')::numeric AS matched\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n)\nSELECT COALESCE(matched / NULLIF(total, 0), 0) AS \"Closed %\"\nFROM counts;",
+          "refId": "A"
         }
       ],
       "title": "Closed %",
@@ -575,10 +459,12 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
+      "description": "Inspections per time bucket (minimum 1 day, widens with the date range).",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "fixedColor": "#4a7aff",
+            "mode": "fixed"
           },
           "custom": {
             "axisBorderShow": false,
@@ -613,19 +499,9 @@
               "mode": "off"
             }
           },
+          "decimals": 0,
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
+          "unit": "locale"
         },
         "overrides": []
       },
@@ -636,12 +512,13 @@
         "y": 5
       },
       "id": 9,
+      "interval": "1d",
       "options": {
         "legend": {
           "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": false
         },
         "tooltip": {
           "hideZeros": false,
@@ -656,8 +533,10 @@
             "type": "grafana-postgresql-datasource",
             "uid": "dinesafe-postgres"
           },
+          "editorMode": "code",
           "format": "table",
-          "rawSql": "SELECT date_trunc('week', inspection_date) AS \"time\", COUNT(*) AS \"Inspections\" FROM inspections WHERE $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 1;",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(inspection_date, $__interval), COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 1;",
           "refId": "A"
         }
       ],
@@ -669,6 +548,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
+      "description": "Inspections by weekday, Sunday to Saturday.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -696,19 +576,9 @@
               "mode": "off"
             }
           },
+          "decimals": 0,
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
+          "unit": "locale"
         },
         "overrides": []
       },
@@ -721,16 +591,16 @@
       "id": 10,
       "options": {
         "barRadius": 0,
-        "barWidth": 0.97,
+        "barWidth": 0.8,
         "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
           "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": false
         },
-        "orientation": "auto",
+        "orientation": "vertical",
         "showValue": "auto",
         "stacking": "none",
         "tooltip": {
@@ -738,6 +608,7 @@
           "mode": "single",
           "sort": "none"
         },
+        "xTickLabelMaxLength": 60,
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
@@ -748,8 +619,10 @@
             "type": "grafana-postgresql-datasource",
             "uid": "dinesafe-postgres"
           },
+          "editorMode": "code",
           "format": "table",
-          "rawSql": "SELECT CASE EXTRACT(dow FROM inspection_date) WHEN 0 THEN 'Sun' WHEN 1 THEN 'Mon' WHEN 2 THEN 'Tue' WHEN 3 THEN 'Wed' WHEN 4 THEN 'Thu' WHEN 5 THEN 'Fri' WHEN 6 THEN 'Sat' END AS \"Day\", COUNT(*) AS \"Inspections\" FROM inspections WHERE $__timeFilter(inspection_date) GROUP BY EXTRACT(dow FROM inspection_date), 1 ORDER BY EXTRACT(dow FROM inspection_date);",
+          "rawQuery": true,
+          "rawSql": "SELECT to_char(inspection_date, 'Dy') AS \"Day\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE $__timeFilter(inspection_date)\nGROUP BY EXTRACT(dow FROM inspection_date), 1\nORDER BY EXTRACT(dow FROM inspection_date);",
           "refId": "A"
         }
       ],
@@ -757,7 +630,7 @@
       "type": "barchart"
     },
     {
-      "collapsed": false,
+      "collapsed": true,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -765,253 +638,292 @@
         "y": 13
       },
       "id": 11,
-      "panels": [],
-      "title": "Inspection enforcement",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "dinesafe-postgres"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
+      "panels": [
+        {
+          "gridPos": {
+            "h": 2,
+            "w": 24,
+            "x": 0,
+            "y": 14
           },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
+          "id": 12,
+          "options": {
+            "code": {
+              "language": "plaintext",
+              "showLineNumbers": false,
+              "showMiniMap": false
             },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
+            "content": "**Note:** Establishment type is only available for inspections up to **2023-12-31**. Historical data has no *Closed* results.",
+            "mode": "markdown"
           },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
+          "pluginVersion": "11.6.0",
+          "title": "",
+          "type": "text"
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "dinesafe-postgres"
+          },
+          "description": "Top 10 establishment types by Pass inspections. Historical data only (up to 2023-12-31).",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "fixedColor": "#00875F",
+                "mode": "fixed"
               },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 14
-      },
-      "id": 12,
-      "options": {
-        "barRadius": 0,
-        "barWidth": 0.97,
-        "fullHighlight": false,
-        "groupWidth": 0.7,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "orientation": "horizontal",
-        "showValue": "auto",
-        "stacking": "none",
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        },
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "dinesafe-postgres"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT Action, COUNT(Action) AS \"Inspection Result\"\nFROM inspections WHERE $__timeFilter(inspection_date)\nGROUP BY Action\nORDER BY COUNT(Action) DESC",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "fillOpacity": 80,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
                 },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Inspection - Required remediation",
-      "type": "barchart"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "dinesafe-postgres"
-      },
-      "description": "There are three types of infractions that have been developed under the DineSafe Food Safety Inspection and Disclosure Program (Crucial, Significant and Minor) covering all of the requirements under the Ontario Food Premises Regulation (493/17). These infractions will be identified on the Food Safety Inspection Report at the time of inspection.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
+                "lineWidth": 1,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "decimals": 0,
+              "mappings": [],
+              "unit": "locale",
+              "noValue": "No establishment type data (only available up to 2023-12-31)"
+            },
+            "overrides": []
           },
-          "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
+          "gridPos": {
+            "h": 10,
+            "w": 8,
+            "x": 0,
+            "y": 16
+          },
+          "id": 13,
+          "options": {
+            "barRadius": 0,
+            "barWidth": 0.8,
+            "fullHighlight": false,
+            "groupWidth": 0.7,
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "orientation": "horizontal",
+            "showValue": "auto",
+            "stacking": "none",
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            },
+            "xTickLabelMaxLength": 60,
+            "xTickLabelRotation": 0,
+            "xTickLabelSpacing": 0
+          },
+          "pluginVersion": "11.6.0",
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "dinesafe-postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT establishment_type AS \"Establishment Type\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Pass' AND establishment_type IS NOT NULL AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+              "refId": "A"
             }
-          },
-          "mappings": []
+          ],
+          "title": "Pass by Establishment Type",
+          "type": "barchart"
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Pass"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#00875F",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Conditional Pass"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#FBEF45",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Closed"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#F04B45",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 14
-      },
-      "id": 13,
-      "options": {
-        "displayLabels": [
-          "value"
-        ],
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true,
-          "values": [
-            "value",
-            "percent"
-          ]
-        },
-        "pieType": "pie",
-        "reduceOptions": {
-          "calcs": [],
-          "fields": "",
-          "values": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
         {
           "datasource": {
             "type": "grafana-postgresql-datasource",
             "uid": "dinesafe-postgres"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "WITH status_levels AS (\n  SELECT *\n  FROM (\n    VALUES\n      ('Pass', 1),\n      ('Conditional Pass', 2),\n      ('Closed', 3)\n  ) AS levels(status, sort_order)\n), status_counts AS (\n  SELECT establishment_status AS status, COUNT(*) AS count\n  FROM inspections\n  WHERE establishment_status IS NOT NULL AND $__timeFilter(inspection_date)\n  GROUP BY 1\n)\nSELECT levels.status AS \"Status\", COALESCE(counts.count, 0) AS \"Count\"\nFROM status_levels AS levels\nLEFT JOIN status_counts AS counts ON counts.status = levels.status\nORDER BY levels.sort_order;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
+          "description": "Top 10 establishment types by Conditional Pass inspections. Historical data only (up to 2023-12-31).",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "fixedColor": "#FBEF45",
+                "mode": "fixed"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "fillOpacity": 80,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
                 },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
+                "lineWidth": 1,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "decimals": 0,
+              "mappings": [],
+              "unit": "locale",
+              "noValue": "No establishment type data (only available up to 2023-12-31)"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 8,
+            "x": 8,
+            "y": 16
+          },
+          "id": 14,
+          "options": {
+            "barRadius": 0,
+            "barWidth": 0.8,
+            "fullHighlight": false,
+            "groupWidth": 0.7,
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "orientation": "horizontal",
+            "showValue": "auto",
+            "stacking": "none",
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            },
+            "xTickLabelMaxLength": 60,
+            "xTickLabelRotation": 0,
+            "xTickLabelSpacing": 0
+          },
+          "pluginVersion": "11.6.0",
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "dinesafe-postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT establishment_type AS \"Establishment Type\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Conditional Pass' AND establishment_type IS NOT NULL AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+              "refId": "A"
+            }
+          ],
+          "title": "Conditional Pass by Establishment Type",
+          "type": "barchart"
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "dinesafe-postgres"
+          },
+          "description": "Top 10 establishment types by Closed inspections. Historical data only (up to 2023-12-31).",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "fixedColor": "#F04B45",
+                "mode": "fixed"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "fillOpacity": 80,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineWidth": 1,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "decimals": 0,
+              "mappings": [],
+              "unit": "locale",
+              "noValue": "No establishment type data (only available up to 2023-12-31)"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 8,
+            "x": 16,
+            "y": 16
+          },
+          "id": 15,
+          "options": {
+            "barRadius": 0,
+            "barWidth": 0.8,
+            "fullHighlight": false,
+            "groupWidth": 0.7,
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "orientation": "horizontal",
+            "showValue": "auto",
+            "stacking": "none",
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            },
+            "xTickLabelMaxLength": 60,
+            "xTickLabelRotation": 0,
+            "xTickLabelSpacing": 0
+          },
+          "pluginVersion": "11.6.0",
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "dinesafe-postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT establishment_type AS \"Establishment Type\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Closed' AND establishment_type IS NOT NULL AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+              "refId": "A"
+            }
+          ],
+          "title": "Closed by Establishment Type",
+          "type": "barchart"
         }
       ],
-      "title": "Status Breakdown",
-      "type": "piechart"
+      "title": "Establishment Type",
+      "type": "row"
     },
     {
       "collapsed": false,
@@ -1019,11 +931,11 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 22
+        "y": 14
       },
-      "id": 14,
+      "id": 16,
       "panels": [],
-      "title": "Infraction Details - Closed",
+      "title": "Inspection Status - Closed",
       "type": "row"
     },
     {
@@ -1031,7 +943,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
-      "description": "Crucial Infractions - Immediate Health Hazard\n\nThese infractions must be corrected immediately. An order to close the premises may be issued and/or immediate action must be taken to remove or eliminate the health hazard. A Closed Notice will be issued and must be posted, and other enforcement action will be taken. Crucial infractions are conditions that endanger food directly, such as contamination, time-temperature abuse or lack of safe-to-drink water or any other condition that constitutes a health hazard.",
+      "description": "Top 10 crucial infractions (immediate health hazard) on Closed inspections, counted once per inspection. Label: deficiencyDesc (current feed) or Infraction Details (up to 2023).",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1059,244 +971,29 @@
               "mode": "off"
             }
           },
+          "decimals": 0,
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
+          "unit": "locale"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
+        "h": 10,
+        "w": 8,
         "x": 0,
-        "y": 23
-      },
-      "id": 15,
-      "options": {
-        "barRadius": 0,
-        "barWidth": 0.97,
-        "fullHighlight": false,
-        "groupWidth": 0.7,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "orientation": "horizontal",
-        "showValue": "auto",
-        "stacking": "none",
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        },
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "dinesafe-postgres"
-          },
-          "format": "table",
-          "rawSql": "SELECT COALESCE(establishment_type, 'Unknown') AS \"Type\", COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
-          "refId": "A"
-        }
-      ],
-      "title": "Closed - by Establishment Type",
-      "type": "barchart"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "dinesafe-postgres"
-      },
-      "description": "Crucial Infractions - Immediate Health Hazard\n\nThese infractions must be corrected immediately. An order to close the premises may be issued and/or immediate action must be taken to remove or eliminate the health hazard. A Closed Notice will be issued and must be posted, and other enforcement action will be taken. Crucial infractions are conditions that endanger food directly, such as contamination, time-temperature abuse or lack of safe-to-drink water or any other condition that constitutes a health hazard.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "#F04B45",
-            "mode": "fixed"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 23
-      },
-      "id": 16,
-      "options": {
-        "barRadius": 0,
-        "barWidth": 0.97,
-        "fullHighlight": false,
-        "groupWidth": 0.7,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "orientation": "horizontal",
-        "showValue": "auto",
-        "stacking": "none",
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        },
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "dinesafe-postgres"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT COALESCE(action, 'Unknown') AS \"Action\", COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Closed - by Enforcement Action Type",
-      "type": "barchart"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "dinesafe-postgres"
-      },
-      "description": "Crucial Infractions - Immediate Health Hazard\n\nThese infractions must be corrected immediately. An order to close the premises may be issued and/or immediate action must be taken to remove or eliminate the health hazard. A Closed Notice will be issued and must be posted, and other enforcement action will be taken. Crucial infractions are conditions that endanger food directly, such as contamination, time-temperature abuse or lack of safe-to-drink water or any other condition that constitutes a health hazard.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "#F04B45",
-            "mode": "fixed"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 31
+        "y": 15
       },
       "id": 17,
       "options": {
         "barRadius": 0,
-        "barWidth": 0.97,
+        "barWidth": 0.8,
         "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
           "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": false
         },
         "orientation": "horizontal",
         "showValue": "auto",
@@ -1306,6 +1003,7 @@
           "mode": "single",
           "sort": "none"
         },
+        "xTickLabelMaxLength": 60,
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
@@ -1319,28 +1017,11 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(infraction_details, 'Unknown') AS \"Infraction Details\", COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
+          "rawSql": "SELECT COALESCE(infraction_category, infraction_details) AS \"Infraction\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Closed' AND severity = 'C - Crucial' AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+          "refId": "A"
         }
       ],
-      "title": "Closed - by Infraction Details",
+      "title": "Closed - Crucial Infractions",
       "type": "barchart"
     },
     {
@@ -1348,7 +1029,192 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
-      "description": "Crucial Infractions - Immediate Health Hazard\n\nThese infractions must be corrected immediately. An order to close the premises may be issued and/or immediate action must be taken to remove or eliminate the health hazard. A Closed Notice will be issued and must be posted, and other enforcement action will be taken. Crucial infractions are conditions that endanger food directly, such as contamination, time-temperature abuse or lack of safe-to-drink water or any other condition that constitutes a health hazard.",
+      "description": "Top 10 significant infractions (potential health hazard) on Closed inspections, counted once per inspection. Label: deficiencyDesc (current feed) or Infraction Details (up to 2023).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#FBEF45",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "locale"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 8,
+        "y": 15
+      },
+      "id": 18,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.8,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelMaxLength": 60,
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "dinesafe-postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(infraction_category, infraction_details) AS \"Infraction\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Closed' AND severity = 'S - Significant' AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+          "refId": "A"
+        }
+      ],
+      "title": "Closed - Significant Infractions",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "dinesafe-postgres"
+      },
+      "description": "Top 10 minor infractions (minimal health risk) on Closed inspections, counted once per inspection. Label: deficiencyDesc (current feed) or Infraction Details (up to 2023).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#00875F",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "locale"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 16,
+        "y": 15
+      },
+      "id": 19,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.8,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelMaxLength": 60,
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "dinesafe-postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(infraction_category, infraction_details) AS \"Infraction\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Closed' AND severity = 'M - Minor' AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+          "refId": "A"
+        }
+      ],
+      "title": "Closed - Minor Infractions",
+      "type": "barchart"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 25
+      },
+      "id": 20,
+      "panels": [],
+      "title": "Inspection Status - Conditional Pass",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "dinesafe-postgres"
+      },
+      "description": "Top 10 crucial infractions (immediate health hazard) on Conditional Pass inspections, counted once per inspection. Label: deficiencyDesc (current feed) or Infraction Details (up to 2023).",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1376,276 +1242,29 @@
               "mode": "off"
             }
           },
+          "decimals": 0,
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
+          "unit": "locale"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 31
-      },
-      "id": 18,
-      "options": {
-        "barRadius": 0,
-        "barWidth": 0.97,
-        "fullHighlight": false,
-        "groupWidth": 0.7,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "orientation": "horizontal",
-        "showValue": "auto",
-        "stacking": "none",
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        },
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "dinesafe-postgres"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT COALESCE(infraction_category, 'Unknown') AS \"Infraction Category\", COUNT(*) AS \"Closed\" FROM inspections WHERE establishment_status = 'Closed' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Closed - by Infraction Category",
-      "type": "barchart"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
+        "h": 10,
+        "w": 8,
         "x": 0,
-        "y": 39
-      },
-      "id": 19,
-      "panels": [],
-      "title": "Infraction Details - Conditional Pass",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "dinesafe-postgres"
-      },
-      "description": "Significant infractions - Potential Health Hazard\n\nThese infractions must be corrected immediately and a re-inspection to check for compliance will be conducted within 24 to 48 hours. Legal action may be taken should these infractions remain outstanding. Under exceptional circumstances a re-inspection to check for compliance may be extended beyond 48 hours. Significant infractions concern food handling, preparation, storage and/or service.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "#FBEF45",
-            "mode": "fixed"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 40
-      },
-      "id": 20,
-      "options": {
-        "barRadius": 0,
-        "barWidth": 0.97,
-        "fullHighlight": false,
-        "groupWidth": 0.7,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "orientation": "horizontal",
-        "showValue": "auto",
-        "stacking": "none",
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        },
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "dinesafe-postgres"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT COALESCE(establishment_type, 'Unknown') AS \"Type\", COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Conditional Pass - by Establishment Type",
-      "type": "barchart"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "dinesafe-postgres"
-      },
-      "description": "Significant infractions - Potential Health Hazard\n\nThese infractions must be corrected immediately and a re-inspection to check for compliance will be conducted within 24 to 48 hours. Legal action may be taken should these infractions remain outstanding. Under exceptional circumstances a re-inspection to check for compliance may be extended beyond 48 hours. Significant infractions concern food handling, preparation, storage and/or service.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "#FBEF45",
-            "mode": "fixed"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 40
+        "y": 26
       },
       "id": 21,
       "options": {
         "barRadius": 0,
-        "barWidth": 0.97,
+        "barWidth": 0.8,
         "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
           "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": false
         },
         "orientation": "horizontal",
         "showValue": "auto",
@@ -1655,6 +1274,7 @@
           "mode": "single",
           "sort": "none"
         },
+        "xTickLabelMaxLength": 60,
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
@@ -1668,28 +1288,11 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(action, 'Unknown') AS \"Action\", COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
+          "rawSql": "SELECT COALESCE(infraction_category, infraction_details) AS \"Infraction\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Conditional Pass' AND severity = 'C - Crucial' AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+          "refId": "A"
         }
       ],
-      "title": "Conditional Pass - by Enforcement Action Type",
+      "title": "Conditional Pass - Crucial Infractions",
       "type": "barchart"
     },
     {
@@ -1697,7 +1300,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
-      "description": "Significant infractions - Potential Health Hazard\n\nThese infractions must be corrected immediately and a re-inspection to check for compliance will be conducted within 24 to 48 hours. Legal action may be taken should these infractions remain outstanding. Under exceptional circumstances a re-inspection to check for compliance may be extended beyond 48 hours. Significant infractions concern food handling, preparation, storage and/or service.",
+      "description": "Top 10 significant infractions (potential health hazard) on Conditional Pass inspections, counted once per inspection. Label: deficiencyDesc (current feed) or Infraction Details (up to 2023).",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1725,39 +1328,29 @@
               "mode": "off"
             }
           },
+          "decimals": 0,
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
+          "unit": "locale"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 48
+        "h": 10,
+        "w": 8,
+        "x": 8,
+        "y": 26
       },
       "id": 22,
       "options": {
         "barRadius": 0,
-        "barWidth": 0.97,
+        "barWidth": 0.8,
         "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
           "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": false
         },
         "orientation": "horizontal",
         "showValue": "auto",
@@ -1767,6 +1360,7 @@
           "mode": "single",
           "sort": "none"
         },
+        "xTickLabelMaxLength": 60,
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
@@ -1780,28 +1374,11 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(infraction_details, 'Unknown') AS \"Infraction Details\", COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
+          "rawSql": "SELECT COALESCE(infraction_category, infraction_details) AS \"Infraction\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Conditional Pass' AND severity = 'S - Significant' AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+          "refId": "A"
         }
       ],
-      "title": "Conditional Pass - by Infraction Details",
+      "title": "Conditional Pass - Significant Infractions",
       "type": "barchart"
     },
     {
@@ -1809,11 +1386,11 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
-      "description": "Significant infractions - Potential Health Hazard\n\nThese infractions must be corrected immediately and a re-inspection to check for compliance will be conducted within 24 to 48 hours. Legal action may be taken should these infractions remain outstanding. Under exceptional circumstances a re-inspection to check for compliance may be extended beyond 48 hours. Significant infractions concern food handling, preparation, storage and/or service.",
+      "description": "Top 10 minor infractions (minimal health risk) on Conditional Pass inspections, counted once per inspection. Label: deficiencyDesc (current feed) or Infraction Details (up to 2023).",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "fixedColor": "#FBEF45",
+            "fixedColor": "#00875F",
             "mode": "fixed"
           },
           "custom": {
@@ -1837,39 +1414,29 @@
               "mode": "off"
             }
           },
+          "decimals": 0,
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
+          "unit": "locale"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 48
+        "h": 10,
+        "w": 8,
+        "x": 16,
+        "y": 26
       },
       "id": 23,
       "options": {
         "barRadius": 0,
-        "barWidth": 0.97,
+        "barWidth": 0.8,
         "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
           "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": false
         },
         "orientation": "horizontal",
         "showValue": "auto",
@@ -1879,6 +1446,7 @@
           "mode": "single",
           "sort": "none"
         },
+        "xTickLabelMaxLength": 60,
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
@@ -1892,28 +1460,11 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(infraction_category, 'Unknown') AS \"Infraction Category\", COUNT(*) AS \"Conditional Pass\" FROM inspections WHERE establishment_status = 'Conditional Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
+          "rawSql": "SELECT COALESCE(infraction_category, infraction_details) AS \"Infraction\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Conditional Pass' AND severity = 'M - Minor' AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+          "refId": "A"
         }
       ],
-      "title": "Conditional Pass - by Infraction Category",
+      "title": "Conditional Pass - Minor Infractions",
       "type": "barchart"
     },
     {
@@ -1922,11 +1473,11 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 56
+        "y": 36
       },
       "id": 24,
       "panels": [],
-      "title": "Infraction Details - Pass",
+      "title": "Inspection Status - Pass",
       "type": "row"
     },
     {
@@ -1934,11 +1485,11 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
-      "description": "Minor Infractions - Minimal Health Risk\n\nThese infractions must be corrected immediately. A follow-up compliance check will be conducted at the next scheduled inspection.",
+      "description": "Top 10 significant infractions (potential health hazard) on Pass inspections, counted once per inspection. Label: deficiencyDesc (current feed) or Infraction Details (up to 2023).",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "fixedColor": "#00875F",
+            "fixedColor": "#FBEF45",
             "mode": "fixed"
           },
           "custom": {
@@ -1962,39 +1513,29 @@
               "mode": "off"
             }
           },
+          "decimals": 0,
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
+          "unit": "locale"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 10,
         "w": 12,
         "x": 0,
-        "y": 57
+        "y": 37
       },
       "id": 25,
       "options": {
         "barRadius": 0,
-        "barWidth": 0.97,
+        "barWidth": 0.8,
         "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
           "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": false
         },
         "orientation": "horizontal",
         "showValue": "auto",
@@ -2004,6 +1545,7 @@
           "mode": "single",
           "sort": "none"
         },
+        "xTickLabelMaxLength": 60,
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
@@ -2017,28 +1559,11 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(establishment_type, 'Unknown') AS \"Type\", COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
+          "rawSql": "SELECT COALESCE(infraction_category, infraction_details) AS \"Infraction\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Pass' AND severity = 'S - Significant' AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+          "refId": "A"
         }
       ],
-      "title": "Pass - by Establishment Type",
+      "title": "Pass - Significant Infractions",
       "type": "barchart"
     },
     {
@@ -2046,7 +1571,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
-      "description": "Minor Infractions - Minimal Health Risk\n\nThese infractions must be corrected immediately. A follow-up compliance check will be conducted at the next scheduled inspection.",
+      "description": "Top 10 minor infractions (minimal health risk) on Pass inspections, counted once per inspection. Label: deficiencyDesc (current feed) or Infraction Details (up to 2023).",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2074,39 +1599,29 @@
               "mode": "off"
             }
           },
+          "decimals": 0,
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
+          "unit": "locale"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 10,
         "w": 12,
         "x": 12,
-        "y": 57
+        "y": 37
       },
       "id": 26,
       "options": {
         "barRadius": 0,
-        "barWidth": 0.97,
+        "barWidth": 0.8,
         "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
           "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": false
         },
         "orientation": "horizontal",
         "showValue": "auto",
@@ -2116,6 +1631,7 @@
           "mode": "single",
           "sort": "none"
         },
+        "xTickLabelMaxLength": 60,
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
@@ -2129,252 +1645,11 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(action, 'Unknown') AS \"Action\", COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
+          "rawSql": "SELECT COALESCE(infraction_category, infraction_details) AS \"Infraction\", COUNT(DISTINCT concat_ws('|', establishment_id, inspection_date)) AS \"Inspections\"\nFROM inspections\nWHERE establishment_status = 'Pass' AND severity = 'M - Minor' AND $__timeFilter(inspection_date)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 10;",
+          "refId": "A"
         }
       ],
-      "title": "Pass - by Enforcement Action",
-      "type": "barchart"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "dinesafe-postgres"
-      },
-      "description": "Minor Infractions - Minimal Health Risk\n\nThese infractions must be corrected immediately. A follow-up compliance check will be conducted at the next scheduled inspection.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "#00875F",
-            "mode": "fixed"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 65
-      },
-      "id": 27,
-      "options": {
-        "barRadius": 0,
-        "barWidth": 0.97,
-        "fullHighlight": false,
-        "groupWidth": 0.7,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "orientation": "horizontal",
-        "showValue": "auto",
-        "stacking": "none",
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        },
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "dinesafe-postgres"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT COALESCE(infraction_details, 'Unknown') AS \"Infraction Details\", COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Pass - by Infraction Details",
-      "type": "barchart"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "dinesafe-postgres"
-      },
-      "description": "Minor Infractions - Minimal Health Risk\n\nThese infractions must be corrected immediately. A follow-up compliance check will be conducted at the next scheduled inspection.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "#00875F",
-            "mode": "fixed"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 65
-      },
-      "id": 28,
-      "options": {
-        "barRadius": 0,
-        "barWidth": 0.97,
-        "fullHighlight": false,
-        "groupWidth": 0.7,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "orientation": "horizontal",
-        "showValue": "auto",
-        "stacking": "none",
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        },
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "dinesafe-postgres"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT COALESCE(infraction_category, 'Unknown') AS \"Infraction Category\", COUNT(*) AS \"Pass\" FROM inspections WHERE establishment_status = 'Pass' AND $__timeFilter(inspection_date) GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Pass - by Infraction Category",
+      "title": "Pass - Minor Infractions",
       "type": "barchart"
     }
   ],
@@ -2397,5 +1672,5 @@
   "timezone": "browser",
   "title": "DineSafe Inspections Metrics",
   "uid": "dinesafe",
-  "version": 19
+  "version": 22
 }
