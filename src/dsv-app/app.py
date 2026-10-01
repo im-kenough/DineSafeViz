@@ -404,8 +404,10 @@ def _get_home_stats() -> Dict:
         with closing(psycopg2.connect(**DB_CONFIG, connect_timeout=5)) as conn, \
                 closing(conn.cursor()) as cur:
             with _db_query_duration.labels(route="home").time():
+                # One row per infraction, so count distinct inspections, not rows.
                 cur.execute(
-                    "SELECT COUNT(*), MIN(inspection_date), MAX(inspection_date) FROM inspections"
+                    "SELECT COUNT(DISTINCT inspection_id), MIN(inspection_date), MAX(inspection_date)"
+                    " FROM inspections"
                 )
                 total, min_date, max_date = cur.fetchone()
 
