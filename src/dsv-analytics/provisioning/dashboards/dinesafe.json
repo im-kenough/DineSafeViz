@@ -207,7 +207,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(COUNT(*) FILTER (WHERE establishment_status = 'Pass')::numeric / NULLIF(COUNT(*), 0), 0) AS \"Pass %\"\nFROM (\n  SELECT DISTINCT establishment_id, inspection_date, establishment_status\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n) v;",
+          "rawSql": "SELECT COALESCE(AVG(hit::int), 0) AS \"Pass %\"\nFROM (\n  SELECT bool_or(establishment_status = 'Pass') AS hit\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n  GROUP BY establishment_id, inspection_date\n) v;",
           "refId": "A"
         }
       ],
@@ -327,7 +327,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(COUNT(*) FILTER (WHERE establishment_status = 'Conditional Pass')::numeric / NULLIF(COUNT(*), 0), 0) AS \"Conditional Pass %\"\nFROM (\n  SELECT DISTINCT establishment_id, inspection_date, establishment_status\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n) v;",
+          "rawSql": "SELECT COALESCE(AVG(hit::int), 0) AS \"Conditional Pass %\"\nFROM (\n  SELECT bool_or(establishment_status = 'Conditional Pass') AS hit\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n  GROUP BY establishment_id, inspection_date\n) v;",
           "refId": "A"
         }
       ],
@@ -447,7 +447,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(COUNT(*) FILTER (WHERE establishment_status = 'Closed')::numeric / NULLIF(COUNT(*), 0), 0) AS \"Closed %\"\nFROM (\n  SELECT DISTINCT establishment_id, inspection_date, establishment_status\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n) v;",
+          "rawSql": "SELECT COALESCE(AVG(hit::int), 0) AS \"Closed %\"\nFROM (\n  SELECT bool_or(establishment_status = 'Closed') AS hit\n  FROM inspections\n  WHERE $__timeFilter(inspection_date)\n  GROUP BY establishment_id, inspection_date\n) v;",
           "refId": "A"
         }
       ],

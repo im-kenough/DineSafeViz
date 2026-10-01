@@ -137,6 +137,13 @@ class TestMapRecentRow:
         result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
         assert "_id" not in result
 
+    def test_keeps_old_establishment_id_for_dedup(self):
+        # Not an inspections column: map_row must still carry it so
+        # drop_old_id_duplicates can read it before bulk_insert drops it.
+        result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
+        assert result["old_establishment_id"] == "10752656"
+        assert "old_establishment_id" not in INSPECTIONS_COLUMNS
+
     def test_maps_recent_only_columns(self):
         result = map_row(self.SAMPLE_ROW, RECENT_COLUMN_MAP)
         assert result["establishment_status"] == "Pass"
