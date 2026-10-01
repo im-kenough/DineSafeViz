@@ -72,6 +72,24 @@ def test_info_page(client):
     assert b"Establishment ID" in resp.data
 
 
+def test_info_page_shows_dataset_stats(client):
+    stats = {"total_inspections": 123456, "years_of_data": 25,
+             "min_date": date(2001, 1, 1), "max_date": date(2025, 12, 31)}
+    with patch("app._get_home_stats", return_value=stats):
+        resp = client.get("/info")
+    assert b"25 years" in resp.data
+    assert b"123,456 inspections" in resp.data
+
+
+def test_info_page_renders_without_db(client):
+    import psycopg2
+    with patch("app._get_home_stats", side_effect=psycopg2.OperationalError):
+        resp = client.get("/info")
+    assert resp.status_code == 200
+    assert b"Types of infractions" in resp.data
+    assert b"The dataset covers" not in resp.data
+
+
 def test_route_returns_200(client):
     with patch("app._get_home_stats", return_value=_HOME_STATS):
         resp = client.get("/")

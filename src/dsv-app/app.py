@@ -523,7 +523,12 @@ def dashboard():
 @app.route("/info")
 def info():
     """Render the information page about DineSafe and the dataset."""
-    return render_template("info.html")
+    try:
+        stats = _get_home_stats()
+    except psycopg2.Error:
+        _logger.warning("info stats unavailable, omitting dataset summary", exc_info=True)
+        stats = None
+    return render_template("info.html", stats=stats)
 
 
 @app.route("/healthz")
