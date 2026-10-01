@@ -261,45 +261,26 @@
                     <dt>Issued when</dt>
                     <dd>A crucial infraction isn't fixed on the spot. An establishment can only be closed when a health hazard is present.</dd>
                 </dl>
-                <ul>
-                    <li>An <strong>Order to Close</strong> is issued, and the hazard must be removed.</li>
-                    <li>An inspector visits daily to check that the establishment stays closed. Breaking the order brings more charges.</li>
-                    <li>The establishment can <strong>reopen with a Pass</strong> once every infraction in the order, plus any other significant or crucial ones, is fixed.</li>
-                    <li>Repeat or new crucial infractions can mean a court summons and a referral to the Licensing Tribunal.</li>
-                </ul>
+                <p>The establishment stays closed until the hazard is removed:</p>
+                <ol>
+                    <li>
+                        <strong>Order to Close:</strong>
+                        The inspector issues an order to close the establishment and remove the hazard.
+                    </li>
+                    <li>
+                        <strong>Daily checks:</strong>
+                        An inspector visits daily to make sure the establishment stays closed. Breaking the order brings more charges.
+                    </li>
+                    <li>
+                        <strong>Reopening:</strong>
+                        Once every infraction in the order, plus any other significant or crucial ones, is fixed,
+                        the establishment gets a Pass and can reopen.
+                    </li>
+                </ol>
+                <p>
+                    Repeat or new crucial infractions can mean a court summons and a referral to the Licensing Tribunal.
+                </p>
             </div>
         </section>
-
-        <h2>Data Dictionary</h2>
-        <p>Column definitions for the DineSafe dataset.</p>
-        <div class="data-dictionary">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Column</th>
-                        <th>Description</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr><td>_id</td><td>Unique row identifier for Open Data database</td></tr>
-                    <tr><td>Establishment ID</td><td>Unique identifier for an establishment</td></tr>
-                    <tr><td>Inspection ID</td><td>Unique ID for an inspection</td></tr>
-                    <tr><td>Establishment Name</td><td>Business name of the establishment</td></tr>
-                    <tr><td>Establishment Type</td><td>Establishment type i.e. restaurant, mobile cart</td></tr>
-                    <tr><td>Establishment Address</td><td>Municipal address of the establishment</td></tr>
-                    <tr><td>Infraction Details</td><td>Description of the Infraction</td></tr>
-                    <tr><td>Infraction Category</td><td>Category of the infraction, i.e. 05. MAINTENANCE / SANITATION</td></tr>
-                    <tr><td>Inspection Date</td><td>Calendar date the inspection was conducted</td></tr>
-                    <tr><td>Severity</td><td>Level of the infraction, i.e. S - Significant, M - Minor, C - Crucial</td></tr>
-                    <tr><td>Action</td><td>Enforcement activity based on the infractions noted during a food safety inspection</td></tr>
-                    <tr><td>Outcome</td><td>The registered court decision resulting from the issuance of a ticket or summons for outstanding infractions to the Health Protection and Promotion Act</td></tr>
-                    <tr><td>Outcome Date</td><td>The date of the court outcome</td></tr>
-                    <tr><td>Amount Fined</td><td>Fine determined in the court outcome</td></tr>
-                    <tr><td>Latitude</td><td>Latitude of establishment</td></tr>
-                    <tr><td>Longitude</td><td>Longitude of establishment</td></tr>
-                    <tr><td>unique_id</td><td>Unique composite key</td></tr>
-                </tbody>
-            </table>
-        </div>
     </div>
 {% endblock %}
