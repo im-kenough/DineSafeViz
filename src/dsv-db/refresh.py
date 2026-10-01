@@ -89,11 +89,13 @@ HISTORICAL_COLUMN_MAP = {
 }
 
 # Maps recent CSV headers → unified inspections column names.
-# "_id", "oldEstId", "phone", and "observation" are intentionally absent
-# (discarded on import). The recent feed no longer carries an "actionDesc"
-# column, so `action` stays NULL for recent rows.
+# "_id", "phone", and "observation" are intentionally absent (discarded on
+# import). "oldEstId" is read only by drop_old_id_duplicates and isn't stored,
+# because it isn't in INSPECTIONS_COLUMNS. The recent feed no longer carries an
+# "actionDesc" column, so `action` stays NULL for recent rows.
 RECENT_COLUMN_MAP = {
     "estId": "establishment_id",
+    "oldEstId": "old_establishment_id",
     "estName": "establishment_name",
     "address": "establishment_address",
     "typeDesc": "infraction_details",
@@ -176,6 +178,22 @@ def min_inspection_date(rows):
 def exclude_on_or_after(rows, cutoff):
     """Return rows whose inspection_date is before cutoff (None dates are kept)."""
     return [r for r in rows if r["inspection_date"] is None or r["inspection_date"] < cutoff]
+
+
+def drop_old_id_duplicates(rows):
+    """Drop recent rows filed under an old establishment ID when the same
+    inspection is also listed under the new ID.
+
+    Between Nov 2023 and Nov 2025 the recent feed lists some inspections twice:
+    once under the old numeric estId and once under the new estId, whose
+    oldEstId points back to the old one. Keeping both double-counts them.
+    """
+    listed_under_new_id = {
+        (r["old_establishment_id"], r["inspection_date"])
+        for r in rows
+        if r["old_establishment_id"] and r["old_establishment_id"] != r["establishment_id"]
+    }
+    return [r for r in rows if (r["establishment_id"], r["inspection_date"]) not in listed_under_new_id]
 
 
 def map_row(row, column_map):
@@ -320,6 +338,9 @@ def _fetch_recent_rows():
             print(f"Downloading recent data from {source} ...")
             urlretrieve(source, tmp_path)
             rows = _read_csv_rows(tmp_path, RECENT_COLUMN_MAP)
+    deduped = drop_old_id_duplicates(rows)
+    print(f"  Dropped old-ID duplicate rows: {len(rows) - len(deduped)}")
+    rows = deduped
     # Non-zero means the upstream address format changed; the raw address is kept in street.
     print(f"  Unparsed recent addresses: {count_unparsed_addresses(rows)}")
     return rows

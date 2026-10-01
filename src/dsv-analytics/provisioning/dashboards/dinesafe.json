@@ -99,7 +99,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
-      "description": "Inspections with a Pass result. Issued when only minor or no infractions are found.",
+      "description": "Inspections with a Pass result. No crucial infractions were found; minor or significant infractions may have been.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -219,7 +219,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "dinesafe-postgres"
       },
-      "description": "Inspections with a Conditional Pass result. Issued when one or more significant infractions are found.",
+      "description": "Inspections with a Conditional Pass result. Issued when significant or crucial infractions are found.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1669,7 +1669,7 @@
       "1d"
     ]
   },
-  "timezone": "browser",
+  "timezone": "utc",
   "title": "DineSafe Inspections Metrics",
   "uid": "dinesafe",
   "version": 22
