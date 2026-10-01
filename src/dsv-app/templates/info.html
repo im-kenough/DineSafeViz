@@ -23,15 +23,9 @@
         .info-lead {
             font-size: 1.1rem;
         }
-        .info-stats {
-            color: var(--text);
-        }
         .info-card {
-            border-left: 4px solid var(--border);
+            border-left-width: 4px;
         }
-        .info-card.sev-crucial     { border-left-color: var(--sev-crucial); }
-        .info-card.sev-significant { border-left-color: var(--sev-significant); }
-        .info-card.sev-minor       { border-left-color: var(--sev-minor); }
         .info-card h3 {
             margin: 0 0 0.5rem;
             font-size: 1.1rem;
@@ -56,9 +50,6 @@
         .info-facts dd {
             margin: 0;
         }
-        .info-facts + ul {
-            margin-top: 0.75rem;
-        }
         .info-outcome {
             display: flex;
             align-items: flex-start;
@@ -77,12 +68,6 @@
         .info-subhead {
             margin: 1rem 0 0;
             color: var(--accent);
-            font-weight: 600;
-        }
-        .data-dictionary td {
-            vertical-align: top;
-        }
-        .data-dictionary td:first-child {
             font-weight: 600;
         }
         @media (max-width: 600px) {
@@ -125,7 +110,7 @@
             This page explains the infraction categories and inspection outcomes that appear in that data.
         </p>
         {% if stats and stats.total_inspections %}
-        <p class="info-stats">
+        <p>
             The dataset covers <strong>{{ stats.years_of_data }} years</strong>
             and <strong>{{ "{:,}".format(stats.total_inspections) }} inspections</strong>.
         </p>
@@ -211,7 +196,7 @@
             and how much and what kind of food is served.
         </p>
 
-        <section class="day-box info-card info-outcome sev-minor">
+        <section class="day-box info-card info-outcome status-pass">
             <img class="info-sign" src="{{ url_for('static', filename='imgs/dinesafepasslrg.png') }}"
                  alt="Green DineSafe PASS notice" width="148" height="192" loading="lazy">
             <div class="info-outcome-body">
@@ -227,7 +212,7 @@
             </div>
         </section>
 
-        <section class="day-box info-card info-outcome sev-significant">
+        <section class="day-box info-card info-outcome status-conditional">
             <img class="info-sign" src="{{ url_for('static', filename='imgs/dinesafeconditionallrg.png') }}"
                  alt="Yellow DineSafe CONDITIONAL PASS notice" width="148" height="192" loading="lazy">
             <div class="info-outcome-body">
@@ -252,7 +237,7 @@
             </div>
         </section>
 
-        <section class="day-box info-card info-outcome sev-crucial">
+        <section class="day-box info-card info-outcome status-closed">
             <img class="info-sign" src="{{ url_for('static', filename='imgs/dinesafeclosedlrg.png') }}"
                  alt="Red DineSafe CLOSED notice" width="148" height="192" loading="lazy">
             <div class="info-outcome-body">

@@ -38,18 +38,11 @@
     --text-muted:      #7a8094;
     --accent:          #4a7aff;
 
-    /* official DineSafe sign colours (sampled from static/imgs) */
-    --dinesafe-red:       #F04B45;
-    --dinesafe-yellow:    #FBEF45;
-    --dinesafe-green:     #00875F;
-
-    --status-closed:      var(--dinesafe-red);
-    --status-conditional: var(--dinesafe-yellow);
-    --status-pass:        var(--dinesafe-green);
-
-    --sev-crucial:        var(--dinesafe-red);
-    --sev-significant:    var(--dinesafe-yellow);
-    --sev-minor:          var(--dinesafe-green);
+    /* official DineSafe sign colours (sampled from static/imgs);
+       mirrored in dsv-analytics/provisioning/dashboards/dinesafe.json */
+    --dinesafe-red:    #F04B45;
+    --dinesafe-yellow: #FBEF45;
+    --dinesafe-green:  #00875F;
 }
 
 /* ── base ───────────────────────────────────────────────── */
@@ -236,9 +229,9 @@ th {
 .inf-counts td { text-align: right; }
 
 /* ── status accents ─────────────────────────────────────── */
-.est-card.status-closed      { border-left-color: var(--status-closed); }
-.est-card.status-conditional { border-left-color: var(--status-conditional); }
-.est-card.status-pass        { border-left-color: var(--status-pass); }
+.status-closed,      .sev-crucial     { border-left-color: var(--dinesafe-red); }
+.status-conditional, .sev-significant { border-left-color: var(--dinesafe-yellow); }
+.status-pass,        .sev-minor       { border-left-color: var(--dinesafe-green); }
 
 /* ── footer ─────────────────────────────────────────────── */
 footer {
