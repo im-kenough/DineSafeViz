@@ -38,9 +38,18 @@
     --text-muted:      #7a8094;
     --accent:          #4a7aff;
 
-    --status-closed:      rgba(220,  38,  38, 0.6);
-    --status-conditional: rgba(234,  88,  12, 0.6);
-    --status-pass:        rgba( 22, 163,  74, 0.6);
+    /* official DineSafe sign colours (sampled from static/imgs) */
+    --dinesafe-red:       #F04B45;
+    --dinesafe-yellow:    #FBEF45;
+    --dinesafe-green:     #00875F;
+
+    --status-closed:      var(--dinesafe-red);
+    --status-conditional: var(--dinesafe-yellow);
+    --status-pass:        var(--dinesafe-green);
+
+    --sev-crucial:        var(--dinesafe-red);
+    --sev-significant:    var(--dinesafe-yellow);
+    --sev-minor:          var(--dinesafe-green);
 }
 
 /* ── base ───────────────────────────────────────────────── */
