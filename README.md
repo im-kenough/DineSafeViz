@@ -14,7 +14,7 @@ of inspection results.
 
 Browse the complete list of DineSafe inspection results.
 
-![Inspection results page](docs/img/root-readme/inspec-1.png)
+![Inspection results page](docs/img/root-readme/dsv-inspect-1.png)
 
 ### Analytics dashboard
 
