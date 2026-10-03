@@ -28,8 +28,8 @@ It uses this new schema (post 06-2026):
 | phone            | Establishment phone number                                                                                                  |
 | inspectionDate   | Date of inspection                                                                                                          |
 | observation      | Observation made during inspection                                                                                          |
-| typeDesc         | Category of infraction                                                                                                      |
-| deficiencyDesc   | Details of infraction                                                                                                       |
+| typeDesc         | Details of infraction (Open Data portal erroneously has this Category of infraction)                                        |
+| deficiencyDesc   | Category of infraction (Open Data portal erroneously has this Details of infraction)                                        |
 | severity         | Severity of infraction                                                                                                      |
 | OutcomeDate      | Date of outcome of prosecution, if there was one                                                                            |
 | OutcomeDesc      | Description of outcome, if there was one - this can be 'pending' if an outcome is being processed                           |
@@ -56,25 +56,22 @@ Historic data stores inspection results from 2001 to 2023-11-10 and still uses t
 
 ### Data Dictionary
 
-| Column                 | Description                                                                                                                                      |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| _id                    | Unique row identifier for Open Data database                                                                                                     |
-| Establishment ID       | Unique identifier for an establishment                                                                                                           |
-| Inspection ID          | Unique ID for an inspection                                                                                                                      |
-| Establishment Name     | Business name of the establishment                                                                                                               |
-| Establishment Type     | Establishment type ie restaurant, mobile cart                                                                                                    |
-| Establishment Address  | Municipal address of the establishment                                                                                                           |
-| Infraction Details     | Description of the Infraction                                                                                                                    |
-| Inspection Observation | Details observed associated with the Infraction                                                                                                  |
-| Inspection Date        | Calendar date the inspection was conducted                                                                                                       |
-| Severity               | Level of the infraction, i.e. S - Significant, M - Minor, C - Crucial                                                                            |
-| Action                 | Enforcement activity based on the infractions noted during a food safety inspection                                                              |
-| Outcome                | The registered court decision resulting from the issuance of a ticket or summons for outstanding infractions to the Health Protection and Promotion Act |
-| Outcome Date           | The date of the court outcome                                                                                                                    |
-| Amount Fined           | Fine determined in the court outcome                                                                                                             |
-| Latitude               | Latitude of establishment                                                                                                                        |
-| Longitude              | Longitude of establishment                                                                                                                       |
-| unique_id              | Unique composite key                                                                                                                             |
+Rec #
+Establishment ID
+Inspection ID
+Establishment Name
+Establishment Type
+Establishment Address
+Latitude
+Longitude
+Establishment Status: Pass/Conditional Pass/Closed
+Min. Inspections Per Year
+Infraction Details
+Inspection Date
+Severity: C - Crucial, S - Significant, M - Minor, NA - Not Applicable
+Action
+Outcome
+Amount Fined
 
 ### Sample historic data
 
