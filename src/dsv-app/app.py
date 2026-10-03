@@ -4,11 +4,8 @@ This module provides a web interface to query and display food safety inspection
 from Toronto's DineSafe program, grouped by inspection date with severity-based sorting.
 """
 import calendar
-import logging
 import os
 import threading
-import time
-import uuid
 import collections
 import itertools
 from contextlib import closing
@@ -17,45 +14,9 @@ from typing import Dict, List, Optional, Tuple
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from flask import Flask, abort, g, render_template, request
-from prometheus_flask_exporter import PrometheusMetrics
-from prometheus_client import Counter, Histogram
-from pythonjsonlogger import jsonlogger
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
-from opentelemetry.instrumentation.flask import FlaskInstrumentor
-from opentelemetry.instrumentation.psycopg2 import Psycopg2Instrumentor
+from flask import Flask, abort, render_template, request
 
 app = Flask(__name__)
-
-_logger = logging.getLogger("dsv-app")
-_log_handler = logging.StreamHandler()
-_log_handler.setFormatter(
-    jsonlogger.JsonFormatter("%(asctime)s %(name)s %(levelname)s %(message)s")
-)
-_logger.addHandler(_log_handler)
-_logger.setLevel(logging.INFO)
-_logger.propagate = False
-
-metrics = PrometheusMetrics(app)
-_db_query_duration = Histogram(
-    "dsv_db_query_duration_seconds", "DB query latency", ["route"]
-)
-_stats_cache_hits = Counter("dsv_stats_cache_hits_total", "Stats cache hits")
-_stats_cache_misses = Counter("dsv_stats_cache_misses_total", "Stats cache misses")
-_inspection_rows_returned = Histogram(
-    "dsv_inspection_query_rows",
-    "Inspection rows per month query",
-    ["route"],
-    buckets=(100, 500, 1000, 5000, 10000, 50000),
-)
-
-_otel_provider = TracerProvider()
-_otel_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
-trace.set_tracer_provider(_otel_provider)
-FlaskInstrumentor().instrument_app(app)
-Psycopg2Instrumentor().instrument()
 
 # Fallback range start, used only when the DB is unreachable or empty
 DATA_START = date(2001, 1, 1)
@@ -222,34 +183,6 @@ def _read_version() -> str:
 _VERSION = _read_version()
 
 
-@app.before_request
-def _before_request():
-    g.request_id = str(uuid.uuid4())
-    g.start_time = time.monotonic()
-
-
-@app.after_request
-def _after_request(response):
-    start = getattr(g, "start_time", None)
-    duration_ms = round((time.monotonic() - start) * 1000, 2) if start is not None else None
-    request_id = getattr(g, "request_id", None)
-    _logger.info(
-        "request",
-        extra={
-            "request_id": request_id,
-            "route": request.endpoint,
-            "method": request.method,
-            "status": response.status_code,
-            "duration_ms": duration_ms,
-            "remote_addr": request.remote_addr,
-            "user_agent": request.user_agent.string,
-        },
-    )
-    if request_id:
-        response.headers["X-Request-ID"] = request_id
-    return response
-
-
 @app.context_processor
 def inject_globals():
     """Inject global variables into all templates."""
@@ -376,10 +309,9 @@ DB_CONFIG = {
 
 
 def _cached_stats(now: datetime):
-    """Return cached stats if still fresh (counting a hit), else None."""
+    """Return cached stats if still fresh, else None."""
     fetched_at = _stats_cache["fetched_at"]
     if fetched_at is not None and now - fetched_at <= _STATS_TTL:
-        _stats_cache_hits.inc()
         return _stats_cache["data"]
     return None
 
@@ -396,18 +328,16 @@ def _get_home_stats() -> Dict:
         if cached is not None:
             return cached
 
-        _stats_cache_misses.inc()
         with closing(psycopg2.connect(**DB_CONFIG, connect_timeout=5)) as conn, \
                 closing(conn.cursor()) as cur:
-            with _db_query_duration.labels(route="home").time():
-                # One row per infraction, so count distinct inspections, not rows.
-                # An inspection is an (establishment, date) pair: recent rows have
-                # no inspection_id. The Grafana dashboard counts the same way.
-                cur.execute(
-                    "SELECT COUNT(*), MIN(inspection_date), MAX(inspection_date)"
-                    " FROM (SELECT DISTINCT establishment_id, inspection_date FROM inspections) v"
-                )
-                total, min_date, max_date = cur.fetchone()
+            # One row per infraction, so count distinct inspections, not rows.
+            # An inspection is an (establishment, date) pair: recent rows have
+            # no inspection_id. The Grafana dashboard counts the same way.
+            cur.execute(
+                "SELECT COUNT(*), MIN(inspection_date), MAX(inspection_date)"
+                " FROM (SELECT DISTINCT establishment_id, inspection_date FROM inspections) v"
+            )
+            total, min_date, max_date = cur.fetchone()
 
         years_of_data = 0
         if min_date is not None and max_date is not None:
@@ -425,11 +355,10 @@ def _get_home_stats() -> Dict:
 
 
 def _get_home_stats_or_none() -> Optional[Dict]:
-    """Return the home stats, or None (logged) when the DB is unreachable."""
+    """Return the home stats, or None when the DB is unreachable."""
     try:
         return _get_home_stats()
     except psycopg2.Error:
-        _logger.warning("home stats unavailable", exc_info=True)
         return None
 
 
@@ -438,25 +367,22 @@ def home():
     return render_template("home.html", stats=_get_home_stats())
 
 
-def _fetch_inspections(start: date, end: date, route: str) -> List[Dict]:
-    """Fetch inspection rows between start and end (inclusive), timed under route."""
+def _fetch_inspections(start: date, end: date) -> List[Dict]:
+    """Fetch inspection rows between start and end (inclusive)."""
     with closing(psycopg2.connect(**DB_CONFIG, connect_timeout=5)) as conn, \
             closing(conn.cursor(cursor_factory=RealDictCursor)) as cur:
-        with _db_query_duration.labels(route=route).time():
-            cur.execute(
-                "SELECT inspection_date, establishment_status, action, infraction_details,"
-                "       establishment_name, establishment_address, establishment_type,"
-                "       street, unit, postal_code,"
-                "       outcome, outcome_date, amount_fined,"
-                "       establishment_id, severity,"
-                "       infraction_category"
-                " FROM inspections"
-                " WHERE inspection_date BETWEEN %s AND %s",
-                (start, end),
-            )
-            rows = cur.fetchall()
-        _inspection_rows_returned.labels(route=route).observe(len(rows))
-    return rows
+        cur.execute(
+            "SELECT inspection_date, establishment_status, action, infraction_details,"
+            "       establishment_name, establishment_address, establishment_type,"
+            "       street, unit, postal_code,"
+            "       outcome, outcome_date, amount_fined,"
+            "       establishment_id, severity,"
+            "       infraction_category"
+            " FROM inspections"
+            " WHERE inspection_date BETWEEN %s AND %s",
+            (start, end),
+        )
+        return cur.fetchall()
 
 
 @app.route("/inspections")
@@ -479,7 +405,7 @@ def index():
     months = get_quarter_months(year, q, first)
     start, end = months[-1][0], months[0][1]
     latest_start, latest_end = months[0]
-    rows = _fetch_inspections(latest_start, latest_end, "inspections")
+    rows = _fetch_inspections(latest_start, latest_end)
     prev_q, next_q = get_adjacent_quarters(year, q, first, last)
 
     return render_template(
@@ -517,7 +443,7 @@ def inspections_month():
     if m not in months:
         abort(404)
     start, end = months[m]
-    rows = _fetch_inspections(start, end, "inspections_month")
+    rows = _fetch_inspections(start, end)
     return render_template("_days.html", days=build_days(rows, start, end))
 
 

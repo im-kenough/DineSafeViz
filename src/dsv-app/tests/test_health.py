@@ -1,4 +1,3 @@
-import uuid
 from unittest.mock import MagicMock, patch
 
 
@@ -24,14 +23,3 @@ def test_readyz_returns_503_when_db_fails(client):
         resp = client.get("/readyz")
     assert resp.status_code == 503
 
-
-def test_request_id_header_present(client):
-    resp = client.get("/healthz")
-    assert "X-Request-ID" in resp.headers
-
-
-def test_request_id_is_valid_uuid(client):
-    resp = client.get("/healthz")
-    header_value = resp.headers.get("X-Request-ID")
-    assert header_value is not None, "X-Request-ID header missing"
-    uuid.UUID(header_value)  # raises ValueError if not a valid UUID

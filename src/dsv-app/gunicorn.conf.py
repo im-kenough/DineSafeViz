@@ -1,4 +1,4 @@
-workers = 1          # local only; production: 4 with PROMETHEUS_MULTIPROC_DIR set
+workers = 1
 worker_class = "gthread"
 threads = 4
 timeout = 30
@@ -6,5 +6,5 @@ graceful_timeout = 30
 keepalive = 5
 accesslog = "-"
 errorlog = "-"
-preload_app = True   # safe for 1 worker + gthread; revisit when adding OTLP exporter with multi-worker
+preload_app = True
 bind = "0.0.0.0:8000"
