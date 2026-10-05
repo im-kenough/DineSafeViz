@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Test double for git, used through PATH by tests/test_deploy.py.
+echo "git $*" >> "${FAKE_LOG:-/dev/null}"
+case "$1" in
+  fetch)
+    ;;
+  rev-parse)
+    [[ -n ${FAKE_GIT_MISSING_REF:-} ]] && exit 1
+    echo "${FAKE_GIT_SHA:-abc1234def5678900000000000000000000000000}"
+    ;;
+  checkout)
+    if [[ -n ${FAKE_GIT_CHECKOUT_FAIL:-} ]]; then
+      echo "error: Your local changes to the following files would be overwritten by checkout:" >&2
+      exit 1
+    fi
+    ;;
+  *)
+    echo "fake git: unexpected: $*" >&2
+    exit 99
+    ;;
+esac
