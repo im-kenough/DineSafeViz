@@ -30,13 +30,15 @@ case "$1 $2" in
     fi
     ;;
   "compose logs")
-    if [[ " $* " == *" dsv-tunnel "* || $* == *" dsv-tunnel" ]]; then
-      echo "INF Registered tunnel connection connIndex=0"
-    else
-      echo "fake logs for ${*: -1}"
+    echo "fake logs for ${*: -1}"
+    ;;
+  "compose exec")
+    if [[ $* == *"dsv-tunnel:2000/ready"* && -n ${FAKE_TUNNEL_NOT_READY:-} ]]; then
+      echo "wget: server returned error: HTTP/1.1 503 Service Unavailable" >&2
+      exit 1
     fi
     ;;
-  "compose pull" | "compose exec" | "image prune")
+  "compose pull" | "image prune")
     ;;
   *)
     echo "fake docker: unexpected: $*" >&2

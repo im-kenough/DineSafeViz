@@ -4,6 +4,10 @@ echo "git $*" >> "${FAKE_LOG:-/dev/null}"
 case "$1" in
   fetch)
     ;;
+  status)
+    [[ -n ${FAKE_GIT_DIRTY:-} ]] && echo "$FAKE_GIT_DIRTY"
+    exit 0
+    ;;
   rev-parse)
     [[ -n ${FAKE_GIT_MISSING_REF:-} ]] && exit 1
     echo "${FAKE_GIT_SHA:-abc1234def5678900000000000000000000000000}"

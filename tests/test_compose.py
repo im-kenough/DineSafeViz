@@ -189,3 +189,8 @@ def test_vm_init_db_memory_covers_the_measured_peak(vm):
     # refresh.py peaked at about 430 MiB on the full data load (October 5,
     # 2026). Below that, the kernel kills it with exit 137.
     assert int(vm["services"]["dsv-init-db"]["mem_limit"]) >= 512 * 1024 * 1024
+
+
+def test_vm_tunnel_serves_readiness_for_deploy_sh(vm):
+    # deploy.sh asks http://dsv-tunnel:2000/ready from dsv-nginx (edge network).
+    assert vm["services"]["dsv-tunnel"]["environment"]["TUNNEL_METRICS"] == "0.0.0.0:2000"

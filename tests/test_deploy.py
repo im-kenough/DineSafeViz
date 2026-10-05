@@ -176,3 +176,35 @@ def test_repeated_deploys_keep_one_version_line(vm_repo):
     assert text.count("DSV_VERSION=") == 1
     assert "DSV_VERSION=sha-def5678\n" in text
     assert text.count("COMPOSE_FILE=") == 1
+
+
+# A tunnel's logs grow between deploys, and grep -q on a long docker logs
+# stream fails under pipefail. Readiness comes from cloudflared's /ready.
+def test_tunnel_readiness_comes_from_its_ready_endpoint(vm_repo):
+    repo, env, log = vm_repo
+    assert deploy(repo, env, "stg", "main").returncode == 0
+    lines = calls(log)
+    assert ("docker compose exec -T dsv-nginx wget -q -O /dev/null "
+            "http://dsv-tunnel:2000/ready") in lines
+    assert not ran(lines, "docker compose logs")
+
+
+def test_tunnel_not_ready_fails_the_deploy_with_its_logs(vm_repo):
+    repo, env, log = vm_repo
+    result = deploy(repo, env | {"FAKE_TUNNEL_NOT_READY": "1"}, "stg", "main")
+    assert result.returncode == 1
+    assert result.stderr.rstrip().endswith("fake logs for dsv-tunnel")
+    assert not ran(calls(log), "docker image prune")
+
+
+# Review focus 3: local edits that don't conflict with the target commit
+# would survive the checkout and run under the new version's name.
+def test_dirty_tree_stops_before_anything_changes(vm_repo):
+    repo, env, log = vm_repo
+    result = deploy(repo, env | {"FAKE_GIT_DIRTY": " M docker-compose.vm.yml"}, "stg", "main")
+    assert result.returncode == 1
+    assert "docker-compose.vm.yml" in result.stderr
+    lines = calls(log)
+    assert not ran(lines, "git checkout")
+    assert not ran(lines, "docker")
+    assert not ran(lines, "curl")

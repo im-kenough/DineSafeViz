@@ -54,8 +54,14 @@ main() {
     || die "deploy/$env_name.env is missing. Copy deploy/$env_name.env-example to deploy/$env_name.env first."
 
   # 1. Resolve the ref to a commit and image tag without changing anything.
-  local commit tag
+  local commit tag dirty
   git fetch --quiet --prune --tags --force origin
+  # Local edits that don't conflict with the target commit would survive the
+  # checkout and run under the new version's name. .env files are ignored.
+  dirty=$(git status --porcelain --untracked-files=no)
+  [[ -z $dirty ]] \
+    || die "the checkout has local changes. Commit, stash, or discard them, then rerun:
+$dirty"
   if [[ $env_name == stg ]]; then
     commit=$(git rev-parse --verify --quiet "origin/main^{commit}") \
       || die "can't resolve origin/main"
@@ -95,9 +101,13 @@ main() {
   # 6. Smoke test: nginx reaches the app, and the tunnel is connected.
   docker compose exec -T dsv-nginx wget -q -O /dev/null http://127.0.0.1/healthz \
     || fail dsv-nginx dsv-app
+  # cloudflared's /ready returns 200 only while it has a live connection to
+  # Cloudflare. (Searching its logs would match old lines, and grep -q on a
+  # long log stream fails under pipefail.)
   local attempt
   for attempt in $(seq 1 15); do
-    if docker compose logs dsv-tunnel 2>/dev/null | grep -q 'Registered tunnel connection'; then
+    if docker compose exec -T dsv-nginx wget -q -O /dev/null http://dsv-tunnel:2000/ready \
+        2>/dev/null; then
       break
     fi
     if [[ $attempt == 15 ]]; then

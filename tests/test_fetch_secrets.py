@@ -118,13 +118,15 @@ def test_rejects_value_with_single_quote(vm_repo):
     assert not (repo / ".env").exists()
 
 
+# The tunnel token is the one secret not generated as hex; it may hold
+# base64 characters.
 def test_dollar_and_slash_survive_compose_interpolation(vm_repo, tmp_path):
     repo, env, _ = vm_repo
-    set_secret(env, "dsv-db-password", "a$b/c+d=")
+    set_secret(env, "dsv-tunnel-token", "a$b/c+d=")
     assert fetch(repo, env, "stg").returncode == 0
     (repo / "probe.yml").write_text(
         "services:\n  probe:\n    image: alpine\n    environment:\n"
-        "      V: ${DSV_DB_PASSWORD}\n"
+        "      V: ${DSV_TUNNEL_TOKEN}\n"
     )
     result = subprocess.run(
         ["docker", "compose", "--project-directory", str(repo),
@@ -137,6 +139,19 @@ def test_dollar_and_slash_survive_compose_interpolation(vm_repo, tmp_path):
     # its own escaping, so check inside a real container instead.)
     assert result.returncode == 0, result.stderr
     assert result.stdout == "a$b/c+d=\n"
+
+
+# The Grafana admin password goes into a basic-auth URL in
+# dsv-init-analytics, where / @ : # ? % would corrupt it silently.
+def test_rejects_url_unsafe_generated_secret(vm_repo):
+    repo, env, _ = vm_repo
+    (repo / ".env").write_text("OLD=1\n")
+    set_secret(env, "dsv-analytics-admin-password", "pa/ss@word")
+    result = fetch(repo, env, "stg")
+    assert result.returncode == 1
+    assert "dsv-analytics-admin-password" in result.stderr
+    assert "openssl rand -hex 32" in result.stderr
+    assert env_text(repo) == "OLD=1\n"
 
 
 # Review focus 4: .env stays self-contained after a secret refresh.
