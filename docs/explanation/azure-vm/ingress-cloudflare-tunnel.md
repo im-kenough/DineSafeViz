@@ -133,8 +133,9 @@ The following table lists the per-environment values.
 
 The deployment uses the tunnel in these ways:
 
-- **Compose service.** `cloudflared` runs as a container in the same Docker
-  network as `dsv-nginx`, started with `tunnel --no-autoupdate run`. It reads
+- **Compose service.** The `dsv-tunnel` service runs `cloudflared` in the same
+  Docker network as `dsv-nginx`, started with `tunnel run` (the image adds
+  `--no-autoupdate`). It reads
   the token from the `TUNNEL_TOKEN` environment variable instead of the
   `--token` flag, so the token doesn't appear in process listings. The image
   tag is pinned, so updates go through the normal deploy process.
@@ -146,7 +147,8 @@ The deployment uses the tunnel in these ways:
   network. The Cloudflare Origin CA certificate, and the `dsv-origin-cert` and
   `dsv-origin-key` secrets from the earlier plan, aren't needed.
 - **No published host ports.** `dsv-nginx` and `dsv-analytics` don't publish
-  ports on the VM. Only `cloudflared` can reach them.
+  ports on the VM. Only `cloudflared` can reach them from outside the VM.
+  Admins reach Grafana through an SSH tunnel to its fixed internal address.
 - **NSG rules.** Inbound allows only SSH (port 22) from the operator's home IP.
   Outbound uses the default rules, which allow the tunnel's port `7844` and the
   VM's other egress, such as pulling images from GHCR and reaching Key Vault.

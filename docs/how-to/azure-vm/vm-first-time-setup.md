@@ -133,6 +133,15 @@ git clone https://github.com/im-kenough/DineSafeViz.git ~/DineSafeViz
 cd ~/DineSafeViz
 ```
 
+Then create the environment's settings file from its committed example. The
+real file, `deploy/stg.env`, is gitignored, so deploys never overwrite it and
+it's never committed. The example holds no secrets, so you don't need to edit
+it unless a setting differs on this VM.
+
+```bash
+cp deploy/stg.env-example deploy/stg.env
+```
+
 ## 5. Check Key Vault access from the VM
 
 Before the first deploy, confirm that the VM can list the vault's secrets
@@ -173,8 +182,8 @@ because `dsv-init-db` downloads and loads the inspection data.
 
 Then check the tunnel and the site:
 
-1.  In the Cloudflare dashboard, go to **Zero Trust** > **Networks** >
-    **Tunnels**. Confirm that `tun-dsv-stg01` shows **Healthy**.
+1.  In the Cloudflare dashboard, go to **Networking** > **Tunnels**. Confirm
+    that `tun-dsv-stg01` shows **Healthy**.
 2.  Open `https://stg.dinesafeviz.com` and `https://stg.dinesafeviz.com/analytics/`.
 
 ## 7. Confirm the setup survives a reboot
@@ -189,6 +198,32 @@ swapon --show
 sudo iptables -S DOCKER-USER | grep 169.254.169.254
 cd ~/DineSafeViz && docker compose ps
 ```
+
+## Sign in to Grafana as admin
+
+The public site returns `404` for the Grafana sign-in page, so admins sign in
+through an SSH tunnel instead. Grafana has a fixed address, `172.30.10.30`, on
+the VM's internal Docker network, which the VM itself can reach.
+
+1.  On your workstation, get the admin password from the vault. Your home IP
+    address must be allowed by the vault firewall.
+
+    ```bash
+    az keyvault secret show --vault-name kv-dsv-stg01 \
+      -n dsv-analytics-admin-password --query value -o tsv
+    ```
+
+2.  Open the tunnel and leave it running:
+
+    ```bash
+    ssh -N -L 3000:172.30.10.30:3000 <admin-user>@<vm-public-ip>
+    ```
+
+3.  Open `http://localhost:3000/analytics/login` and sign in as
+    `dsv-analytics-admin`, the `DSV_ANALYTICS_ADMIN_USER` in
+    `deploy/stg.env`.
+
+Close the tunnel when you're done.
 
 ## Next steps
 
