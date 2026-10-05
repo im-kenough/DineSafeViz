@@ -78,15 +78,19 @@ Three free tools keep dependencies current and flag known vulnerabilities.
 
   Minor and patch updates are grouped into one PR per ecosystem. Major
   Postgres updates are ignored, because moving from 17 to 18 needs a data
-  migration, not just a new tag.
+  migration, not just a new tag. GitHub doesn't document whether the
+  `docker-compose` ecosystem reads override files, so watch for a
+  cloudflared PR. If none arrives, the weekly rescan still flags
+  vulnerabilities in the pinned cloudflared tag, and you update it by hand.
 
 - **Dependabot alerts and security updates** are turned on in the repository
   settings. They open PRs when a dependency has a published advisory, without
   waiting for the weekly schedule.
 
 - **Trivy image scanning** runs in `images.yml`. Each owned image is built
-  locally, scanned, and only pushed if the scan passes. Results go to the
-  repository's **Security > Code scanning** page as SARIF. A weekly scheduled
+  locally, scanned, and only pushed if the scan passes. On pushes, results go
+  to the repository's **Security > Code scanning** page as SARIF; on pull
+  requests, the scan prints a table in the job log. A weekly scheduled
   run rescans the deployed tags and the pinned upstream images, because new
   vulnerabilities are published after an image is built.
 
