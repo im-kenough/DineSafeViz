@@ -164,6 +164,12 @@ activemq-data/
 
 # Environments
 .env
+# Real environment files anywhere in the repo, including deploy/<env>.env on
+# the VMs and fetch-secrets.sh temp files. Commit only the examples.
+*.env
+.env.*
+!.env.example
+!*.env-example
 .envrc
 .venv
 env/
