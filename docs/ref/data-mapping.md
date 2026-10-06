@@ -191,8 +191,8 @@ From November 2023 to November 2025, the recent feed lists some inspections
 twice: once under the old numeric `estId`, and again under a new `estId`
 whose `oldEstId` points back to the old one. `drop_old_id_duplicates()`
 removes the old-ID copy whenever the same `(oldEstId, inspectionDate)`
-appears under a new ID. On the local snapshot in `docs/ref/local-data`
-(latest inspection September 28, 2026), it drops 3,561 of 118,777 rows.
+appears under a new ID. On the snapshot whose latest inspection is
+September 28, 2026, it drops 3,561 of 118,777 rows.
 
 ### Address formats
 

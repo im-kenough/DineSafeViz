@@ -1,9 +1,11 @@
 # Purge the old CSVs from git history
 
 This runbook removes the DineSafe CSVs from every commit in the repository,
-so new clones no longer download about 120 MB of data that now lives in
-Azure Blob Storage. You run it once, by hand, after the CSVs are gone from
-`main`.
+so new clones no longer download data that now lives in Azure Blob Storage.
+The CSVs are about 240 MB uncompressed, and they make up about 30 MiB of the
+34 MiB pack. It also removes a Terraform provider binary and state
+file that were committed by mistake. You run it once, by hand, after these
+files are gone from `main`.
 
 <!-- prettier-ignore -->
 > [!CAUTION]
@@ -27,9 +29,9 @@ The rewrite changes the following:
 
 Confirm these prerequisites:
 
-- The pull request that removed `src/data`, `docs/ref/local-data`, and
-  `docs/rug/0-needs-review/ref/local-data` from `main` is merged, and prod
-  loads its data from Blob Storage.
+- The pull request that removed the CSV folders and stopped tracking
+  `infra/rug/terraform/.terraform` and `terraform.tfstate` is merged, and
+  prod loads its data from Blob Storage.
 - There are no open pull requests.
 - `git filter-repo` is installed on your workstation. On Ubuntu, run
   `sudo apt-get install git-filter-repo`.
@@ -61,16 +63,24 @@ Run the rewrite in a second, fresh mirror clone, never in your working clone.
     git count-objects -vH | grep size-pack
     ```
 
-2.  Remove the three CSV folders from every commit:
+2.  Remove the files from every commit. The list includes every path a CSV
+    has had, including folders that were later moved. Git stores identical
+    contents once, so if one old path is left out, its CSVs stay in the
+    history under that path and the repository barely shrinks.
 
     ```bash
     git filter-repo --invert-paths \
       --path src/data \
+      --path src/db/Dinesafe.csv \
+      --path db/Dinesafe.csv \
       --path docs/ref/local-data \
-      --path docs/rug/0-needs-review/ref/local-data
+      --path docs/rug/0-needs-review/ref/local-data \
+      --path docs/0-needs-review/ref/local-data \
+      --path infra/rug/terraform/.terraform \
+      --path infra/rug/terraform/terraform.tfstate
     ```
 
-3.  Record the new size. It's about 120 MB smaller:
+3.  Record the new size. It drops from about 34 MiB to under 4 MiB:
 
     ```bash
     git count-objects -vH | grep size-pack
@@ -97,7 +107,7 @@ Add it back, then force-push every branch and tag.
 
 ## Re-clone on each VM
 
-Each VM's clone still holds the old history and its 120 MB of CSVs. Replace
+Each VM's clone still holds the old history and its CSVs. Replace
 the clone and keep the two files that aren't in git.
 
 The rewritten commits have new SHAs, so stg's `sha-<commit>` images don't
@@ -148,10 +158,10 @@ cd /tmp
 git clone https://github.com/im-kenough/DineSafeViz.git dsv-verify
 cd dsv-verify
 git count-objects -vH | grep size-pack
-git log --all --oneline -- src/data docs/ref/local-data | head
+git log --all --oneline -- '*.csv' '*/.terraform/*' '*.tfstate' | head
 ```
 
-The pack is about 120 MB smaller than the backup's, and `git log` prints
+The pack is under 4 MiB, against about 34 MiB for the backup, and `git log` prints
 nothing. After both VMs deploy from their new clones, delete
 `dsv-backup.git` and `dsv-purge.git`.
 

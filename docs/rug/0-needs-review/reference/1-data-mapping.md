@@ -69,10 +69,8 @@ The `src/dsv-db/refresh.py` script downloads the historical ZIP archive at
 runtime and extracts one CSV per year, covering 2001 through 2022. This
 document covers the files from 2001 to 2015.
 
-In production, `src/dsv-db/refresh.py` downloads and extracts the
-historical ZIP directly (no checked-in copy). For local testing, an offline
-copy lives in `docs/ref/local-data/dinesafe-historical/` — see
-[how to run locally](../how-to/7-run-locally.md). Either way it contains one
+The CSVs now live in Azure Blob Storage, and `scripts/data.sh` copies them
+into `./data` for `refresh.py`. The archive contains one
 CSV per year (`dinesafe_hist_YYYY.csv`), covering 2001 through 2023 (the
 City added the 2023 file to the archive sometime before 2026-07-24; it
 previously stopped at 2022). The files from 2001 to 2015 are documented
