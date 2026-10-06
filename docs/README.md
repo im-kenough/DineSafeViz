@@ -5,8 +5,8 @@ separates content by what you need:
 
 - **[How-to guides](how-to/README.md):** task-oriented steps to install,
   deploy, operate, and troubleshoot the application.
-- **[Reference](reference/README.md):** factual lookup — data mapping and the
-  Azure component inventory.
+- **[Reference](ref/):** factual lookup — data mapping, the Azure component
+  inventory, and [how the app works](ref/app-architecture.md).
 - **[Explanation](explanation/README.md):** the architecture and the reasoning
   behind the design.
 
