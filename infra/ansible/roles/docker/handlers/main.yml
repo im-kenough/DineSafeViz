@@ -1,6 +1,0 @@
-# infra/ansible/roles/docker/handlers/main.yml
----
-- name: Restart docker
-  systemd:
-    name: docker
-    state: restarted

@@ -1,0 +1,8 @@
+# infra/ansible/playbooks/packer-dsv-app.yml
+---
+- name: Build dsv-app image (Layer 3)
+  hosts: all
+  become: true
+  roles:
+    - dsv-app
+    - cleanup

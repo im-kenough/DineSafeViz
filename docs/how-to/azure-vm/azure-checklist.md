@@ -64,11 +64,13 @@ The following items exist and were verified on October 5, 2026.
       90-day soft delete. Purge protection is on for prod only (see 4.1).
 - [x] `rg-dsv-prod01-snapshots`, with no lock.
 
-### 1.2 Tag the existing resource groups and vaults
+### 1.2 Done: tag the existing resource groups and vaults
 
 Tags make cost reports and resource searches filterable by workload and
 environment. Resources created later in this checklist get tags when they're
-created.
+created. On October 5, 2026, all four tags were verified on `rg-dsv-stg01`,
+`kv-dsv-stg01`, `rg-dsv-prod01`, `kv-dsv-prod01`, and
+`rg-dsv-prod01-snapshots`.
 
 - **Portal:** For each of `rg-dsv-<env>01`, `kv-dsv-<env>01`, and (prod only)
   `rg-dsv-prod01-snapshots`, open the resource, select **Tags**, add
@@ -86,7 +88,14 @@ created.
     --resource-id "$(az group show -n rg-dsv-prod01-snapshots --query id -o tsv)"
   ```
 
-- **Verify:** `az group show -n $RG --query tags`
+- **Verify:** Both commands show all four tags on every row. On prod, the
+  first command also lists `rg-dsv-prod01-snapshots`.
+
+  ```bash
+  az group list --query "[].{name:name, tags:tags}" -o jsonc
+  az resource list --query "[].{name:name, tags:tags}" -o jsonc
+  ```
+
 - **Source:** [az tag update](https://learn.microsoft.com/cli/azure/tag#az-tag-update)
 
 ### 1.3 Role assignments still to do
