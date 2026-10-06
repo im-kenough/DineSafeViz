@@ -10,7 +10,7 @@ x-db-app-env: &db-app-env
 
 services:
   dsv-nginx:
-    image: nginx:1.31.3-alpine
+    image: nginx:1.31.6-alpine
     ports:
       - "8080:80"
     volumes:
@@ -35,7 +35,7 @@ services:
         condition: service_healthy
 
   dsv-db:
-    image: postgres:17.10
+    image: postgres:17.11
     environment:
       POSTGRES_USER: ${DSV_DB_USER}
       POSTGRES_PASSWORD: ${DSV_DB_PASSWORD}
@@ -73,7 +73,7 @@ services:
     restart: "no"
 
   dsv-analytics:
-    image: grafana/grafana:13.1
+    image: grafana/grafana:13.2
     ports:
       - "3000:3000"
     environment:
@@ -101,7 +101,7 @@ services:
         condition: service_healthy
 
   dsv-init-analytics:
-    image: curlimages/curl:8.21.0
+    image: curlimages/curl:8.22.0
     depends_on:
       dsv-analytics:
         condition: service_healthy
