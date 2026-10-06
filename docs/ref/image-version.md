@@ -20,8 +20,10 @@ DineSafeViz uses the following images. Use the latest LTS or stable release when
 - [curlimages/curl:8.21.0](https://hub.docker.com/r/curlimages/curl/tags)
   - https://curl.se/download.html
 
-- [python:3.14.6-slim-trixie](https://hub.docker.com/_/python/tags)
-  - [python versions](https://www.python.org/downloads/)
-  - [debian versions](https://www.debian.org/releases/)
+## Python
+- https://hub.docker.com/_/python/tags
+- https://alpinelinux.org/releases/
+- https://www.python.org/downloads/
+- https://www.debian.org/releases/
 
 
