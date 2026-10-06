@@ -58,8 +58,11 @@ else
   settings=deploy/$env_name.env
   [[ -f $settings ]] \
     || die "$settings is missing. Copy deploy/$env_name.env-example to deploy/$env_name.env first."
-  account=$(sed -n 's/^DSV_STORAGE_ACCOUNT=//p' "$settings")
+  # Last assignment wins, as it does when compose reads the copied .env.
+  account=$(sed -n 's/^DSV_STORAGE_ACCOUNT=//p' "$settings" | tail -n 1)
   [[ -n $account ]] || die "DSV_STORAGE_ACCOUNT is missing from $settings"
+  [[ $account =~ ^[a-z0-9]{3,24}$ ]] \
+    || die "DSV_STORAGE_ACCOUNT in $settings isn't a valid storage account name: '$account'"
   token=$(curl -sS --fail-with-body --max-time 5 -H Metadata:true "$IMDS_URL" \
     | jq -r .access_token) \
     || die "can't get a token from IMDS. Run this on the Azure VM, with its managed identity attached."
