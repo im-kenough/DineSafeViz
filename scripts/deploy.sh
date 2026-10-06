@@ -111,6 +111,11 @@ $dirty"
   # 6. Smoke test: nginx reaches the app, and the tunnel is connected.
   docker compose exec -T dsv-nginx wget -q -O /dev/null http://127.0.0.1/healthz \
     || fail dsv-nginx dsv-app
+  # Containers must not reach IMDS (dsv-imds-block.service).
+  if docker compose exec -T dsv-nginx wget -q -T 3 -O /dev/null \
+      http://169.254.169.254/metadata/instance 2>/dev/null; then
+    die "a container reached IMDS. Run: sudo systemctl restart dsv-imds-block"
+  fi
   # cloudflared's /ready returns 200 only while it has a live connection to
   # Cloudflare. (Searching its logs would match old lines, and grep -q on a
   # long log stream fails under pipefail.)

@@ -18,8 +18,10 @@ hardening steps cover each item.
 - The VM is `vm-dsv-stg01` or `vm-dsv-prod01`, running Ubuntu 24.04 LTS.
 - The VM's only managed identity is `id-dsv-<env>01-vm`, and that identity has
   Key Vault Secrets User on `kv-dsv-<env>01`.
-- The VM's subnet has the `Microsoft.KeyVault` service endpoint, and the vault
-  firewall allows that subnet.
+- The VM's subnet has the `Microsoft.KeyVault` and `Microsoft.Storage` service
+  endpoints, and the vault and storage account firewalls allow that subnet.
+- The identity has Storage Blob Data Contributor on the `dinesafe` container
+  in `stdsv<env>01`.
 - The `kv-dsv-<env>01` vault holds all five secrets listed in the secrets
   inventory.
 - The Cloudflare tunnel `tun-dsv-<env>01` exists and routes to
@@ -64,45 +66,54 @@ sudo sysctl --system >/dev/null
 swapon --show
 ```
 
-## 3. Block containers from the instance metadata service
+## 3. Clone the repository
 
-Any process that can reach `169.254.169.254` can request a Key Vault token as
-the VM's identity. Only the host script `fetch-secrets.sh` needs that, so
-block it for containers with a rule in Docker's `DOCKER-USER` chain.
+The repository is public, so cloning needs no credentials:
 
-Docker creates the chain each time it starts, so a systemd unit adds the rule
-after Docker starts, including after every reboot.
+```bash
+git clone https://github.com/im-kenough/DineSafeViz.git ~/DineSafeViz
+cd ~/DineSafeViz
+```
 
-1.  Create the unit file:
+Then create the environment's settings file from its committed example. The
+real file, `deploy/stg.env`, is gitignored, so deploys never overwrite it and
+it's never committed. The example holds no secrets, so you don't need to edit
+it unless a setting differs on this VM.
+
+```bash
+cp deploy/stg.env-example deploy/stg.env
+```
+
+## 4. Block containers from the instance metadata service
+
+Any process that can reach `169.254.169.254` can request a token as the VM's
+identity, for Key Vault or for the storage account. Only the host scripts
+`fetch-secrets.sh` and `data.sh` need that, so a systemd unit blocks it for
+containers with rules in Docker's `DOCKER-USER` chain. The same unit blocks
+the Azure WireServer, `168.63.129.16`. The unit file is in the clone, at
+`deploy/systemd/dsv-imds-block.service`.
+
+1.  Confirm that Docker uses the iptables firewall backend. `DOCKER-USER`
+    rules don't apply with the nftables backend:
 
     ```bash
-    sudo tee /etc/systemd/system/dsv-imds-block.service >/dev/null <<'EOF'
-    [Unit]
-    Description=Block containers from the Azure instance metadata service
-    After=docker.service
-    Requires=docker.service
-    PartOf=docker.service
-
-    [Service]
-    Type=oneshot
-    RemainAfterExit=yes
-    ExecStart=/bin/sh -c 'iptables -C DOCKER-USER -d 169.254.169.254 -j DROP 2>/dev/null || iptables -I DOCKER-USER -d 169.254.169.254 -j DROP'
-    ExecStop=/bin/sh -c 'iptables -D DOCKER-USER -d 169.254.169.254 -j DROP 2>/dev/null || true'
-
-    [Install]
-    WantedBy=multi-user.target docker.service
-    EOF
+    docker info 2>/dev/null | grep -i 'firewall backend' || echo "iptables (default)"
     ```
 
-2.  Enable and start it:
+    Stop here if the output says `nftables`.
+
+2.  Install the unit, enable it, and confirm its rules:
 
     ```bash
+    cd ~/DineSafeViz
+    sudo install -m 644 deploy/systemd/dsv-imds-block.service /etc/systemd/system/
     sudo systemctl daemon-reload
     sudo systemctl enable --now dsv-imds-block.service
-    sudo iptables -S DOCKER-USER
+    sudo iptables -S DOCKER-USER | grep -E '169.254.169.254|168.63.129.16'
     ```
 
-    The output includes `-A DOCKER-USER -d 169.254.169.254/32 -j DROP`.
+    The output includes `-A DOCKER-USER -d 169.254.169.254/32 -j DROP` and
+    the same rule for `168.63.129.16/32`.
 
 3.  Verify that a container can't reach the metadata service. This command
     must time out:
@@ -123,26 +134,9 @@ after Docker starts, including after every reboot.
     ```
 
 There's a short window during boot, between Docker starting the containers and
-the unit adding the rule, when the rule isn't in place. The containers that run
-at that point are the app's own, so this is an accepted risk.
-
-## 4. Clone the repository
-
-The repository is public, so cloning needs no credentials:
-
-```bash
-git clone https://github.com/im-kenough/DineSafeViz.git ~/DineSafeViz
-cd ~/DineSafeViz
-```
-
-Then create the environment's settings file from its committed example. The
-real file, `deploy/stg.env`, is gitignored, so deploys never overwrite it and
-it's never committed. The example holds no secrets, so you don't need to edit
-it unless a setting differs on this VM.
-
-```bash
-cp deploy/stg.env-example deploy/stg.env
-```
+the unit adding the rules, when the rules aren't in place. The containers that
+run at that point are the app's own, so this is an accepted risk. Each deploy
+also checks that a container can't reach the metadata service.
 
 ## 5. Check Key Vault access from the VM
 
@@ -179,8 +173,9 @@ docker compose ps
 ```
 
 All services show `running` or `healthy`, and `dsv-init-db` and
-`dsv-init-analytics` show `exited (0)`. The first deploy takes several minutes
-because `dsv-init-db` downloads and loads the inspection data.
+`dsv-init-analytics` show `exited (0)`. The first deploy takes several minutes,
+because `scripts/data.sh` syncs the CSVs from Blob Storage into `./data` and
+`dsv-init-db` loads them.
 
 Then check the tunnel and the site:
 
@@ -188,16 +183,53 @@ Then check the tunnel and the site:
     that `tun-dsv-stg01` shows **Healthy**.
 2.  Open `https://stg.dinesafeviz.com` and `https://stg.dinesafeviz.com/analytics/`.
 
-## 7. Confirm the setup survives a reboot
+## 7. Schedule the data refresh
 
-Reboot once to check that the swap file, the metadata block, and the containers
-all come back on their own:
+A systemd timer runs `scripts/data.sh stg --load` each business-day morning
+at 07:30 Toronto time. It fetches the CSVs from Toronto Open Data, uploads
+changed files to Blob Storage, syncs them into `./data`, and reloads
+Postgres. The unit files are in the clone, at `deploy/systemd/`.
+
+1.  Install the service and the timer, filling in your user, the clone path,
+    and the environment (`stg` or `prod`):
+
+    ```bash
+    cd ~/DineSafeViz
+    for f in dsv-data.service dsv-data.timer; do
+      sed -e "s|@ADMIN_USER@|$USER|" -e "s|@REPO_DIR@|$PWD|" -e "s|@ENV@|stg|" \
+        "deploy/systemd/$f" | sudo tee "/etc/systemd/system/$f" >/dev/null
+    done
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now dsv-data.timer
+    ```
+
+2.  Confirm the next run time:
+
+    ```bash
+    systemctl list-timers dsv-data.timer
+    ```
+
+3.  Optional: run it once now and read its log:
+
+    ```bash
+    sudo systemctl start dsv-data.service
+    journalctl -u dsv-data.service -n 50 --no-pager
+    ```
+
+If Toronto Open Data is down, the run still loads the data already in Blob
+Storage, but the unit shows `failed` so you notice it.
+
+## 8. Confirm the setup survives a reboot
+
+Reboot once to check that the swap file, the metadata block, the timer, and
+the containers all come back on their own:
 
 ```bash
 sudo reboot
 # after reconnecting:
 swapon --show
-sudo iptables -S DOCKER-USER | grep 169.254.169.254
+sudo iptables -S DOCKER-USER | grep -E '169.254.169.254|168.63.129.16'
+systemctl list-timers dsv-data.timer
 cd ~/DineSafeViz && docker compose ps
 ```
 

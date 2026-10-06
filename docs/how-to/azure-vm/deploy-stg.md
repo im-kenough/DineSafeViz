@@ -103,7 +103,8 @@ in order, then come back here:
 1. [Install the tools the scripts need](vm-first-time-setup.md#1-install-the-tools-the-scripts-need).
    Sign out and back in afterward, so `docker` works without `sudo`.
 2. [Add a swap file](vm-first-time-setup.md#2-add-a-swap-file).
-3. [Block containers from the instance metadata service](vm-first-time-setup.md#3-block-containers-from-the-instance-metadata-service).
+3. [Clone the repository](vm-first-time-setup.md#3-clone-the-repository).
+4. [Block containers from the instance metadata service](vm-first-time-setup.md#4-block-containers-from-the-instance-metadata-service).
    Don't skip the two checks at the end: the container check must print
    `Blocked`, and the host check must print a number.
 
@@ -117,7 +118,7 @@ in order, then come back here:
 The deploy script runs from the clone and checks out the exact commit it
 deploys, so the clone must have no local changes. The clone must be at
 `~/DineSafeViz`, the path that
-[the VM setup guide](vm-first-time-setup.md#4-clone-the-repository) uses.
+[the VM setup guide](vm-first-time-setup.md#3-clone-the-repository) uses.
 
 1.  Confirm that the clone is clean and tracks GitHub:
 
@@ -190,7 +191,7 @@ connected. Check the stack and the site yourself the first time:
     [Sign in to Grafana as admin](vm-first-time-setup.md#sign-in-to-grafana-as-admin).
 
 Optional: reboot once and confirm that everything comes back, as described in
-[Confirm the setup survives a reboot](vm-first-time-setup.md#7-confirm-the-setup-survives-a-reboot).
+[Confirm the setup survives a reboot](vm-first-time-setup.md#8-confirm-the-setup-survives-a-reboot).
 
 ## Redeploy after a merge to main
 
