@@ -180,6 +180,18 @@ verify_role_assignment(){
 #################################
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
+register_storage_provider(){
+    # new subscriptions start with Microsoft.Storage unregistered, and
+    # check-name then fails with SubscriptionNotFound
+    local state
+    state=$(az provider show -n Microsoft.Storage --query registrationState -o tsv)
+    if [[ $state == Registered ]]; then
+        return
+    fi
+    echo "Registering the Microsoft.Storage resource provider (takes a minute or two)..."
+    az provider register -n Microsoft.Storage --wait -o none
+}
+
 create_storage_account(){
     echo ""
     if az storage account show -g "$RG" -n "$ST_NAME" -o none 2>/dev/null; then
@@ -187,7 +199,10 @@ create_storage_account(){
         return
     fi
     # names are global across Azure: 3-24 lowercase letters and numbers
-    if [[ $(az storage account check-name -n "$ST_NAME" --query nameAvailable -o tsv) != true ]]; then
+    local available
+    available=$(az storage account check-name -n "$ST_NAME" --query nameAvailable -o tsv) \
+        || { echo "ERROR: couldn't check whether $ST_NAME is available (see the error above)" >&2; exit 1; }
+    if [[ $available != true ]]; then
         echo "ERROR: storage account name $ST_NAME is taken. Pick another (for example ${ST_NAME}a1) and update DSV_STORAGE_ACCOUNT in deploy/$SHORT.env-example" >&2
         exit 1
     fi
@@ -332,6 +347,7 @@ run_infra(){
     # home IP; data roles at container scope only
     ST_NAME=stdsv$ENV
     ST_CONTAINER=dinesafe
+    register_storage_provider
     create_storage_account
     configure_storage_protection
     storage_network_rule_add
