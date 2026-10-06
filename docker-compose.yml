@@ -62,14 +62,26 @@ services:
       DSV_DB_NAME: ${DSV_DB_NAME}
       DSV_DB_USER: ${DSV_DB_USER}
       DSV_DB_PASSWORD: ${DSV_DB_PASSWORD}
-      # Set DSV_LOCAL_DATA_DIR=/data in .env to seed from the offline copy
-      # mounted below instead of downloading from the Toronto Open Data portal.
-      DSV_LOCAL_DATA_DIR: ${DSV_LOCAL_DATA_DIR:-}
+      DSV_DATA_DIR: /data
+    # Mirror of the Blob container. scripts/data.sh fills it.
     volumes:
-      - ./docs/ref/local-data:/data:ro
+      - ./data:/data:ro
     depends_on:
       dsv-db:
         condition: service_healthy
+    restart: "no"
+
+  # Toronto Open Data -> Blob -> ./data. Same image as dsv-init-db, but no
+  # DB credentials. Runs only through scripts/data.sh, which mounts the
+  # storage token and passes the command (fetch or sync).
+  dsv-data:
+    build: ./src/dsv-db
+    profiles: [data]
+    entrypoint: ["python3", "data.py"]
+    environment:
+      DSV_DATA_DIR: /data
+    volumes:
+      - ./data:/data
     restart: "no"
 
   dsv-analytics:

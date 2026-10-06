@@ -19,6 +19,9 @@ you start:
   works (checklist step 6.3).
 - `kv-dsv-stg01` holds all five secrets, including `dsv-tunnel-token`
   (checklist steps 4.4 and 5.1).
+- The storage account `stdsvstg01` exists with its `dinesafe` container,
+  firewall, and role assignments. `SUB_ID=<id> ENV=stg01
+  infra/az/setup-az-vms.sh infra` creates them.
 - The `tun-dsv-stg01` tunnel routes `stg.dinesafeviz.com` to
   `http://dsv-nginx:80` (checklist step 5.2).
 - The latest `images.yml` run on `main` is green, and the `dsv-app` and
@@ -46,11 +49,12 @@ ssh dsv-vm-admin@vm-dsv-stg01
 ```
 
 If `vm-dsv-stg01` doesn't resolve from your workstation, use the VM's public
-IP address instead:
+IP address instead. Set `SUB_ID` to the ID of subscription `sub-dsv-stg01`
+first:
 
 ```bash
 ssh dsv-vm-admin@$(az vm show -d -g rg-dsv-stg01 -n vm-dsv-stg01 \
-  --subscription dsv-stg01 --query publicIps -o tsv)
+  --subscription "$SUB_ID" --query publicIps -o tsv)
 ```
 
 The NSG only allows SSH from your home IP address. If the connection times
@@ -103,7 +107,8 @@ in order, then come back here:
 1. [Install the tools the scripts need](vm-first-time-setup.md#1-install-the-tools-the-scripts-need).
    Sign out and back in afterward, so `docker` works without `sudo`.
 2. [Add a swap file](vm-first-time-setup.md#2-add-a-swap-file).
-3. [Block containers from the instance metadata service](vm-first-time-setup.md#3-block-containers-from-the-instance-metadata-service).
+3. [Clone the repository](vm-first-time-setup.md#3-clone-the-repository).
+4. [Block containers from the instance metadata service](vm-first-time-setup.md#4-block-containers-from-the-instance-metadata-service).
    Don't skip the two checks at the end: the container check must print
    `Blocked`, and the host check must print a number.
 
@@ -117,7 +122,7 @@ in order, then come back here:
 The deploy script runs from the clone and checks out the exact commit it
 deploys, so the clone must have no local changes. The clone must be at
 `~/DineSafeViz`, the path that
-[the VM setup guide](vm-first-time-setup.md#4-clone-the-repository) uses.
+[the VM setup guide](vm-first-time-setup.md#3-clone-the-repository) uses.
 
 1.  Confirm that the clone is clean and tracks GitHub:
 
@@ -128,7 +133,9 @@ deploys, so the clone must have no local changes. The clone must be at
     ```
 
 2.  Create the stg settings file from its example. The file holds no secrets
-    and is gitignored, so later deploys don't overwrite it:
+    and is gitignored, so later deploys don't overwrite it. Its
+    `DSV_STORAGE_ACCOUNT` names the storage account that holds the CSVs,
+    `stdsvstg01`:
 
     ```bash
     cp deploy/stg.env-example deploy/stg.env
@@ -142,7 +149,8 @@ deploys, so the clone must have no local changes. The clone must be at
 
 `scripts/deploy.sh stg main` resolves `origin/main` to a commit, confirms its
 `sha-<commit>` images exist in GHCR, checks out that commit, writes `.env` from
-Key Vault, then starts the stack and smoke-tests nginx and the tunnel. It
+Key Vault, syncs the CSVs from Blob Storage, then starts the stack and
+smoke-tests nginx, the tunnel, and the metadata block. It
 stops before changing anything if the images or the vault aren't ready.
 
 ```bash
@@ -150,10 +158,14 @@ cd ~/DineSafeViz
 ./scripts/deploy.sh stg main
 ```
 
-The first deploy takes several minutes, because `dsv-init-db` downloads the
-inspection CSVs from Toronto Open Data and loads them, while Grafana runs its
-schema migrations on a new database. Later deploys run the shorter daily
-refresh instead. The script ends with a line like this:
+The first deploy takes several minutes. When `stdsvstg01` is empty,
+`data.sh` downloads the current and historical CSVs from Toronto Open Data,
+validates them, and uploads them before it syncs them into `./data`. Then
+`dsv-init-db` loads them into a new database while Grafana runs its schema
+migrations. A `403` from `data.sh` right after `setup-az-vms.sh` means the
+role assignment hasn't applied yet; wait five minutes and rerun the deploy. Later deploys run the shorter refresh instead. After the
+first deploy, schedule the business-day refresh as described in
+[Schedule the data refresh](vm-first-time-setup.md#7-schedule-the-data-refresh). The script ends with a line like this:
 
 ```text
 deploy: stg is running sha-4626289 (4626289...)
@@ -190,7 +202,7 @@ connected. Check the stack and the site yourself the first time:
     [Sign in to Grafana as admin](vm-first-time-setup.md#sign-in-to-grafana-as-admin).
 
 Optional: reboot once and confirm that everything comes back, as described in
-[Confirm the setup survives a reboot](vm-first-time-setup.md#7-confirm-the-setup-survives-a-reboot).
+[Confirm the setup survives a reboot](vm-first-time-setup.md#8-confirm-the-setup-survives-a-reboot).
 
 ## Redeploy after a merge to main
 
@@ -221,6 +233,10 @@ errors you're most likely to see on a first stg deploy.
 | `can't read ... from kv-dsv-stg01: ForbiddenByFirewall` | The vault firewall doesn't allow the VM's subnet. See checklist step 4.2. |
 | `can't read ... from kv-dsv-stg01: ForbiddenByRbac` | `id-dsv-stg01-vm` lacks Key Vault Secrets User, or the role was just assigned. Wait a few minutes. |
 | `... must contain only letters, digits, and . _ ~ -` | Regenerate that secret with `openssl rand -hex 32`. See checklist step 4.4. |
+| `data: ... HTTP 403` | The storage firewall doesn't allow the VM's subnet, or `id-dsv-stg01-vm` lacks Storage Blob Data Contributor on the `dinesafe` container. Rerun `setup-az-vms.sh infra`, then wait a few minutes. |
+| `data: manifest.json isn't in the container` | Blob Storage is empty and the fetch before it failed. Fix the fetch error printed above it, then rerun the deploy. |
+| `deploy: warning: using the CSVs already in Blob Storage` | Toronto Open Data failed or its files didn't validate. The deploy continues on the last good data. |
+| `a container reached IMDS` | The metadata block isn't in place. Run `sudo systemctl restart dsv-imds-block`, then check its rules as in [the VM setup guide](vm-first-time-setup.md#4-block-containers-from-the-instance-metadata-service). |
 | `dsv-init-db` exits non-zero or is `OOMKilled` | Check `free -h` for the swap file, then `docker compose logs dsv-init-db`. |
 | `dependency failed to start: container dsv-dsv-analytics-1 is unhealthy` | Grafana's first-start migrations outlasted its health check, so nginx and the tunnel never started. Wait for `docker compose ps` to show `dsv-analytics` as `healthy`, then rerun `deploy.sh`. `docker-compose.vm.yml` allows 300 seconds, so this means the VM is short on memory. Check `free -h`, and confirm the VM is a `Standard_B2als_v2` (checklist step 6.3). |
 | `dsv-db` never becomes healthy | `DSV_DB_NAME` must be `dinesafe`. Check `deploy/stg.env`. |

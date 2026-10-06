@@ -6,6 +6,9 @@
 **/superpowers/
 **/journal/
 
+# CSV mirror of the Blob container, written by scripts/data.sh
+/data/
+
 *.csv#
 
 # Byte-compiled / optimized / DLL files

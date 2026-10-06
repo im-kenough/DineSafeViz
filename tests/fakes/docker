@@ -37,6 +37,21 @@ case "$1 $2" in
       echo "wget: server returned error: HTTP/1.1 503 Service Unavailable" >&2
       exit 1
     fi
+    if [[ $* == *"169.254.169.254"* ]]; then
+      # The real check expects wget to fail; FAKE_IMDS_REACHABLE makes it succeed.
+      [[ -n ${FAKE_IMDS_REACHABLE:-} ]] && exit 0
+      exit 1
+    fi
+    ;;
+  "compose --profile")
+    # data.sh: docker compose --profile data run --rm ... dsv-data fetch|sync
+    if [[ " $* " == *" fetch"* ]]; then
+      exit "${FAKE_FETCH_EXIT:-0}"
+    fi
+    exit "${FAKE_SYNC_EXIT:-0}"
+    ;;
+  "compose run")
+    exit "${FAKE_LOAD_EXIT:-0}"
     ;;
   "compose pull" | "image prune")
     ;;

@@ -1,0 +1,23 @@
+# Containers must not reach the instance metadata service (169.254.169.254),
+# where any process can get tokens as the VM's managed identity, or the
+# WireServer (168.63.129.16). DOCKER-USER runs before Docker's own FORWARD
+# rules and Docker never edits it. The host's own traffic (OUTPUT chain,
+# used by fetch-secrets.sh and data.sh) isn't affected.
+# Installed by docs/how-to/azure-vm/vm-first-time-setup.md.
+[Unit]
+Description=Block container access to Azure IMDS and WireServer
+After=docker.service
+Requires=docker.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# $$ passes a literal $ to the shell; systemd expands a single $ itself.
+# WireServer is blocked on its agent ports only: Docker before 28 sends
+# container DNS queries to 168.63.129.16:53 from the container's namespace.
+ExecStart=/bin/sh -c 'for r in "-d 169.254.169.254/32 -j DROP" "-d 168.63.129.16/32 -p tcp -m multiport --dports 80,32526 -j DROP"; do iptables -C DOCKER-USER $$r 2>/dev/null || iptables -I DOCKER-USER $$r; done'
+ExecStop=/bin/sh -c 'for r in "-d 169.254.169.254/32 -j DROP" "-d 168.63.129.16/32 -p tcp -m multiport --dports 80,32526 -j DROP"; do iptables -D DOCKER-USER $$r 2>/dev/null || true; done'
+
+[Install]
+WantedBy=docker.service

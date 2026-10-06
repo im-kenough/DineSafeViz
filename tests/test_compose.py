@@ -11,10 +11,12 @@ from helpers import ROOT
 COMPOSE_DIR = Path(__file__).resolve().parent / "compose"
 
 
-def compose_config(env_file, *files):
+def compose_config(env_file, *files, profiles=()):
     cmd = ["docker", "compose", "--project-directory", str(ROOT), "--env-file", str(env_file)]
     for name in files:
         cmd += ["-f", str(ROOT / name)]
+    for profile in profiles:
+        cmd += ["--profile", profile]
     cmd += ["config", "--format", "json"]
     return subprocess.run(
         cmd,
@@ -24,15 +26,16 @@ def compose_config(env_file, *files):
     )
 
 
-def load(env_file, *files):
-    result = compose_config(env_file, *files)
+def load(env_file, *files, profiles=()):
+    result = compose_config(env_file, *files, profiles=profiles)
     assert result.returncode == 0, result.stderr
     return json.loads(result.stdout)
 
 
+# Profile services (dsv-data) are left out of `config` unless their profile is on.
 @pytest.fixture(scope="module")
 def local():
-    return load(COMPOSE_DIR / "local.env-test", "docker-compose.yml")
+    return load(COMPOSE_DIR / "local.env-test", "docker-compose.yml", profiles=("data",))
 
 
 def test_local_db_role_passwords_default_to_todays_values(local):
@@ -55,13 +58,13 @@ def test_local_db_runs_set_passwords_after_init_sql(local):
 
 
 LONG_RUNNING = ["dsv-tunnel", "dsv-nginx", "dsv-app", "dsv-db", "dsv-analytics"]
-ONE_SHOT = ["dsv-init-db", "dsv-init-analytics"]
+ONE_SHOT = ["dsv-init-db", "dsv-init-analytics", "dsv-data"]
 VM_FILES = ("docker-compose.yml", "docker-compose.vm.yml")
 
 
 @pytest.fixture(scope="module")
 def vm():
-    return load(COMPOSE_DIR / "vm.env-test", *VM_FILES)
+    return load(COMPOSE_DIR / "vm.env-test", *VM_FILES, profiles=("data",))
 
 
 def test_local_stack_is_unaffected_by_the_vm_file(local):
@@ -77,6 +80,7 @@ def test_vm_uses_published_images(vm):
     services = vm["services"]
     assert services["dsv-app"]["image"] == "ghcr.io/im-kenough/dsv-app:test-version"
     assert services["dsv-init-db"]["image"] == "ghcr.io/im-kenough/dsv-init-db:test-version"
+    assert services["dsv-data"]["image"] == "ghcr.io/im-kenough/dsv-init-db:test-version"
     assert services["dsv-tunnel"]["image"] == "cloudflare/cloudflared:2026.10.0"
 
 
@@ -116,7 +120,8 @@ def test_vm_networks(vm):
         "dsv-app": {"backend"},
         "dsv-db": {"backend"},
         "dsv-analytics": {"backend"},
-        "dsv-init-db": {"backend", "egress"},
+        "dsv-init-db": {"backend"},
+        "dsv-data": {"egress"},
         "dsv-init-analytics": {"backend"},
     }
 
@@ -194,3 +199,40 @@ def test_vm_init_db_memory_covers_the_measured_peak(vm):
 def test_vm_tunnel_serves_readiness_for_deploy_sh(vm):
     # deploy.sh asks http://dsv-tunnel:2000/ready from dsv-nginx (edge network).
     assert vm["services"]["dsv-tunnel"]["environment"]["TUNNEL_METRICS"] == "0.0.0.0:2000"
+
+
+def test_data_runs_only_when_asked():
+    plain = load(COMPOSE_DIR / "local.env-test", "docker-compose.yml")
+    assert "dsv-data" not in plain["services"]
+
+
+def test_data_service_runs_data_py_and_owns_the_mirror(local):
+    svc = local["services"]["dsv-data"]
+    assert svc["entrypoint"] == ["python3", "data.py"]
+    mounts = {v["target"]: v for v in svc["volumes"]}
+    assert mounts["/data"]["source"] == str(ROOT / "data")
+    assert not mounts["/data"].get("read_only")
+    assert "DSV_DB_PASSWORD" not in svc.get("environment", {})
+
+
+def test_init_db_reads_the_mirror_read_only(local):
+    svc = local["services"]["dsv-init-db"]
+    mounts = {v["target"]: v for v in svc["volumes"]}
+    assert mounts["/data"]["source"] == str(ROOT / "data")
+    assert mounts["/data"]["read_only"] is True
+    assert svc["environment"]["DSV_DATA_DIR"] == "/data"
+
+
+def test_nothing_mounts_the_old_csv_folder(local, vm):
+    for config in (local, vm):
+        for name, svc in config["services"].items():
+            for v in svc.get("volumes", []):
+                assert "local-data" not in v.get("source", ""), name
+
+
+def test_vm_data_service_is_hardened(vm):
+    svc = vm["services"]["dsv-data"]
+    assert svc["read_only"] is True
+    assert svc["cap_drop"] == ["ALL"]
+    assert "/tmp" in svc["tmpfs"]
+    assert int(svc["mem_limit"]) <= 384 * 1024 * 1024

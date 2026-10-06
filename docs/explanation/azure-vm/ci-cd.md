@@ -147,12 +147,13 @@ gh run watch                       # wait for images.yml on v0.5.0
 
 Then, from your workstation as `dsv-ops01`, take a pre-deploy snapshot of the
 prod OS disk. Snapshots go in `rg-dsv-prod01-snapshots`, which has no lock,
-because the lock on `rg-dsv-prod01` would stop you deleting old ones:
+because the lock on `rg-dsv-prod01` would stop you deleting old ones. Set
+`SUB_ID` to the ID of subscription `sub-dsv-prod01` first:
 
 ```bash
 DISK=$(az vm show -g rg-dsv-prod01 -n vm-dsv-prod01 \
-  --subscription dsv-prod01 --query storageProfile.osDisk.managedDisk.id -o tsv)
-az snapshot create -g rg-dsv-prod01-snapshots --subscription dsv-prod01 \
+  --subscription "$SUB_ID" --query storageProfile.osDisk.managedDisk.id -o tsv)
+az snapshot create -g rg-dsv-prod01-snapshots --subscription "$SUB_ID" \
   -n "snap-dsv-prod01-v0.5.0-$(date +%Y%m%d)" --source "$DISK" --incremental true
 ```
 

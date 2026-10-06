@@ -1,14 +1,13 @@
 # Run DineSafeViz locally with Docker Desktop
 
 This guide shows you how to run the full DineSafeViz stack on your own machine
-with Docker Desktop, seeded from the offline copy of the DineSafe data that
-ships in the repository. This is meant for testing and development. For the
+with Docker Desktop, seeded from the DineSafe CSVs in the stg Azure Blob
+Storage container. This is meant for testing and development. For the
 production deployment on Proxmox, see the [deploy guide](1-install/6-deploy.md)
 instead.
 
-By default the stack downloads fresh data from Toronto's Open Data portal. For
-local testing you point it at the bundled offline copy instead, so the seed is
-reproducible and works without internet access.
+The CSVs aren't in the repository. `scripts/data.sh local` syncs them from
+stg into `./data`, so your local stack loads the same data as stg.
 
 ## Prerequisites
 
@@ -17,8 +16,10 @@ You need the following before you start.
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and
   running (it includes Docker Compose).
 - A local clone of this repository.
-- The offline data under [`docs/ref/local-data/`](../ref/local-data/). It's part
-  of the repository, so a normal clone already has it.
+- The Azure CLI, signed in as `dsv-ops01`. Its operator group has Storage
+  Blob Data Reader on the stg `dinesafe` container.
+- Your home network. The storage firewall only allows your home IP address,
+  so a sync from anywhere else fails with HTTP 403.
 
 ## Step 1: create your environment file
 
@@ -40,9 +41,6 @@ the example and set the values below.
    DSV_DB_NAME=dinesafe
    DSV_ANALYTICS_ADMIN_USER=admin
    DSV_ANALYTICS_ADMIN_PASSWORD=admin
-
-   # Seed from the bundled offline copy instead of downloading live data.
-   DSV_LOCAL_DATA_DIR=/data
    ```
 
 <!-- prettier-ignore -->
@@ -55,18 +53,25 @@ The `DSV_DB_USER` and `DSV_DB_PASSWORD` values are the PostgreSQL superuser that
 the seeder uses. The application and Grafana connect with a separate, read-only
 role that `init.sql` creates automatically, so you don't set those here.
 
-## Step 2: choose your data source
+## Step 2: sync the data
 
-The `DSV_LOCAL_DATA_DIR` variable controls where the seed data comes from. The
-`docker-compose.yml` file mounts the offline copy at `/data` inside the seeder
-container.
+The seeder reads the CSVs from `./data`, which `docker-compose.yml` mounts
+read-only at `/data`. Fill it from the stg Blob container:
 
-- **Offline (recommended for testing):** set `DSV_LOCAL_DATA_DIR=/data`. The
-  seeder reads `docs/ref/local-data/Dinesafe.csv` and the yearly files under
-  `docs/ref/local-data/dinesafe-historical/`. No internet access is needed.
-- **Live download:** leave `DSV_LOCAL_DATA_DIR` empty or remove it. The seeder
-  downloads the current data from Toronto's Open Data portal, which is the same
-  behavior used in production.
+```bash
+az login                      # as dsv-ops01
+scripts/data.sh local
+```
+
+The output ends with `Sync complete:` and a file count. `./data` is
+gitignored. Run the sync again whenever you want newer data; it only
+downloads files that changed.
+
+<!-- prettier-ignore -->
+> [!NOTE]
+> If the sync fails with HTTP 403 (`AuthorizationFailure`), the storage
+> firewall doesn't allow your current IP address. See
+> [Troubleshoot: your home IP address changed](../../../how-to/azure-vm/troubleshoot-home-ip-change.md).
 
 ## Step 3: start the stack
 
@@ -122,13 +127,13 @@ Use these commands to stop or reset the stack.
 > restarting the stack reuses the existing data. To force a fresh seed, run
 > `docker compose down -v` first to remove the database volume.
 
-## How the offline seed works
+## How the seed works
 
-The seeder is a small Python script, `src/dsv-db/refresh.py`. When
-`DSV_LOCAL_DATA_DIR` is set, it reads the local CSV files instead of downloading
-them; when it's unset, it downloads the live data. The two paths share the same
-parsing and loading code, so local testing exercises the same ingestion logic
-that runs in production.
+The seeder is a small Python script, `src/dsv-db/refresh.py`. It reads only
+the files in `./data` and stops with a message if `manifest.json` is
+missing. The Azure VMs use the same script and the same files, so local
+testing exercises the same loading logic that runs in production. For the
+whole data path, see [App architecture](../../../ref/app-architecture.md).
 
 The DineSafe CSV files mix character encodings across years (older files are
 UTF-8, newer ones are Windows-1252). The seeder detects and handles both, so
@@ -140,7 +145,8 @@ Use these checks when the stack doesn't come up as expected.
 
 ### The seeder exits with an error
 
-Check the seeder logs for the specific failure:
+If the logs say `/data/manifest.json is missing`, run `scripts/data.sh local`
+first. For other failures, check the seeder logs:
 
 ```bash
 docker compose logs dsv-init-db
