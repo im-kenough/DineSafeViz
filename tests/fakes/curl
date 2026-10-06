@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Test double for curl, used through PATH by tests/test_fetch_secrets.py and
+# tests/test_deploy.py. Logs its arguments to $FAKE_LOG.
+#
+# IMDS token requests return a fixed token. Key Vault secret requests return
+# the contents of $FAKE_SECRETS_DIR/<name>, or a Key Vault error body and
+# exit 22 (what curl --fail-with-body does on an HTTP error).
+echo "curl $*" >> "${FAKE_LOG:-/dev/null}"
+url=${*: -1}
+
+case "$url" in
+  http://169.254.169.254/*)
+    if [[ -n ${FAKE_IMDS_DOWN:-} ]]; then
+      echo "curl: (28) Connection timed out" >&2
+      exit 28
+    fi
+    echo '{"access_token":"fake-token","expires_in":"86399"}'
+    ;;
+  https://*.vault.azure.net/secrets/*)
+    if [[ -n ${FAKE_KV_ERROR:-} ]]; then
+      printf '{"error":{"code":"Forbidden","message":"denied","innererror":{"code":"%s"}}}' "$FAKE_KV_ERROR"
+      exit 22
+    fi
+    name=${url##*/secrets/}
+    name=${name%%\?*}
+    if [[ -f $FAKE_SECRETS_DIR/$name ]]; then
+      jq -n --rawfile v "$FAKE_SECRETS_DIR/$name" '{value: $v}'
+    else
+      printf '{"error":{"code":"SecretNotFound","message":"A secret with (name/id) %s was not found in this key vault."}}' "$name"
+      exit 22
+    fi
+    ;;
+  *)
+    echo "fake curl: unexpected URL $url" >&2
+    exit 99
+    ;;
+esac

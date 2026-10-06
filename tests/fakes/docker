@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Test double for docker, used through PATH by tests/test_deploy.py.
+echo "docker $*" >> "${FAKE_LOG:-/dev/null}"
+case "$1 $2" in
+  "manifest inspect")
+    if [[ " ${FAKE_MISSING_IMAGES:-} " == *" ${3##*/} "* ]]; then
+      echo "no such manifest: $3" >&2
+      exit 1
+    fi
+    echo '{}'
+    ;;
+  "compose up")
+    # The --wait call checks health; the first call only starts the stack.
+    if [[ " $* " == *" --wait "* ]]; then
+      exit "${FAKE_UP_WAIT_EXIT:-0}"
+    fi
+    exit "${FAKE_UP_EXIT:-0}"
+    ;;
+  "compose wait")
+    code=0
+    [[ $3 == dsv-init-db ]] && code=${FAKE_INIT_DB_EXIT:-0}
+    echo "container \"fake\" exited with status code $code"
+    exit "$code"
+    ;;
+  "compose ps")
+    if [[ " $* " == *" --format json "* ]]; then
+      printf '%s\n' "${FAKE_PS_JSON:-}"
+    else
+      echo "NAME   STATUS"
+    fi
+    ;;
+  "compose logs")
+    echo "fake logs for ${*: -1}"
+    ;;
+  "compose exec")
+    if [[ $* == *"dsv-tunnel:2000/ready"* && -n ${FAKE_TUNNEL_NOT_READY:-} ]]; then
+      echo "wget: server returned error: HTTP/1.1 503 Service Unavailable" >&2
+      exit 1
+    fi
+    ;;
+  "compose pull" | "image prune")
+    ;;
+  *)
+    echo "fake docker: unexpected: $*" >&2
+    exit 99
+    ;;
+esac

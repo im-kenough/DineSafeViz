@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Test double for sleep, so retry loops in deploy.sh run instantly.
+echo "sleep $*" >> "${FAKE_LOG:-/dev/null}"

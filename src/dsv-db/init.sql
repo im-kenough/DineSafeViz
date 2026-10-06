@@ -1,5 +1,6 @@
-CREATE ROLE dinesafe_migrator WITH LOGIN PASSWORD 'dinesafe_migrator';
-CREATE ROLE dinesafe_app      WITH LOGIN PASSWORD 'dinesafe_app';
+-- Passwords are set by set-passwords.sh, which runs after this file.
+CREATE ROLE dinesafe_migrator WITH LOGIN;
+CREATE ROLE dinesafe_app      WITH LOGIN;
 
 CREATE TABLE inspections (
     id                          SERIAL PRIMARY KEY,
@@ -33,6 +34,9 @@ CREATE INDEX inspections_inspection_date_idx ON inspections (inspection_date);
 GRANT CONNECT ON DATABASE dinesafe TO dinesafe_app;
 GRANT USAGE   ON SCHEMA public       TO dinesafe_app;
 GRANT SELECT ON TABLE inspections TO dinesafe_app; -- SELECT only: Flask app is read-only; dsv-init-db handles writes
+
+-- Caps every app and Grafana query, including anonymous Grafana API queries.
+ALTER ROLE dinesafe_app SET statement_timeout = '10s';
 
 GRANT CONNECT ON DATABASE dinesafe TO dinesafe_migrator;
 GRANT USAGE, CREATE ON SCHEMA public TO dinesafe_migrator;
