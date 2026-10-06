@@ -172,7 +172,6 @@ activemq-data/
 # the VMs and fetch-secrets.sh temp files. Commit only the examples.
 *.env
 .env.*
-!.env.example
 !*.env-example
 .envrc
 .venv

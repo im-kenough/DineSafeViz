@@ -19,6 +19,7 @@ def ignored(path):
     ".env.Ab12Cd",  # fetch-secrets.sh temp file
     "deploy/stg.env",
     "deploy/prod.env",
+    "deploy/dev.env",
     "src/dsv-app/.env",
     "infra/some/dir/prod.env",
 ])
@@ -27,7 +28,7 @@ def test_real_env_files_are_ignored(path):
 
 
 @pytest.mark.parametrize("path", [
-    ".env.example",
+    "deploy/dev.env-example",
     "deploy/stg.env-example",
     "deploy/prod.env-example",
     "tests/compose/local.env-test",

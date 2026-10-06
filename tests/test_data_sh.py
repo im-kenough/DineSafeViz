@@ -16,7 +16,7 @@ def docker_calls(log):
     return [line for line in calls(log) if line.startswith("docker ")]
 
 
-@pytest.mark.parametrize("args", [(), ("dev",), ("stg", "--bogus"), ("local", "--historical")])
+@pytest.mark.parametrize("args", [(), ("local",), ("stg", "--bogus"), ("dev", "--historical")])
 def test_rejects_bad_arguments(vm_repo, args):
     repo, env, log = vm_repo
     assert data_sh(repo, env, *args).returncode == 2
@@ -90,9 +90,9 @@ def test_imds_failure_runs_nothing(vm_repo):
     assert docker_calls(log) == []
 
 
-def test_local_syncs_only_with_az_token(vm_repo):
+def test_dev_syncs_only_with_az_token(vm_repo):
     repo, env, log = vm_repo
-    result = data_sh(repo, env, "local")
+    result = data_sh(repo, env, "dev")
     assert result.returncode == 0, result.stderr
     assert any(line.startswith("az account get-access-token --resource https://storage.azure.com/")
                for line in calls(log))
@@ -101,11 +101,28 @@ def test_local_syncs_only_with_az_token(vm_repo):
     assert "stdsvstg01" in docker[0]
 
 
-def test_local_without_az_login_explains(vm_repo):
+def test_dev_without_az_login_explains(vm_repo):
     repo, env, log = vm_repo
-    result = data_sh(repo, {**env, "FAKE_AZ_LOGGED_OUT": "1"}, "local")
+    result = data_sh(repo, {**env, "FAKE_AZ_LOGGED_OUT": "1"}, "dev")
     assert result.returncode == 1
     assert "az login" in result.stderr
+
+
+def test_dev_reads_the_account_from_dev_env(vm_repo):
+    repo, env, log = vm_repo
+    with open(repo / "deploy" / "dev.env", "a") as f:
+        f.write("DSV_STORAGE_ACCOUNT=stdsvdevtest01\n")
+    assert data_sh(repo, env, "dev").returncode == 0
+    assert "-e DSV_STORAGE_ACCOUNT=stdsvdevtest01" in docker_calls(log)[0]
+
+
+def test_dev_without_settings_file_names_the_example(vm_repo):
+    repo, env, log = vm_repo
+    (repo / "deploy" / "dev.env").unlink()
+    result = data_sh(repo, env, "dev")
+    assert result.returncode == 1
+    assert "deploy/dev.env-example" in result.stderr
+    assert calls(log) == []
 
 
 def test_unwritable_data_dir_explains_the_fix(vm_repo):

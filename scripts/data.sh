@@ -3,12 +3,12 @@
 # optionally loads them into Postgres.
 #
 # Usage: scripts/data.sh stg|prod [--historical] [--load]   on the VM
-#        scripts/data.sh local [--load]                      on a workstation
+#        scripts/data.sh dev [--load]                        on a workstation
 #
 # On the VM, gets a token for Azure Storage (and nothing else) from IMDS as
 # the VM's managed identity, then runs dsv-data fetch and dsv-data sync.
-# Locally, gets the token from your az login (dsv-ops01, Blob Data Reader on
-# stg) and runs sync only. The token reaches the container as a mode-600
+# On dev, gets the token from your az login (dsv-ops01, Blob Data Reader on
+# stg) and runs sync only. The account comes from deploy/<env>.env. The token reaches the container as a mode-600
 # file, never as an argument or environment variable, and is deleted on exit.
 #
 # Exit codes: 0 ok, 1 error, 2 usage, 3 fetch failed but the existing Blob
@@ -18,7 +18,7 @@ set -euo pipefail
 IMDS_URL="http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fstorage.azure.com%2F"
 
 usage() {
-  echo "usage: data.sh stg|prod [--historical] [--load] | data.sh local [--load]" >&2
+  echo "usage: data.sh stg|prod [--historical] [--load] | data.sh dev [--load]" >&2
   exit 2
 }
 
@@ -28,12 +28,12 @@ die() {
 }
 
 env_name=${1:-}
-[[ $env_name == stg || $env_name == prod || $env_name == local ]] || usage
+[[ $env_name == stg || $env_name == prod || $env_name == dev ]] || usage
 shift
 historical=() load=
 for arg in "$@"; do
   case $arg in
-    --historical) [[ $env_name != local ]] || usage; historical=(--historical) ;;
+    --historical) [[ $env_name != dev ]] || usage; historical=(--historical) ;;
     --load) load=1 ;;
     *) usage ;;
   esac
@@ -49,20 +49,20 @@ for dir in data data/dinesafe-historical; do
     || die "./$dir isn't writable by $(id -un). Run: sudo chown -R $(id -u):$(id -g) data"
 done
 
-if [[ $env_name == local ]]; then
-  account=${DSV_STORAGE_ACCOUNT:-stdsvstg01}
+settings=deploy/$env_name.env
+[[ -f $settings ]] \
+  || die "$settings is missing. Copy deploy/$env_name.env-example to deploy/$env_name.env first."
+# Last assignment wins, as it does when compose reads the copied .env.
+account=$(sed -n 's/^DSV_STORAGE_ACCOUNT=//p' "$settings" | tail -n 1)
+[[ -n $account ]] || die "DSV_STORAGE_ACCOUNT is missing from $settings"
+[[ $account =~ ^[a-z0-9]{3,24}$ ]] \
+  || die "DSV_STORAGE_ACCOUNT in $settings isn't a valid storage account name: '$account'"
+
+if [[ $env_name == dev ]]; then
   token=$(az account get-access-token --resource https://storage.azure.com/ \
     --query accessToken -o tsv) \
     || die "can't get a storage token. Run az login as dsv-ops01 first."
 else
-  settings=deploy/$env_name.env
-  [[ -f $settings ]] \
-    || die "$settings is missing. Copy deploy/$env_name.env-example to deploy/$env_name.env first."
-  # Last assignment wins, as it does when compose reads the copied .env.
-  account=$(sed -n 's/^DSV_STORAGE_ACCOUNT=//p' "$settings" | tail -n 1)
-  [[ -n $account ]] || die "DSV_STORAGE_ACCOUNT is missing from $settings"
-  [[ $account =~ ^[a-z0-9]{3,24}$ ]] \
-    || die "DSV_STORAGE_ACCOUNT in $settings isn't a valid storage account name: '$account'"
   token=$(curl -sS --fail-with-body --max-time 5 -H Metadata:true "$IMDS_URL" \
     | jq -r .access_token) \
     || die "can't get a token from IMDS. Run this on the Azure VM, with its managed identity attached."
@@ -83,7 +83,7 @@ run_data() {
 }
 
 status=0
-if [[ $env_name != local ]]; then
+if [[ $env_name != dev ]]; then
   if ! run_data fetch "${historical[@]}"; then
     echo "data: fetch failed; continuing with the data already in $account" >&2
     status=3

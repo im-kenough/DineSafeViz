@@ -1,19 +1,23 @@
 #!/usr/bin/env bash
-# Deploys DineSafeViz on its Azure VM.
+# Deploys DineSafeViz on its Azure VM, or on your workstation.
 #
 # Usage: scripts/deploy.sh stg main
 #        scripts/deploy.sh prod vX.Y.Z
+#        scripts/deploy.sh dev
 #
-# Resolves the ref to a commit, confirms that commit's images are in GHCR,
-# checks it out, writes .env from Key Vault, syncs the CSVs from Blob Storage,
-# then pulls and starts the stack.
+# stg and prod: resolves the ref to a commit, confirms that commit's images
+# are in GHCR, checks it out, writes .env from Key Vault, syncs the CSVs from
+# Blob Storage, then pulls and starts the stack.
+# dev: deploys the working tree as it is. Writes .env from deploy/dev.env,
+# syncs the CSVs from stg Blob Storage (needs az login), then builds and
+# starts the stack on http://localhost:8080.
 # Exits non-zero, with the failing services' logs printed last, if anything
 # goes wrong. Everything runs inside main() so bash reads the whole script
 # before the checkout can replace this file.
 set -euo pipefail
 
 usage() {
-  echo "usage: deploy.sh stg main | deploy.sh prod vX.Y.Z" >&2
+  echo "usage: deploy.sh stg main | deploy.sh prod vX.Y.Z | deploy.sh dev" >&2
   exit 2
 }
 
@@ -40,9 +44,27 @@ fail() {
   exit 1
 }
 
+# Writes .env, syncs the CSVs, then builds and starts the stack. Same order
+# and waits as the VM deploy in main().
+deploy_dev() {
+  local repo_dir=$1 data_status=0
+  "$repo_dir/scripts/fetch-secrets.sh" dev
+  "$repo_dir/scripts/data.sh" dev || data_status=$?
+  [[ $data_status == 0 ]] || die "scripts/data.sh failed, so the stack wasn't started"
+  docker compose up -d --build --remove-orphans || fail
+  docker compose wait dsv-init-db >/dev/null || fail
+  docker compose wait dsv-init-analytics >/dev/null || fail
+  docker compose up -d --no-build --wait --wait-timeout 600 \
+    dsv-nginx dsv-app dsv-db dsv-analytics || fail
+  docker compose exec -T dsv-nginx wget -q -O /dev/null http://127.0.0.1/healthz \
+    || fail dsv-nginx dsv-app
+  echo "deploy: dev is running on http://localhost:8080"
+}
+
 main() {
   local env_name=${1:-} ref=${2:-}
   case "$env_name:$ref" in
+    dev:) ;;
     stg:main) ;;
     prod:v*) [[ $ref =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || usage ;;
     *) usage ;;
@@ -53,6 +75,10 @@ main() {
   cd "$repo_dir"
   [[ -f deploy/$env_name.env ]] \
     || die "deploy/$env_name.env is missing. Copy deploy/$env_name.env-example to deploy/$env_name.env first."
+  if [[ $env_name == dev ]]; then
+    deploy_dev "$repo_dir"
+    return
+  fi
 
   # 1. Resolve the ref to a commit and image tag without changing anything.
   local commit tag dirty
