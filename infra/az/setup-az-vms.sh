@@ -6,10 +6,11 @@ set -euo pipefail
 # Tags
 #################################
 create_tags(){
-    for id in $(az group show -n $RG --query id -o tsv) \
-            $(az keyvault show -n kv-dsv-$ENV --query id -o tsv); do
-    az tag update --resource-id "$id" --operation Merge --tags $TAGS -o none
-    done    
+    # $TAGS is deliberately unquoted so each tag becomes its own argument
+    for id in $(az group show -n "$RG" --query id -o tsv) \
+            $(az keyvault show -n "kv-dsv-$ENV" --query id -o tsv); do
+        az tag update --resource-id "$id" --operation Merge --tags $TAGS -o none
+    done
 }
 
 verify_tags(){
@@ -23,14 +24,15 @@ verify_tags(){
 #################################
 
 create_nsg(){
-    az network nsg create -g $RG -n $NSG_NAME -l $LOC --tags $TAGS -o none
+    az network nsg create -g "$RG" -n "$NSG_NAME" -l "$LOC" --tags $TAGS -o none
 }
 
 configure_nsg_rule(){
-    az network nsg rule create -g $RG --nsg-name $NSG_NAME -n $NSG_RULE_NAME \
-        --priority $PRIORITY --direction $DIRECTION --access $ACCESS --protocol $PROTOCOL \
-        --source-address-prefixes "$HOME_IP/$SRC_MASK" --source-port-ranges $SRC_PORT_RANGES \
-        --destination-address-prefixes $DST_ADDR_PREFIXES --destination-port-ranges $DST_PORT_RANGES -o none
+    # quoted so '*' reaches az literally instead of globbing to filenames
+    az network nsg rule create -g "$RG" --nsg-name "$NSG_NAME" -n "$NSG_RULE_NAME" \
+        --priority "$PRIORITY" --direction "$DIRECTION" --access "$ACCESS" --protocol "$PROTOCOL" \
+        --source-address-prefixes "$HOME_IP/$SRC_MASK" --source-port-ranges "$SRC_PORT_RANGES" \
+        --destination-address-prefixes "$DST_ADDR_PREFIXES" --destination-port-ranges "$DST_PORT_RANGES" -o none
 }
 
 main() {
@@ -55,22 +57,22 @@ main() {
     az login
     az account set --subscription dsv-$ENV
     
-    create_tags $RG $ENV $TAGS
+    create_tags
     verify_tags
 
     NSG_NAME=nsg-dsv-$ENV-app
-    create_nsgs $RG $NSG_NAME $LOC $TAGS $HOME_IP
+    create_nsg
     
     NSG_RULE_NAME=AllowSshFromHome
     PRIORITY=100
     DIRECTION=Inbound
     ACCESS=Allow
-    PROTOCOL=TcP
+    PROTOCOL=Tcp
     SRC_MASK=32
     SRC_PORT_RANGES='*'
     DST_ADDR_PREFIXES='*'
     DST_PORT_RANGES=22
-    configure_nsg_rule $RG $NSG_NAME $NSG_RULE_NAME $PRIORITY $DIRECTION $ACCESS $PROTOCOL $HOME_IP $SRC_MASK $SRC_PORT_RANGES $DST_ADDR_PREFIXES $DST_PORT_RANGES
+    configure_nsg_rule
 
 
 }
