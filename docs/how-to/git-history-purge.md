@@ -1,8 +1,9 @@
 # Purge the old CSVs from git history
 
 This runbook removes the DineSafe CSVs from every commit in the repository,
-so new clones no longer download about 120 MB of data that now lives in
-Azure Blob Storage. It also removes a Terraform provider binary and state
+so new clones no longer download data that now lives in Azure Blob Storage.
+The CSVs are about 240 MB uncompressed, and they make up about 30 MiB of the
+34 MiB pack. It also removes a Terraform provider binary and state
 file that were committed by mistake. You run it once, by hand, after these
 files are gone from `main`.
 
@@ -71,6 +72,7 @@ Run the rewrite in a second, fresh mirror clone, never in your working clone.
     git filter-repo --invert-paths \
       --path src/data \
       --path src/db/Dinesafe.csv \
+      --path db/Dinesafe.csv \
       --path docs/ref/local-data \
       --path docs/rug/0-needs-review/ref/local-data \
       --path docs/0-needs-review/ref/local-data \
@@ -78,7 +80,7 @@ Run the rewrite in a second, fresh mirror clone, never in your working clone.
       --path infra/rug/terraform/terraform.tfstate
     ```
 
-3.  Record the new size. It's about 120 MB smaller:
+3.  Record the new size. It drops from about 34 MiB to under 4 MiB:
 
     ```bash
     git count-objects -vH | grep size-pack
@@ -105,7 +107,7 @@ Add it back, then force-push every branch and tag.
 
 ## Re-clone on each VM
 
-Each VM's clone still holds the old history and its 120 MB of CSVs. Replace
+Each VM's clone still holds the old history and its CSVs. Replace
 the clone and keep the two files that aren't in git.
 
 The rewritten commits have new SHAs, so stg's `sha-<commit>` images don't
@@ -159,7 +161,7 @@ git count-objects -vH | grep size-pack
 git log --all --oneline -- '*.csv' '*/.terraform/*' '*.tfstate' | head
 ```
 
-The pack is about 120 MB smaller than the backup's, and `git log` prints
+The pack is under 4 MiB, against about 34 MiB for the backup, and `git log` prints
 nothing. After both VMs deploy from their new clones, delete
 `dsv-backup.git` and `dsv-purge.git`.
 
