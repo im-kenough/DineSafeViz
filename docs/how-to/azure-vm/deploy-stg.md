@@ -12,8 +12,9 @@ The Azure, Cloudflare, and GitHub pieces come from the
 [Azure checklist](azure-checklist.md). Confirm each of the following before
 you start:
 
-- `vm-dsv-stg01` exists, runs Ubuntu 24.04 LTS, and has `id-dsv-stg01-vm` as
-  its only managed identity (checklist steps 3 and 6.3).
+- `vm-dsv-stg01` exists as a `Standard_B2als_v2` (4 GiB), runs Ubuntu 24.04
+  LTS, and has `id-dsv-stg01-vm` as its only managed identity (checklist
+  steps 3 and 6.3).
 - You've run `infra/az/harden-vm.sh` on the VM, and a new SSH login still
   works (checklist step 6.3).
 - `kv-dsv-stg01` holds all five secrets, including `dsv-tunnel-token`
@@ -149,11 +150,10 @@ cd ~/DineSafeViz
 ./scripts/deploy.sh stg main
 ```
 
-The first deploy takes about 6 to 10 minutes. `dsv-init-db` downloads the
+The first deploy takes several minutes, because `dsv-init-db` downloads the
 inspection CSVs from Toronto Open Data and loads them, while Grafana runs its
-schema migrations on a new database. Both compete for the VM's memory: `free
--h` reports about 836 MiB total, not 1 GiB, so expect a few hundred MiB of
-swap in use afterward. The script ends with a line like this:
+schema migrations on a new database. Later deploys run the shorter daily
+refresh instead. The script ends with a line like this:
 
 ```text
 deploy: stg is running sha-4626289 (4626289...)
@@ -222,7 +222,7 @@ errors you're most likely to see on a first stg deploy.
 | `can't read ... from kv-dsv-stg01: ForbiddenByRbac` | `id-dsv-stg01-vm` lacks Key Vault Secrets User, or the role was just assigned. Wait a few minutes. |
 | `... must contain only letters, digits, and . _ ~ -` | Regenerate that secret with `openssl rand -hex 32`. See checklist step 4.4. |
 | `dsv-init-db` exits non-zero or is `OOMKilled` | Check `free -h` for the swap file, then `docker compose logs dsv-init-db`. |
-| `dependency failed to start: container dsv-dsv-analytics-1 is unhealthy` | Grafana's first-start migrations outlasted its health check, so nginx and the tunnel never started. Wait for `docker compose ps` to show `dsv-analytics` as `healthy`, then rerun `deploy.sh`. `docker-compose.vm.yml` allows 300 seconds, so this means the VM is short on memory. Check `free -h`. |
+| `dependency failed to start: container dsv-dsv-analytics-1 is unhealthy` | Grafana's first-start migrations outlasted its health check, so nginx and the tunnel never started. Wait for `docker compose ps` to show `dsv-analytics` as `healthy`, then rerun `deploy.sh`. `docker-compose.vm.yml` allows 300 seconds, so this means the VM is short on memory. Check `free -h`, and confirm the VM is a `Standard_B2als_v2` (checklist step 6.3). |
 | `dsv-db` never becomes healthy | `DSV_DB_NAME` must be `dinesafe`. Check `deploy/stg.env`. |
 | Smoke test fails on `dsv-tunnel` | The tunnel token is wrong or was rotated. See checklist step 9.3. |
 | Site returns `502` but the app is healthy | Run `docker compose restart dsv-nginx`. nginx kept the app's old IP address. |
