@@ -8,9 +8,9 @@ DineSafeViz uses the following images. Use the latest LTS or stable release when
   
 
 ## Postgres
-- [postgres:17.10](https://hub.docker.com/_/postgres/tags)
-  - https://www.postgresql.org/support/versioning/
-  - https://endoflife.date/postgresql
+- https://hub.docker.com/_/postgres/tags
+- https://www.postgresql.org/support/versioning/
+- https://endoflife.date/postgresql
 
 ## Grafana
 - https://github.com/grafana/grafana/releases
