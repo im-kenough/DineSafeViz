@@ -34,3 +34,9 @@ def test_real_env_files_are_ignored(path):
 ])
 def test_examples_and_fixtures_are_not_ignored(path):
     assert not ignored(path)
+
+
+@pytest.mark.parametrize("path", ["data/Dinesafe.csv", "data/manifest.json",
+                                  "data/dinesafe-historical/dinesafe_hist_2001.csv"])
+def test_synced_data_is_ignored(path):
+    assert ignored(path)
