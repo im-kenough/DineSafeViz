@@ -141,8 +141,8 @@ def test_dollar_and_slash_survive_compose_interpolation(vm_repo, tmp_path):
     assert result.stdout == "a$b/c+d=\n"
 
 
-# The Grafana admin password goes into a basic-auth URL in
-# dsv-init-analytics, where / @ : # ? % would corrupt it silently.
+# Generated secrets stay URL-safe: / @ : # ? % would corrupt a connection
+# string or basic-auth URL silently.
 def test_rejects_url_unsafe_generated_secret(vm_repo):
     repo, env, _ = vm_repo
     (repo / ".env").write_text("OLD=1\n")

@@ -48,7 +48,6 @@ def test_stg_deploys_main_by_its_commit_tag(vm_repo):
     assert ("docker compose up -d --no-build --wait --wait-timeout 600 "
             "dsv-tunnel dsv-nginx dsv-app dsv-db dsv-analytics") in lines
     assert "docker compose wait dsv-init-db" in lines
-    assert "docker compose wait dsv-init-analytics" in lines
     assert ran(lines, "docker image prune")
     assert "DSV_VERSION=sha-abc1234\n" in (repo / ".env").read_text()
     assert "kv-dsv-stg01" in log.read_text()
@@ -75,7 +74,7 @@ def test_jobs_are_waited_on_before_health_and_wait_skips_them(vm_repo):
     assert deploy(repo, env, "stg", "main").returncode == 0
     lines = calls(log)
     up_wait = first(lines, "docker compose up -d --no-build --wait")
-    assert first(lines, "docker compose wait dsv-init-analytics") < up_wait
+    assert first(lines, "docker compose wait dsv-init-db") < up_wait
     assert "dsv-init" not in lines[up_wait]
 
 
@@ -265,7 +264,7 @@ def test_dev_builds_and_starts_the_working_tree(vm_repo):
         first(lines, "az account get-access-token")
         < first(lines, "docker compose --profile data run")
         < first(lines, "docker compose up -d --build --remove-orphans")
-        < first(lines, "docker compose wait dsv-init-analytics")
+        < first(lines, "docker compose wait dsv-init-db")
         < first(lines, "docker compose up -d --no-build --wait")
     )
     up_wait = lines[first(lines, "docker compose up -d --no-build --wait")]

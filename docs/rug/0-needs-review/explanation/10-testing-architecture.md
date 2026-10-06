@@ -102,8 +102,7 @@ sense but provide runtime health verification:
   startup on a healthy database.
 - **Grafana:** `wget` against `/analytics/api/health` with a 5-second
   interval and 5 retries. Grafana returns 503 when its database check fails.
-  `dsv-nginx` and `dsv-init-analytics` wait for `service_healthy` before
-  starting.
+  `dsv-nginx` waits for `service_healthy` before starting.
 
 ## Dependency scanning
 

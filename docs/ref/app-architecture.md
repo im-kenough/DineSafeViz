@@ -24,7 +24,6 @@ published images, networks, hardening, and memory limits.
 | `dsv-app`            | `ghcr.io/im-kenough/dsv-app`         | `backend`           | Flask app. Read-only database role.                         |
 | `dsv-db`             | `postgres`                           | `backend`           | Postgres with the `inspections` table.                      |
 | `dsv-analytics`      | `grafana/grafana`                    | `backend`           | Dashboards. Read-only database role.                        |
-| `dsv-init-analytics` | `curlimages/curl`                    | `backend`           | One-shot: lets anonymous viewers see the dashboard.         |
 | `dsv-init-db`        | `ghcr.io/im-kenough/dsv-init-db`     | `backend`           | One-shot: loads `./data` into Postgres with `refresh.py`.   |
 | `dsv-data`           | `ghcr.io/im-kenough/dsv-init-db`     | `egress`            | On demand: `data.py fetch` and `sync`. Profile `data`.      |
 

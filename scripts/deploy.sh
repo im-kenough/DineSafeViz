@@ -55,7 +55,6 @@ start_stack() {
   shift
   docker compose up -d "$up_flag" --remove-orphans || fail
   docker compose wait dsv-init-db >/dev/null || fail
-  docker compose wait dsv-init-analytics >/dev/null || fail
   docker compose up -d --no-build --wait --wait-timeout 600 "$@" || fail
   docker compose exec -T dsv-nginx wget -q -O /dev/null http://127.0.0.1/healthz \
     || fail dsv-nginx dsv-app

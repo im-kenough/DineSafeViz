@@ -87,8 +87,9 @@ for pair in "${SECRETS[@]}"; do
   if [[ -z $value || $value == *"'"* || $value == *$'\n'* ]]; then
     die "$(secret_label "$var" "$name") is empty or contains a single quote or newline, which .env can't hold"
   fi
-  # Generated secrets also end up in URLs (Grafana basic auth), where / @ : #
-  # ? % would corrupt them. The tunnel token comes from Cloudflare as base64.
+  # Generated secrets stay URL-safe, so one can go into a connection string or
+  # basic-auth URL without escaping. The tunnel token comes from Cloudflare as
+  # base64.
   if [[ $var != DSV_TUNNEL_TOKEN && ! $value =~ ^[A-Za-z0-9._~-]+$ ]]; then
     die "$(secret_label "$var" "$name") must contain only letters, digits, and . _ ~ -. Generate it with: openssl rand -hex 32"
   fi

@@ -58,7 +58,7 @@ def test_local_db_runs_set_passwords_after_init_sql(local):
 
 
 LONG_RUNNING = ["dsv-tunnel", "dsv-nginx", "dsv-app", "dsv-db", "dsv-analytics"]
-ONE_SHOT = ["dsv-init-db", "dsv-init-analytics", "dsv-data"]
+ONE_SHOT = ["dsv-init-db", "dsv-data"]
 VM_FILES = ("docker-compose.yml", "docker-compose.vm.yml")
 
 
@@ -122,7 +122,6 @@ def test_vm_networks(vm):
         "dsv-analytics": {"backend"},
         "dsv-init-db": {"backend"},
         "dsv-data": {"egress"},
-        "dsv-init-analytics": {"backend"},
     }
 
 

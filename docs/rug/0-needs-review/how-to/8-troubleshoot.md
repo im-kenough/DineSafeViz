@@ -144,7 +144,6 @@ dashboard still does not load, check the health status and the logs.
 ```bash
 docker compose ps dsv-analytics
 docker compose logs dsv-analytics
-docker compose logs dsv-init-analytics
 ```
 
 ## Port already in use
