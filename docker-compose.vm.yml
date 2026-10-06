@@ -97,6 +97,11 @@ services:
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
       GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
       DSV_DB_PASSWORD: ${DSV_DB_APP_PASSWORD:?}
+    # The first start on a new VM runs Grafana's schema migrations while
+    # dsv-init-db loads the CSVs, and took over 100s on stg (October 6, 2026).
+    # Later starts are healthy within seconds. Merges with the base healthcheck.
+    healthcheck:
+      start_period: 300s
     networks:
       backend:
         # Fixed so admins can tunnel to it: ssh -L 3000:172.30.10.30:3000
