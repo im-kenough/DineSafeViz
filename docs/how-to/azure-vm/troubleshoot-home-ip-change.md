@@ -1,7 +1,7 @@
 # Troubleshoot: your home IP address changed
 
-This guide explains how to restore access to the Azure VMs and key vaults when
-your home public IP address changes. It lists the symptoms, which account to
+This guide explains how to restore access to the Azure VMs, key vaults, and
+storage accounts when your home public IP address changes. It lists the symptoms, which account to
 use for each environment, and the portal and Azure CLI steps.
 
 <!-- prettier-ignore -->
@@ -12,7 +12,7 @@ use for each environment, and the portal and Azure CLI steps.
 
 ## Symptoms
 
-Two firewall rules trust your home IP address. When it changes, both stop
+Three firewall rules trust your home IP address. When it changes, they stop
 matching, and you see these errors:
 
 - **SSH to the VM times out.** The NSG rule `AllowSshFromHome` on
@@ -20,14 +20,17 @@ matching, and you see these errors:
 - **Key Vault returns `403 Forbidden` with `ForbiddenByFirewall`.** The vault
   firewall only allows your old address. In the portal, you can open the vault
   but can't list its secrets.
+- **`scripts/data.sh local` fails with HTTP 403 (`AuthorizationFailure`).**
+  The storage account firewall on `stdsv<env>01` only allows your old address.
 
 The site itself isn't affected. Visitors reach it through Cloudflare Tunnel,
-and the VM reaches Key Vault through its subnet's service endpoint, so neither
-depends on your IP address.
+and the VM reaches Key Vault and Blob Storage through its subnet's service
+endpoints, so none of them depend on your IP address.
 
 ## Why you can always fix it remotely
 
-Both rules filter traffic to the VM and to the vault's data plane only. Changing
+These rules filter traffic to the VM and to the vault's and storage
+account's data planes only. Changing
 the rules goes through Azure Resource Manager, which isn't restricted by your
 IP address. You can update them from any network, as long as your account has
 the right role.
@@ -43,12 +46,12 @@ change prod infrastructure.
 | prod        | `dsv-admin01` | Owner at the Tenant Root Group                     |
 
 `dsv-ops01` has only Reader on `rg-dsv-prod01`, so it can't edit the prod NSG
-or vault firewall. Sign in as `dsv-admin01` for prod, make only these two
-changes, then sign out.
+or firewalls. Sign in as `dsv-admin01` for prod, make only these changes,
+then sign out.
 
 ## Update the rules
 
-Update both rules for each environment you use, then remove your old address.
+Update every rule for each environment you use, then remove your old address.
 
 1.  Find your current public IPv4 address. Key Vault firewall rules support
     IPv4 only, so force IPv4:
@@ -58,13 +61,15 @@ Update both rules for each environment you use, then remove your old address.
     ```
 
 2.  Sign in with the account for the environment, and set the variables. This
-    example uses stg. For prod, use `dsv-admin01`, `ENV=prod01`, and
-    subscription `dsv-prod01`.
+    example uses stg. For prod, use `dsv-admin01`, `ENV=prod01`, and the ID
+    of subscription `sub-dsv-prod01`. Set `SUB_ID` to the subscription ID,
+    which `az account list -o table` shows.
 
     ```bash
     az login        # dsv-ops01 for stg, dsv-admin01 for prod
     ENV=stg01
-    az account set --subscription dsv-$ENV
+    SUB_ID=<subscription-id>
+    az account set --subscription "$SUB_ID"
     NEW_IP=$(curl -4 -s https://ifconfig.me)
     ```
 
@@ -93,11 +98,26 @@ Update both rules for each environment you use, then remove your old address.
       az keyvault network-rule remove -g rg-dsv-$ENV -n kv-dsv-$ENV --ip-address "<old-ip>/32"
       ```
 
-5.  Verify both paths:
+5.  Add your new address to the storage account firewall, and remove the
+    old one. Storage IP rules take a bare address, not a `/32` range.
+
+    - **Portal:** Go to **Storage accounts** > **stdsvstg01** >
+      **Networking**. Under **Firewall**, add your new address, delete the
+      old one, and then select **Save**.
+    - **CLI:**
+
+      ```bash
+      az storage account network-rule list -g rg-dsv-$ENV --account-name stdsv$ENV --query ipRules -o tsv
+      az storage account network-rule add -g rg-dsv-$ENV --account-name stdsv$ENV --ip-address "$NEW_IP"
+      az storage account network-rule remove -g rg-dsv-$ENV --account-name stdsv$ENV --ip-address "<old-ip>"
+      ```
+
+6.  Verify each path:
 
     ```bash
     az keyvault secret list --vault-name kv-dsv-$ENV --query "[].name" -o tsv
     ssh <admin-user>@<vm-public-ip> true && echo "SSH OK"
+    scripts/data.sh local        # stg only: syncs the CSVs into ./data
     ```
 
 Rule changes can take a few minutes to apply. If verification fails right away,
@@ -115,3 +135,5 @@ account. Don't use the break-glass account for routine rule updates.
   and role assignments.
 - [Configure network security for Azure Key Vault](https://learn.microsoft.com/azure/key-vault/general/network-security#firewall-settings):
   firewall rule limits and CLI reference.
+- [Create an IP network rule for Azure Storage](https://learn.microsoft.com/azure/storage/common/storage-network-security-ip-address-range):
+  storage firewall CLI reference.

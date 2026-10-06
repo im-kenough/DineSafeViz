@@ -117,6 +117,9 @@ deployment.
 | ------------------------- | ---------------------------- | -------------------- | ------------------------------------------------- | ------- |
 | `id-dsv-prod01-vm`        | Key Vault Secrets User       | `kv-dsv-prod01`      | `fetch-secrets.sh` reads secrets (read-only)      | Planned |
 | `id-dsv-stg01-vm`         | Key Vault Secrets User       | `kv-dsv-stg01`       | Same, for stg                                     | Planned |
+| `id-dsv-prod01-vm`        | Storage Blob Data Contributor | `stdsvprod01/dinesafe` container | `data.sh` uploads and syncs the CSVs  | Planned |
+| `id-dsv-stg01-vm`         | Storage Blob Data Contributor | `stdsvstg01/dinesafe` container  | Same, for stg                         | Planned |
+| `sg-dsv-stg01-operators`  | Storage Blob Data Reader     | `stdsvstg01/dinesafe` container  | `data.sh local` syncs the CSVs for local development | Planned |
 | `sg-dsv-prod01-operators` | Reader                       | `rg-dsv-prod01`      | See prod resources                                | Exists  |
 | `sg-dsv-prod01-operators` | Virtual Machine Contributor  | `vm-dsv-prod01`      | Start, stop, restart, and serial console          | Planned |
 | `sg-dsv-prod01-operators` | Disk Snapshot Contributor    | `rg-dsv-prod01-snapshots` | Create and delete pre-deploy snapshots       | Exists  |

@@ -1,0 +1,16 @@
+# Installed by docs/how-to/azure-vm/vm-first-time-setup.md, which fills in
+# @ADMIN_USER@, @REPO_DIR@, and @ENV@. Exit 3 (fetch failed, existing Blob
+# data loaded) shows as failed on purpose, so you notice it.
+[Unit]
+Description=DineSafeViz data refresh (Toronto Open Data -> Blob -> Postgres)
+Requires=docker.service
+After=docker.service network-online.target dsv-imds-block.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=@ADMIN_USER@
+WorkingDirectory=@REPO_DIR@
+ExecStart=@REPO_DIR@/scripts/data.sh @ENV@ --load
+# A stalled run must end, or the timer can't start the next one.
+TimeoutStartSec=30min

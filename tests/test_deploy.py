@@ -208,3 +208,44 @@ def test_dirty_tree_stops_before_anything_changes(vm_repo):
     assert not ran(lines, "git checkout")
     assert not ran(lines, "docker")
     assert not ran(lines, "curl")
+
+
+def test_data_is_synced_after_pull_and_before_start(vm_repo):
+    repo, env, log = vm_repo
+    assert deploy(repo, env, "stg", "main").returncode == 0
+    lines = calls(log)
+    sync = first(lines, "docker compose --profile data run")
+    assert first(lines, "docker compose pull") < sync < first(lines, "docker compose up")
+
+
+def test_data_sync_failure_stops_before_start(vm_repo):
+    repo, env, log = vm_repo
+    result = deploy(repo, {**env, "FAKE_SYNC_EXIT": "1"}, "stg", "main")
+    assert result.returncode != 0
+    assert not ran(calls(log), "docker compose up")
+
+
+def test_data_fetch_failure_warns_and_continues(vm_repo):
+    repo, env, log = vm_repo
+    result = deploy(repo, {**env, "FAKE_FETCH_EXIT": "1"}, "stg", "main")
+    assert result.returncode == 0, result.stderr
+    assert "fetch failed" in result.stderr
+    assert ran(calls(log), "docker compose up")
+
+
+def test_smoke_check_confirms_containers_cannot_reach_imds(vm_repo):
+    repo, env, log = vm_repo
+    assert deploy(repo, env, "stg", "main").returncode == 0
+    # IMDS answers 400 without these, which a bare wget would read as blocked.
+    imds = [line for line in calls(log)
+            if "169.254.169.254" in line and line.startswith("docker compose exec")]
+    assert len(imds) == 1
+    assert "Metadata: true" in imds[0]
+    assert "api-version=" in imds[0]
+
+
+def test_reachable_imds_fails_the_deploy(vm_repo):
+    repo, env, log = vm_repo
+    result = deploy(repo, {**env, "FAKE_IMDS_REACHABLE": "1"}, "stg", "main")
+    assert result.returncode != 0
+    assert "IMDS" in result.stderr

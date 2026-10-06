@@ -39,17 +39,21 @@ then a one-shot container fills it.
 > `DSV_DB_NAME` to anything else, the grants fail.
 
 <!-- prettier-ignore -->
-> [!IMPORTANT]
-> The code describes the refresh as a "daily cron," but this repository
-> doesn't schedule it. The refresh only runs when `dsv-init-db` runs, for
-> example on `docker compose up`.
+> [!NOTE]
+> On the Azure VMs, `dsv-data.timer` runs `scripts/data.sh <env> --load`
+> each business-day morning, which runs `dsv-init-db`. Locally, the refresh
+> only runs when `dsv-init-db` runs, for example on `docker compose up`.
 
 ### Data sources at runtime
 
-By default, `refresh.py` downloads both datasets from the Toronto Open Data
-CKAN portal (`RECENT_CSV_URL` and `HISTORICAL_ZIP_URL`). If you set
-`DSV_LOCAL_DATA_DIR=/data`, it reads files from the `docs/ref/local-data`
-bind mount instead:
+`refresh.py` has no network code. It reads the files under `DSV_DATA_DIR`
+(`/data`, the read-only `./data` bind mount) and exits non-zero if
+`manifest.json` is missing. `scripts/data.sh` fills `./data` from the
+`dinesafe` Blob container; `data.py fetch` fills the container from the
+Toronto Open Data CKAN portal (`RECENT_CSV_URL` and `HISTORICAL_ZIP_URL`).
+See [App architecture](app-architecture.md#data-path).
+
+- `manifest.json`: each file's name, base64 MD5, size, and row count.
 
 - `Dinesafe.csv`: the recent dataset.
 - `dinesafe-historical/*.csv`: the historical files, one per year.
@@ -71,7 +75,7 @@ bind mount instead:
 
 ### Refresh path
 
-`refresh()` downloads and maps the recent CSV first. Then, in one
+`refresh()` reads and maps the recent CSV first. Then, in one
 transaction, it runs `DELETE FROM inspections WHERE inspection_date >=
 cutoff`, inserts the new rows, and commits. Readers never see a partially
 loaded table. Historical rows stay in place because they're older than the

@@ -5,7 +5,8 @@
 #        scripts/deploy.sh prod vX.Y.Z
 #
 # Resolves the ref to a commit, confirms that commit's images are in GHCR,
-# checks it out, writes .env from Key Vault, then pulls and starts the stack.
+# checks it out, writes .env from Key Vault, syncs the CSVs from Blob Storage,
+# then pulls and starts the stack.
 # Exits non-zero, with the failing services' logs printed last, if anything
 # goes wrong. Everything runs inside main() so bash reads the whole script
 # before the checkout can replace this file.
@@ -92,6 +93,15 @@ $dirty"
   # jobs get `compose wait` (their exit code), and --wait lists only the
   # long-running services.
   docker compose pull --quiet
+  # Fetch and sync the CSVs so dsv-init-db has data, even on a new VM.
+  # Exit 3 means Toronto Open Data failed but the Blob copy synced.
+  local data_status=0
+  "$repo_dir/scripts/data.sh" "$env_name" || data_status=$?
+  case $data_status in
+    0) ;;
+    3) echo "deploy: warning: using the CSVs already in Blob Storage" >&2 ;;
+    *) die "scripts/data.sh failed, so the stack wasn't started" ;;
+  esac
   docker compose up -d --no-build --remove-orphans || fail
   docker compose wait dsv-init-db >/dev/null || fail
   docker compose wait dsv-init-analytics >/dev/null || fail
@@ -101,6 +111,13 @@ $dirty"
   # 6. Smoke test: nginx reaches the app, and the tunnel is connected.
   docker compose exec -T dsv-nginx wget -q -O /dev/null http://127.0.0.1/healthz \
     || fail dsv-nginx dsv-app
+  # Containers must not reach IMDS (dsv-imds-block.service).
+  # IMDS answers 400 without the header and api-version, which wget would
+  # report as a failure, so ask properly: success means it's reachable.
+  if docker compose exec -T dsv-nginx wget -q -T 3 -O /dev/null --header "Metadata: true" \
+      "http://169.254.169.254/metadata/instance?api-version=2021-02-01" 2>/dev/null; then
+    die "a container reached IMDS. Run: sudo systemctl restart dsv-imds-block"
+  fi
   # cloudflared's /ready returns 200 only while it has a live connection to
   # Cloudflare. (Searching its logs would match old lines, and grep -q on a
   # long log stream fails under pipefail.)

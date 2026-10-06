@@ -42,7 +42,8 @@ NET=$([ "$SHORT" = prod ] && echo 10.10 || echo 10.20)
 HOME_IP=$(curl -4 -s https://ifconfig.me)   # Key Vault rules are IPv4 only
 ADMIN_USER=<your-vm-admin-username>
 SSH_KEY=~/.ssh/id_ed25519_dsv_${ENV}_az_admin.pub   # this environment's admin key
-az account set --subscription dsv-$ENV
+SUB_ID=<subscription-id>                    # ID of sub-dsv-$ENV: az account list -o table
+az account set --subscription "$SUB_ID"
 echo "ENV=$ENV RG=$RG SUB=$(az account show --query name -o tsv)"; ls -l "$SSH_KEY"
 ```
 
@@ -155,7 +156,7 @@ subscription without `Microsoft.Compute`, `az vm list-usage` returns nothing.
 Both are subscription-scope changes, so run them as `dsv-admin01`. On October
 5, 2026, `Microsoft.Compute` and `Microsoft.Quota` were registered and the
 limit was set to 10 vCPUs on both subscriptions. The regional total vCPU limit
-is 10 in `dsv-stg01` and 20 in `dsv-prod01`; a VM counts against both limits.
+is 10 in `sub-dsv-stg01` and 20 in `sub-dsv-prod01`; a VM counts against both limits.
 
 - **Portal:**
   1. Open the subscription > **Settings** > **Resource providers**. Select
@@ -559,7 +560,7 @@ environment:
 
 | Environment | Size | vCPUs | Memory | Cost |
 | --- | --- | --- | --- | --- |
-| prod | `Standard_B2ats_v2` | 2 | 1 GiB | Covered by the free account's VM and disk allowances in `dsv-prod01` |
+| prod | `Standard_B2ats_v2` | 2 | 1 GiB | Covered by the free account's VM and disk allowances in `sub-dsv-prod01` |
 | stg | `Standard_B2als_v2` | 2 | 4 GiB | Billed, $0.0592 CAD per hour pay-as-you-go (about $43 per month if left running) |
 
 stg is larger because the 1 GiB size made the first deploy unreliable: the

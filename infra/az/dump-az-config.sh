@@ -58,9 +58,9 @@ dump_env(){
 
     # resolve the ID for the signed-in user, since several cached accounts
     # can see a subscription with the same name
-    sub=$(az account list --query "[?name=='dsv-$env' && user.name=='$USER_NAME'].id | [0]" -o tsv)
+    sub=$(az account list --query "[?name=='sub-dsv-$env' && user.name=='$USER_NAME'].id | [0]" -o tsv)
     if [[ -z $sub ]]; then
-        echo "Skipping $env: $USER_NAME can't see subscription dsv-$env" >&2
+        echo "Skipping $env: $USER_NAME can't see subscription sub-dsv-$env" >&2
         return
     fi
     local S=(--subscription "$sub")

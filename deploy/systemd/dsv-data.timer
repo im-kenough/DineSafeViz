@@ -1,0 +1,10 @@
+[Unit]
+Description=Run dsv-data.service on business-day mornings
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 07:30:00 America/Toronto
+RandomizedDelaySec=10m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

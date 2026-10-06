@@ -80,11 +80,23 @@ services:
     image: ghcr.io/im-kenough/dsv-init-db:${DSV_VERSION:?}
     environment:
       DSV_DB_PASSWORD: ${DSV_DB_PASSWORD:?}
-    # egress: downloads the inspection CSVs from the Toronto Open Data portal.
-    networks: [backend, egress]
+    # backend only: reads the CSVs from ./data, which dsv-data fills.
+    networks: [backend]
     # Measured peak about 430 MiB on the full data load (October 5, 2026);
     # refresh.py reads each CSV into memory. One-shot, so swap absorbs it.
     mem_limit: 640m
+
+  dsv-data:
+    <<: *hardening
+    image: ghcr.io/im-kenough/dsv-init-db:${DSV_VERSION:?}
+    # egress: Toronto Open Data and the storage account. No backend, so it
+    # can't reach the database.
+    networks: [egress]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    # Holds one decoded CSV (about 40 MB raw) while validating it.
+    mem_limit: 384m
 
   dsv-analytics:
     <<: *hardening
@@ -127,5 +139,5 @@ networks:
     ipam:
       config:
         - subnet: 172.30.10.0/24
-  # Only dsv-init-db, for the CSV download.
+  # Only dsv-data: Toronto Open Data and the storage account.
   egress: {}

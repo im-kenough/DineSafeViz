@@ -1,17 +1,15 @@
-"""DineSafe data ingestion: initial seed and daily refresh.
+"""DineSafe data loader: initial seed and refresh from local CSVs.
 
-Detects whether the inspections table is empty:
+Reads the CSVs that scripts/data.sh mirrors from Azure Blob Storage into
+DSV_DATA_DIR. Detects whether the inspections table is empty:
 - Empty:     seeds historical (2001-2022) + recent (2023-present) data
-- Non-empty: replaces recent data from Toronto Open Data daily CSV
+- Non-empty: replaces recent data from Dinesafe.csv
 """
 
 import csv
 import io
 import os
 import re
-import tempfile
-import zipfile
-from urllib.request import urlretrieve
 
 import psycopg2
 
@@ -19,29 +17,17 @@ import psycopg2
 # Configuration
 # ---------------------------------------------------------------------------
 
-RECENT_CSV_URL = (
-    "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/"
-    "b6b4f3fb-2e2c-47e7-931d-b87d22806948/resource/"
-    "af0f5b8a-4b73-4a50-8781-65e949792b40/download/dinesafe.csv"
-)
-
-HISTORICAL_ZIP_URL = (
-    "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/"
-    "b6b4f3fb-2e2c-47e7-931d-b87d22806948/resource/"
-    "c0a5f6b0-534a-47c3-867d-d4b5cc84a656/download/"
-    "Dinesafe%20Historical%20Data.zip"
-)
-
 DSV_DB_HOST = os.environ.get("DSV_DB_HOST", "dsv-db")
 DSV_DB_PORT = os.environ.get("DSV_DB_PORT", "5432")
 DSV_DB_NAME = os.environ.get("DSV_DB_NAME", "dinesafe")
 DSV_DB_USER = os.environ.get("DSV_DB_USER", "dinesafe")
 DSV_DB_PASSWORD = os.environ.get("DSV_DB_PASSWORD", "dinesafe")
 
-# When set, seed from local CSVs under this directory instead of downloading
-# from the Toronto Open Data portal. Used for offline/reproducible local
-# testing. Unset (the default) preserves the live-download behavior.
-DSV_LOCAL_DATA_DIR = os.environ.get("DSV_LOCAL_DATA_DIR", "").strip()
+# Mirror of the Blob container, written by scripts/data.sh (dsv-data sync).
+DSV_DATA_DIR = os.environ.get("DSV_DATA_DIR", "/data")
+RECENT_NAME = "Dinesafe.csv"
+HISTORICAL_DIR = "dinesafe-historical"
+MANIFEST_NAME = "manifest.json"
 
 # Column order for COPY into the inspections table (excludes serial `id`)
 INSPECTIONS_COLUMNS = [
@@ -206,20 +192,6 @@ def map_row(row, column_map):
     return mapped
 
 
-def recent_source(local_dir):
-    """Return the recent CSV source: a local file path if local_dir is set, else the live URL."""
-    if local_dir:
-        return os.path.join(local_dir, "Dinesafe.csv")
-    return RECENT_CSV_URL
-
-
-def historical_source(local_dir):
-    """Return the local historical CSV directory if local_dir is set, else None (use the live ZIP)."""
-    if local_dir:
-        return os.path.join(local_dir, "dinesafe-historical")
-    return None
-
-
 # ---------------------------------------------------------------------------
 # Database utilities
 # ---------------------------------------------------------------------------
@@ -270,20 +242,33 @@ def bulk_insert(conn, rows):
 # ---------------------------------------------------------------------------
 
 
-def _read_csv_rows(csv_path, column_map):
-    """Read a DineSafe CSV into mapped rows, tolerating either UTF-8 or Windows-1252.
+def decode_csv(raw):
+    """Decode DineSafe CSV bytes, tolerating either UTF-8 or Windows-1252.
 
     DineSafe exports mix encodings across files (older years are UTF-8 with a BOM,
     newer files are Windows-1252), so decode UTF-8 first and fall back to cp1252.
     """
-    with open(csv_path, "rb") as f:
-        raw = f.read()
     try:
-        text = raw.decode("utf-8-sig")
+        return raw.decode("utf-8-sig")
     except UnicodeDecodeError:
-        text = raw.decode("cp1252")
+        return raw.decode("cp1252")
+
+
+def _read_csv_rows(csv_path, column_map):
+    """Read a DineSafe CSV file into mapped rows."""
+    with open(csv_path, "rb") as f:
+        text = decode_csv(f.read())
     reader = csv.DictReader(io.StringIO(text))
     return [map_row(r, column_map) for r in reader]
+
+
+def require_manifest(data_dir):
+    """Exit with a clear message unless data_dir holds a synced mirror."""
+    if not os.path.isfile(os.path.join(data_dir, MANIFEST_NAME)):
+        raise SystemExit(
+            f"{data_dir}/{MANIFEST_NAME} is missing. Run scripts/data.sh to "
+            "sync the CSVs from Azure Blob Storage first."
+        )
 
 
 def _insert_historical_csv(conn, csv_path, name, cutoff):
@@ -300,44 +285,24 @@ def _insert_historical_csv(conn, csv_path, name, cutoff):
     print(f"  Loaded {name}: {len(rows)} rows")
 
 
-def download_and_load_historical(conn, cutoff):
-    """Load all historical CSVs from the local directory or the live ZIP.
+def load_historical(conn, cutoff, data_dir):
+    """Load every historical CSV under data_dir/dinesafe-historical.
 
     cutoff is the earliest inspection_date in the recent CSV; historical
     rows on or after it are skipped to avoid double-counting.
     """
-    with tempfile.TemporaryDirectory() as tmpdir:
-        csv_dir = historical_source(DSV_LOCAL_DATA_DIR)
-        if csv_dir:
-            print(f"Reading historical data from {csv_dir} ...")
-            names = os.listdir(csv_dir)
-        else:
-            csv_dir = tmpdir
-            zip_path = os.path.join(tmpdir, "historical.zip")
-            print(f"Downloading historical data from {HISTORICAL_ZIP_URL} ...")
-            urlretrieve(HISTORICAL_ZIP_URL, zip_path)
-            with zipfile.ZipFile(zip_path) as zf:
-                zf.extractall(tmpdir)
-                names = zf.namelist()
-
-        for name in sorted(names):
-            if not name.endswith(".csv"):
-                continue
+    csv_dir = os.path.join(data_dir, HISTORICAL_DIR)
+    print(f"Reading historical data from {csv_dir} ...")
+    for name in sorted(os.listdir(csv_dir)):
+        if name.endswith(".csv"):
             _insert_historical_csv(conn, os.path.join(csv_dir, name), name, cutoff)
 
 
-def _fetch_recent_rows():
-    """Return parsed recent rows from the local file or a live download."""
-    source = recent_source(DSV_LOCAL_DATA_DIR)
-    if DSV_LOCAL_DATA_DIR:
-        print(f"Reading recent data from {source} ...")
-        rows = _read_csv_rows(source, RECENT_COLUMN_MAP)
-    else:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmp_path = os.path.join(tmpdir, "recent.csv")
-            print(f"Downloading recent data from {source} ...")
-            urlretrieve(source, tmp_path)
-            rows = _read_csv_rows(tmp_path, RECENT_COLUMN_MAP)
+def _read_recent_rows(data_dir):
+    """Return parsed, de-duplicated recent rows from data_dir/Dinesafe.csv."""
+    source = os.path.join(data_dir, RECENT_NAME)
+    print(f"Reading recent data from {source} ...")
+    rows = _read_csv_rows(source, RECENT_COLUMN_MAP)
     deduped = drop_old_id_duplicates(rows)
     print(f"  Dropped old-ID duplicate rows: {len(rows) - len(deduped)}")
     rows = deduped
@@ -351,9 +316,9 @@ def seed(conn):
     recent CSV's date window, so overlapping inspections aren't
     double-counted. Commits once.
     """
-    recent_rows = _fetch_recent_rows()
+    recent_rows = _read_recent_rows(DSV_DATA_DIR)
     cutoff = min_inspection_date(recent_rows)
-    download_and_load_historical(conn, cutoff)
+    load_historical(conn, cutoff, DSV_DATA_DIR)
     bulk_insert(conn, recent_rows)
     print(f"  Loaded recent CSV: {len(recent_rows)} rows")
     conn.commit()
@@ -361,19 +326,19 @@ def seed(conn):
 
 
 # ---------------------------------------------------------------------------
-# Refresh path — daily cron, table already has data
+# Refresh path — business-day timer, table already has data
 # ---------------------------------------------------------------------------
 
 
 def refresh(conn):
     """Replace all recent data in a single transaction.
 
-    Downloads the CSV first, then deletes + inserts inside one
+    Reads the CSV first, then deletes + inserts inside one
     transaction so the table is never in a partial state.
     The delete cutoff is derived from the earliest date in the
     fresh CSV so it tracks the upstream data window automatically.
     """
-    rows = _fetch_recent_rows()
+    rows = _read_recent_rows(DSV_DATA_DIR)
     cutoff = min_inspection_date(rows)
     with conn.cursor() as cur:
         cur.execute(
@@ -392,6 +357,7 @@ def refresh(conn):
 
 
 def main():
+    require_manifest(DSV_DATA_DIR)
     conn = get_connection()
     try:
         if is_empty(conn):

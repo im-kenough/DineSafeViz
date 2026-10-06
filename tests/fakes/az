@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Test double for az, used by tests/test_data_sh.py (local mode).
+echo "az $*" >> "${FAKE_LOG:-/dev/null}"
+if [[ -n ${FAKE_AZ_LOGGED_OUT:-} ]]; then
+  echo "ERROR: Please run 'az login' to setup account." >&2
+  exit 1
+fi
+echo "fake-user-token"
