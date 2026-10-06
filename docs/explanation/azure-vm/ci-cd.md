@@ -181,7 +181,10 @@ If the VM itself is damaged, restore the pre-deploy snapshot instead.
 Treat a Dependabot PR like any other PR: let `images.yml` build and scan it,
 check the release notes for breaking changes, then merge and deploy to stg.
 For Grafana and nginx updates, check `/analytics/` and the map on stg before
-the next release.
+the next release. A Grafana update also changes the bundled PostgreSQL plugin.
+Before you merge one, confirm that the new image still bundles it, as
+described in
+[Grafana: the bundled PostgreSQL plugin](../grafana-postgres-plugin.md#how-the-plugin-gets-updated).
 
 ### Fix a failed scan
 
