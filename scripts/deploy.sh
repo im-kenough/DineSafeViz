@@ -5,7 +5,8 @@
 #        scripts/deploy.sh prod vX.Y.Z
 #
 # Resolves the ref to a commit, confirms that commit's images are in GHCR,
-# checks it out, writes .env from Key Vault, then pulls and starts the stack.
+# checks it out, writes .env from Key Vault, syncs the CSVs from Blob Storage,
+# then pulls and starts the stack.
 # Exits non-zero, with the failing services' logs printed last, if anything
 # goes wrong. Everything runs inside main() so bash reads the whole script
 # before the checkout can replace this file.
@@ -92,6 +93,15 @@ $dirty"
   # jobs get `compose wait` (their exit code), and --wait lists only the
   # long-running services.
   docker compose pull --quiet
+  # Fetch and sync the CSVs so dsv-init-db has data, even on a new VM.
+  # Exit 3 means Toronto Open Data failed but the Blob copy synced.
+  local data_status=0
+  "$repo_dir/scripts/data.sh" "$env_name" || data_status=$?
+  case $data_status in
+    0) ;;
+    3) echo "deploy: warning: using the CSVs already in Blob Storage" >&2 ;;
+    *) die "scripts/data.sh failed, so the stack wasn't started" ;;
+  esac
   docker compose up -d --no-build --remove-orphans || fail
   docker compose wait dsv-init-db >/dev/null || fail
   docker compose wait dsv-init-analytics >/dev/null || fail
