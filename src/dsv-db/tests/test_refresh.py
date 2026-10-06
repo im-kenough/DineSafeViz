@@ -1,6 +1,8 @@
 import sys
 import os
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from refresh import (
@@ -10,12 +12,11 @@ from refresh import (
     split_address,
     count_unparsed_addresses,
     min_inspection_date,
-    recent_source,
-    historical_source,
     exclude_on_or_after,
     drop_old_id_duplicates,
     _read_csv_rows,
-    RECENT_CSV_URL,
+    decode_csv,
+    require_manifest,
     HISTORICAL_COLUMN_MAP,
     RECENT_COLUMN_MAP,
     INSPECTIONS_COLUMNS,
@@ -324,15 +325,21 @@ class TestExcludeOnOrAfter:
         assert exclude_on_or_after(rows, "2023-11-10") == [{"inspection_date": None}]
 
 
-class TestDataSourceSelection:
-    def test_recent_source_defaults_to_live_url(self):
-        assert recent_source("") == RECENT_CSV_URL
+class TestDecodeCsv:
+    def test_utf8_with_bom(self):
+        assert decode_csv("\ufeffa,b\n".encode("utf-8")) == "a,b\n"
 
-    def test_recent_source_uses_local_file_when_set(self):
-        assert recent_source("/data") == os.path.join("/data", "Dinesafe.csv")
+    def test_falls_back_to_cp1252(self):
+        assert decode_csv("caf\xe9\n".encode("cp1252")) == "caf\xe9\n"
 
-    def test_historical_source_none_when_unset(self):
-        assert historical_source("") is None
 
-    def test_historical_source_uses_local_dir_when_set(self):
-        assert historical_source("/data") == os.path.join("/data", "dinesafe-historical")
+class TestRequireManifest:
+    def test_missing_manifest_exits_with_a_message(self, tmp_path):
+        with pytest.raises(SystemExit) as exc:
+            require_manifest(str(tmp_path))
+        assert "manifest.json" in str(exc.value)
+        assert "scripts/data.sh" in str(exc.value)
+
+    def test_present_manifest_passes(self, tmp_path):
+        (tmp_path / "manifest.json").write_text("{}")
+        require_manifest(str(tmp_path))
