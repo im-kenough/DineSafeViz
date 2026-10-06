@@ -20,22 +20,26 @@ ENVS=${ENV:-stg01 prod01}
 # Helpers
 #################################
 # section <title> <command...>: run a read-only command and append its output
-# to $FILE as a fenced block
+# to $FILE as a fenced block. stderr is kept apart, so CLI warnings (such as
+# "This command is in preview") don't end up in the block or hide the error.
 section(){
     local title=$1; shift
-    local out
+    local out err rc
+    err=$(mktemp)
     {
         echo "## $title"
         echo ""
-        if out=$("$@" 2>&1); then
+        if out=$("$@" 2>"$err"); then
             echo '```text'
             if [[ -n $out ]]; then echo "$out"; else echo "(none)"; fi
             echo '```'
         else
-            echo "Not available: $(head -n 1 <<<"$out")"
+            rc=$?
+            echo "Not available: $(grep -v -m 1 -e '^WARNING:' -e '^[[:space:]]*$' "$err" || echo "exit code $rc")"
         fi
         echo ""
     } >> "$FILE"
+    rm -f "$err"
 }
 
 # redact <value> <label>: replace every occurrence of value in $FILE
@@ -104,8 +108,9 @@ dump_env(){
     # Compute
     section "Virtual machines" \
         az vm list "${S[@]}" -g "$rg" --query "[].{name:name, size:hardwareProfile.vmSize, securityType:securityProfile.securityType, osDisk:storageProfile.osDisk.name, osDiskDelete:storageProfile.osDisk.deleteOption, identity:identity.type}" -o table
-    section "Disks" \
-        az disk list "${S[@]}" --query "[].{name:name, group:resourceGroup, sku:sku.name, sizeGb:diskSizeGB, state:diskState}" -o table
+    # az disk list requires -g (CLI 2.90); all disks live in $rg
+    section "Disks in $rg" \
+        az disk list "${S[@]}" -g "$rg" --query "[].{name:name, group:resourceGroup, sku:sku.name, sizeGb:diskSizeGB, state:diskState}" -o table
     section "Snapshots" \
         az snapshot list "${S[@]}" --query "sort_by(@, &timeCreated)[].{name:name, group:resourceGroup, incremental:incremental, created:timeCreated}" -o table
 

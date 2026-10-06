@@ -8,9 +8,10 @@ through the parts in order, once for stg and once for prod.
 
 <!-- prettier-ignore -->
 > [!NOTE]
-> Steps marked **Done** were applied on October 5, 2026. The rest describe the
-> target state. Validate each step the first time you run it, and update this
-> checklist with what you find.
+> Steps marked **Done** were applied on October 5, 2026. Steps that are done
+> for one environment only say so in their first paragraph. The rest describe
+> the target state. Validate each step the first time you run it, and update
+> this checklist with what you find.
 
 ## Before you begin
 
@@ -22,6 +23,7 @@ reading and writing secrets uses `dsv-ops01`, through the operator groups.
 | Work | Account | Why |
 | ---- | ------- | --- |
 | Role assignments, locks, all prod infrastructure | `dsv-admin01` | Needs Owner; prod operators only have Reader on `rg-dsv-prod01` |
+| Resource provider registration, vCPU quotas | `dsv-admin01` | Subscription scope; both operator groups are scoped to resource groups |
 | Other stg infrastructure | `dsv-ops01` or `dsv-admin01` | stg operators have Contributor on `rg-dsv-stg01` |
 | Set or read secrets | `dsv-ops01` | Needs Key Vault Secrets Officer on the vault |
 | Prod snapshots | `dsv-ops01` | Disk Snapshot Contributor on `rg-dsv-prod01-snapshots` |
@@ -39,8 +41,15 @@ TAGS="workload=dsv env=$SHORT owner=dsv-admin01 managed-by=manual"
 NET=$([ "$SHORT" = prod ] && echo 10.10 || echo 10.20)
 HOME_IP=$(curl -4 -s https://ifconfig.me)   # Key Vault rules are IPv4 only
 ADMIN_USER=<your-vm-admin-username>
+SSH_KEY=~/.ssh/id_ed25519_dsv_${ENV}_az_admin.pub   # this environment's admin key
 az account set --subscription dsv-$ENV
+echo "ENV=$ENV RG=$RG SUB=$(az account show --query name -o tsv)"; ls -l "$SSH_KEY"
 ```
+
+The last line confirms that the variables match the signed-in subscription
+and that the key file exists. Variables outlive `az login` and
+`az account set`, so a shell left over from the other environment fails with
+`AuthorizationFailed` on resources that aren't in the current subscription.
 
 ### Scripts
 
@@ -134,6 +143,50 @@ up. The step that creates each resource assigns its roles.
 | `id-dsv-<env>01-vm`: Key Vault Secrets User | `kv-dsv-<env>01` | 4.3 | Done |
 | `sg-dsv-prod01-operators`: Key Vault Secrets Officer | `kv-dsv-prod01` | 4.3 | Done |
 | `sg-dsv-prod01-operators`: Virtual Machine Contributor | `vm-dsv-prod01` | 6.5 | To do |
+
+### 1.4 Done: register resource providers and raise the vCPU quota
+
+New subscriptions don't have every resource provider registered, and their
+quota for the `standardBasv2Family` VM family, which includes
+`Standard_B2ats_v2`, starts with a limit of 0 vCPUs in Canada Central. Without
+this step, `az vm create` in step 6.3 fails with `QuotaExceeded`, and on a
+subscription without `Microsoft.Compute`, `az vm list-usage` returns nothing.
+Both are subscription-scope changes, so run them as `dsv-admin01`. On October
+5, 2026, `Microsoft.Compute` and `Microsoft.Quota` were registered and the
+limit was set to 10 vCPUs on both subscriptions. The regional total vCPU limit
+is 10 in `dsv-stg01` and 20 in `dsv-prod01`; a VM counts against both limits.
+
+- **Portal:**
+  1. Open the subscription > **Settings** > **Resource providers**. Select
+     `Microsoft.Compute` and `Microsoft.Quota`, and then select
+     **Register**.
+  2. Go to **Quotas** > **Compute**, filter by region **Canada Central**,
+     select **Standard Basv2 Family vCPUs**, and then select **New quota
+     request** with a new limit of `10`.
+- **CLI:**
+
+  ```bash
+  for ns in Microsoft.Compute Microsoft.Quota; do
+    az provider register -n $ns --wait
+  done
+  az extension add --name quota --upgrade --only-show-errors
+  az quota create --resource-name standardBasv2Family --resource-type dedicated \
+    --scope "/subscriptions/$(az account show --query id -o tsv)/providers/Microsoft.Compute/locations/$LOC" \
+    --limit-object value=10
+  ```
+
+  `--limit-object` takes only `value` and `limit-type`; the CLI sets the
+  object type itself. Registration can take a few minutes.
+- **Verify:**
+
+  ```bash
+  az vm list-usage -l $LOC \
+    --query "[?name.value=='standardBasv2Family' || name.value=='cores'].{name:name.value, used:currentValue, limit:limit}" -o table
+  ```
+
+  `standardBasv2Family` shows a limit of 10.
+- **Source:** [az quota create](https://learn.microsoft.com/cli/azure/quota#az-quota-create),
+  [Azure resource providers and types](https://learn.microsoft.com/azure/azure-resource-manager/management/resource-providers-and-types)
 
 ## 2. Network
 
@@ -382,7 +435,8 @@ own tunnel and token. The zone settings apply to both hostnames.
 ### 5.1 Create the tunnel and store its token
 
 The token lets `cloudflared` on the VM connect as this tunnel. It goes
-straight into the vault; it isn't stored anywhere else.
+straight into the vault; it isn't stored anywhere else. Done for stg on
+October 5, 2026: `dsv-tunnel-token` is in `kv-dsv-stg01`. To do for prod.
 
 - **Dashboard:**
   1. Go to **Networking** > **Tunnels** > **Create a tunnel**. Select
@@ -461,6 +515,7 @@ The public IP gives the VM outbound internet access (Cloudflare, GHCR, apt)
 and your SSH path. Standard SKU addresses are billed hourly, even when the
 free VM hours apply; check the current price on the
 [IP address pricing page](https://azure.microsoft.com/pricing/details/ip-addresses/).
+Done for stg on October 5, 2026. To do for prod.
 
 - **Portal:** Go to **Public IP addresses** > **Create**. Select
   `rg-dsv-<env>01`, region **Canada Central**, name `pip-dsv-<env>01`, SKU
@@ -478,7 +533,8 @@ free VM hours apply; check the current price on the
 ### 6.2 Create the network interface
 
 Creating the NIC separately gives it a CAF name. It has no NSG of its own;
-the subnet's NSG applies.
+the subnet's NSG applies. Done for stg on October 5, 2026: `nic-dsv-stg01`
+has private IP address `10.20.0.4`. To do for prod.
 
 - **Portal:** Go to **Network interfaces** > **Create**. Select
   `rg-dsv-<env>01`, name `nic-dsv-<env>01`, VNet `vnet-dsv-<env>01`, subnet
@@ -501,7 +557,9 @@ The VM is a `Standard_B2ats_v2` (2 vCPUs, 1 GiB) with Trusted Launch and a
 64 GiB Premium SSD, which the free account's VM and disk allowances cover in
 `dsv-prod01`. `id-dsv-<env>01-vm` is its only identity, so IMDS needs no
 client ID. For stg, the OS disk and NIC are deleted with the VM; for prod,
-they're kept.
+they're kept. The VM needs the quota from step 1.4; without it, this step
+fails with `QuotaExceeded` before it creates anything. Done for stg on
+October 5, 2026. To do for prod.
 
 - **Portal:** Go to **Virtual machines** > **Create** > **Azure virtual
   machine**.
@@ -523,18 +581,23 @@ they're kept.
 - **CLI:**
 
   ```bash
-  MI_ID=$(az identity show -g $RG -n id-dsv-$ENV-vm --query id -o tsv)
-  DELETE_OPTION=$([ "$SHORT" = prod ] && echo Detach || echo Delete)
+  MI_ID=$(az identity show -g $RG -n id-dsv-$ENV-vm --query id -o tsv) && \
+  DELETE_OPTION=$([ "$SHORT" = prod ] && echo Detach || echo Delete) && \
   az vm create -g $RG -n vm-dsv-$ENV -l $LOC \
     --image Canonical:ubuntu-24_04-lts:server:latest --size Standard_B2ats_v2 \
     --security-type TrustedLaunch --enable-secure-boot true --enable-vtpm true \
     --nics nic-dsv-$ENV --nic-delete-option $DELETE_OPTION \
     --os-disk-name osdisk-dsv-$ENV --os-disk-size-gb 64 --storage-sku Premium_LRS \
     --os-disk-delete-option $DELETE_OPTION \
-    --admin-username "$ADMIN_USER" --ssh-key-values ~/.ssh/id_ed25519.pub \
-    --assign-identity "$MI_ID" --tags $TAGS -o none
-  az vm boot-diagnostics enable -g $RG -n vm-dsv-$ENV -o none
+    --admin-username "$ADMIN_USER" --ssh-key-values "$SSH_KEY" \
+    --assign-identity "$MI_ID" --tags $TAGS -o none && \
+  az vm boot-diagnostics enable -g $RG -n vm-dsv-$ENV -o none && \
+  echo "VM created"
   ```
+
+  The commands are chained, so a failure stops the rest. If `$SSH_KEY`
+  doesn't point to an existing file, `az vm create` treats the path as a key
+  value and fails with `An RSA key file or key value must be supplied`.
 
 - **Verify:**
 
@@ -553,21 +616,29 @@ normally would, before step 6.4.
 
 ### 6.4 Prepare the serial console
 
-The serial console is your way in if SSH breaks. It needs boot diagnostics
-(step 6.3) and a local user with a password. Setting a password doesn't open
-SSH password login, as long as `sshd` keeps password authentication off.
+The serial console is your way in if SSH breaks. It connects through the
+VM's virtual serial port, not the network, so NSG and `sshd` mistakes don't
+block it. It needs boot diagnostics (step 6.3), a role that includes
+Virtual Machine Contributor actions on the VM, and a local user with a
+password, because the console doesn't accept SSH keys. Setting a password
+doesn't open SSH password login, as long as `sshd` keeps password
+authentication off. Done for stg on October 5, 2026: `dsv-ops01`, through
+the stg operators' Contributor role, signed in as the VM admin user. To do
+for prod, where step 6.5 gives operators the role.
 
-- **On the VM:**
+- **On the VM**, signed in over SSH as the admin user:
 
   ```bash
+  ssh -i "${SSH_KEY%.pub}" "$ADMIN_USER@$(az vm show -d -g $RG -n vm-dsv-$ENV --query publicIps -o tsv)"
   sudo passwd "$USER"        # store it in your password manager, not Key Vault
   sudo sshd -T | grep -Ei '^(passwordauthentication|kbdinteractiveauthentication)'
   echo 'export TMOUT=600' >> ~/.profile   # optional: idle console sessions time out
   ```
 
   Both `sshd` settings show `no`.
-- **Verify:** In the portal, open the VM > **Help** > **Serial console**, and
-  sign in with the password.
+- **Verify:** In the portal, open the VM > **Help** > **Serial console**.
+  Press **Enter** at the blank screen, and sign in as the admin user with the
+  password. Type `exit` when you're done.
 - **Source:** [Azure Serial Console for Linux](https://learn.microsoft.com/troubleshoot/azure/virtual-machines/linux/serial-console-linux)
 
 ### 6.5 Give prod operators VM Contributor (prod)
@@ -595,7 +666,8 @@ Prod operators can then start, stop, and use the serial console on
 only affect Azure Resource Manager, so secrets and the VM's workload aren't
 affected. Prod locks the whole resource group. stg locks only the persistent
 pieces, so you can still delete and recreate the VM. The snapshots resource
-group has no lock, so old snapshots can be pruned.
+group has no lock, so old snapshots can be pruned. On October 5, 2026,
+neither environment had any locks.
 
 - **Portal:** Open the resource group (prod) or each resource (stg) >
   **Settings** > **Locks** > **Add**. Set **Lock type** to **Delete** and use
