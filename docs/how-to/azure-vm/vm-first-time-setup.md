@@ -90,7 +90,7 @@ Any process that can reach `169.254.169.254` can request a token as the VM's
 identity, for Key Vault or for the storage account. Only the host scripts
 `fetch-secrets.sh` and `data.sh` need that, so a systemd unit blocks it for
 containers with rules in Docker's `DOCKER-USER` chain. The same unit blocks
-the Azure WireServer, `168.63.129.16`. The unit file is in the clone, at
+the Azure WireServer's agent ports on `168.63.129.16`. The unit file is in the clone, at
 `deploy/systemd/dsv-imds-block.service`.
 
 1.  Confirm that Docker uses the iptables firewall backend. `DOCKER-USER`
@@ -112,8 +112,10 @@ the Azure WireServer, `168.63.129.16`. The unit file is in the clone, at
     sudo iptables -S DOCKER-USER | grep -E '169.254.169.254|168.63.129.16'
     ```
 
-    The output includes `-A DOCKER-USER -d 169.254.169.254/32 -j DROP` and
-    the same rule for `168.63.129.16/32`.
+    The output includes `-A DOCKER-USER -d 169.254.169.254/32 -j DROP` and a
+    rule for `168.63.129.16/32` on TCP ports 80 and 32526. DNS to the
+    WireServer stays open, because Docker versions before 28 send container
+    DNS queries there.
 
 3.  Verify that a container can't reach the metadata service. This command
     must time out:

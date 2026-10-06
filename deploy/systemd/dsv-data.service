@@ -12,3 +12,5 @@ Type=oneshot
 User=@ADMIN_USER@
 WorkingDirectory=@REPO_DIR@
 ExecStart=@REPO_DIR@/scripts/data.sh @ENV@ --load
+# A stalled run must end, or the timer can't start the next one.
+TimeoutStartSec=30min

@@ -106,3 +106,17 @@ def test_local_without_az_login_explains(vm_repo):
     result = data_sh(repo, {**env, "FAKE_AZ_LOGGED_OUT": "1"}, "local")
     assert result.returncode == 1
     assert "az login" in result.stderr
+
+
+def test_unwritable_data_dir_explains_the_fix(vm_repo):
+    # dockerd creates a missing ./data as root when compose runs before data.sh.
+    repo, env, log = vm_repo
+    (repo / "data").mkdir()
+    (repo / "data").chmod(0o555)
+    try:
+        result = data_sh(repo, env, "stg")
+    finally:
+        (repo / "data").chmod(0o755)
+    assert result.returncode == 1
+    assert "chown" in result.stderr
+    assert docker_calls(log) == []

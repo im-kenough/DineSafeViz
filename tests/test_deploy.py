@@ -236,8 +236,12 @@ def test_data_fetch_failure_warns_and_continues(vm_repo):
 def test_smoke_check_confirms_containers_cannot_reach_imds(vm_repo):
     repo, env, log = vm_repo
     assert deploy(repo, env, "stg", "main").returncode == 0
-    assert any("169.254.169.254" in line and line.startswith("docker compose exec")
-               for line in calls(log))
+    # IMDS answers 400 without these, which a bare wget would read as blocked.
+    imds = [line for line in calls(log)
+            if "169.254.169.254" in line and line.startswith("docker compose exec")]
+    assert len(imds) == 1
+    assert "Metadata: true" in imds[0]
+    assert "api-version=" in imds[0]
 
 
 def test_reachable_imds_fails_the_deploy(vm_repo):

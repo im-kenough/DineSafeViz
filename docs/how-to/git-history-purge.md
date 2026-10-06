@@ -20,7 +20,8 @@ The rewrite changes the following:
 - Every commit SHA after the first commit that added a CSV, which was in June
   2026. Release tags move to the rewritten commits.
 - `sha-<commit>` image tags in GHCR no longer match any commit. Images
-  already deployed keep running, but the next deploy must use a new commit.
+  already deployed keep running, but the next deploy waits for `images.yml`
+  to build the rewritten commit.
 - Open pull requests break, so merge or close them first.
 - Every clone must be replaced with a fresh clone, including both VMs.
 
@@ -96,9 +97,13 @@ Add it back, then force-push every branch and tag.
 
 ## Re-clone on each VM
 
-Each VM's clone still holds the old history, and `deploy.sh` refuses to run
-in a checkout whose commits don't match GitHub. Replace the clone and keep
-the two files that aren't in git.
+Each VM's clone still holds the old history and its 120 MB of CSVs. Replace
+the clone and keep the two files that aren't in git.
+
+The rewritten commits have new SHAs, so stg's `sha-<commit>` images don't
+exist yet. Before you deploy stg, wait until `images.yml` finishes on the
+rewritten `main`. Prod deploys use version tags such as `0.5.0`, which don't
+change, so prod can deploy right away.
 
 On each VM, run the following, with `stg` or `prod` as the environment:
 

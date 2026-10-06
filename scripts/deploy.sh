@@ -112,8 +112,10 @@ $dirty"
   docker compose exec -T dsv-nginx wget -q -O /dev/null http://127.0.0.1/healthz \
     || fail dsv-nginx dsv-app
   # Containers must not reach IMDS (dsv-imds-block.service).
-  if docker compose exec -T dsv-nginx wget -q -T 3 -O /dev/null \
-      http://169.254.169.254/metadata/instance 2>/dev/null; then
+  # IMDS answers 400 without the header and api-version, which wget would
+  # report as a failure, so ask properly: success means it's reachable.
+  if docker compose exec -T dsv-nginx wget -q -T 3 -O /dev/null --header "Metadata: true" \
+      "http://169.254.169.254/metadata/instance?api-version=2021-02-01" 2>/dev/null; then
     die "a container reached IMDS. Run: sudo systemctl restart dsv-imds-block"
   fi
   # cloudflared's /ready returns 200 only while it has a live connection to

@@ -42,6 +42,13 @@ done
 repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$repo_dir"
 
+# dockerd creates a missing ./data as root if compose runs before this script.
+mkdir -p data
+for dir in data data/dinesafe-historical; do
+  [[ ! -e $dir || -w $dir ]] \
+    || die "./$dir isn't writable by $(id -un). Run: sudo chown -R $(id -u):$(id -g) data"
+done
+
 if [[ $env_name == local ]]; then
   account=${DSV_STORAGE_ACCOUNT:-stdsvstg01}
   token=$(az account get-access-token --resource https://storage.azure.com/ \
@@ -59,7 +66,6 @@ else
 fi
 [[ -n $token && $token != null ]] || die "got an empty storage token"
 
-mkdir -p data
 token_dir=$(mktemp -d)
 trap 'rm -rf "$token_dir"' EXIT
 (umask 077 && printf '%s' "$token" >"$token_dir/token")
