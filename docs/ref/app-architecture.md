@@ -131,9 +131,7 @@ scripts/data.sh local         # syncs into ./data
 docker compose up -d --build
 ```
 
-If `data.sh local` fails with HTTP 403, your home IP address probably
-changed. See
-[Troubleshoot: your home IP address changed](../how-to/azure-vm/troubleshoot-home-ip-change.md).
+For the full steps, see [Deploy DineSafeViz locally](../how-to/deploy-locally.md).
 
 ## Where to read next
 
