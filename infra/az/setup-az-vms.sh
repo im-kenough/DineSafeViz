@@ -5,7 +5,7 @@
 # Usage:
 #   ./setup-az-vms.sh infra      # as dsv-admin01: network, identity, vault firewall, roles
 #   ./setup-az-vms.sh secrets    # as dsv-ops01: generate the vault secrets
-#   ENV=prod01 ./setup-az-vms.sh infra
+#   SUB_ID=<id> ENV=prod01 ./setup-az-vms.sh infra
 #
 # The two modes run as different accounts on purpose. dsv-admin01 (Owner) manages
 # resources and role assignments but holds no standing data-plane role on the
@@ -90,11 +90,12 @@ create_vnet(){
 }
 
 #################################
-# Attach NSG and KV service endpoint to the subnet
+# Attach NSG and the KV and Storage service endpoints to the subnet
 #################################
 attach_kv_to_nsg_subnet(){
+    # the list replaces the subnet's endpoints, so name both
     az network vnet subnet update -g "$RG" --vnet-name "$VNET_NAME" -n "$SNET_NAME" \
-        --network-security-group "$NSG_NAME" --service-endpoints Microsoft.KeyVault -o none
+        --network-security-group "$NSG_NAME" --service-endpoints Microsoft.KeyVault Microsoft.Storage -o none
 }
 
 verify_vnet_service_endpoint(){
@@ -172,6 +173,66 @@ assign_role(){
 
 verify_role_assignment(){
     az role assignment list --scope "$KV_ID" --query "[].{who:principalName, type:principalType, role:roleDefinitionName}" -o table
+}
+
+#################################
+# Storage account for the DineSafe CSVs
+#################################
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
+create_storage_account(){
+    echo ""
+    if az storage account show -g "$RG" -n "$ST_NAME" -o none 2>/dev/null; then
+        echo "Storage account $ST_NAME exists, skipping create"
+        return
+    fi
+    # names are global across Azure: 3-24 lowercase letters and numbers
+    if [[ $(az storage account check-name -n "$ST_NAME" --query nameAvailable -o tsv) != true ]]; then
+        echo "ERROR: storage account name $ST_NAME is taken. Pick another (for example ${ST_NAME}a1) and update DSV_STORAGE_ACCOUNT in deploy/$SHORT.env-example" >&2
+        exit 1
+    fi
+    echo "Creating storage account $ST_NAME..."
+    # Deny by default from the start; the allow rules follow right after.
+    az storage account create -g "$RG" -n "$ST_NAME" -l "$LOC" \
+        --sku Standard_LRS --kind StorageV2 --access-tier Hot \
+        --allow-shared-key-access false --allow-blob-public-access false \
+        --min-tls-version TLS1_2 --https-only true \
+        --default-action Deny --bypass None \
+        --tags $TAGS -o none
+}
+
+configure_storage_protection(){
+    # versioning + soft delete are control-plane settings, so the VM's data
+    # role can overwrite blobs but can't remove the way back
+    az storage account blob-service-properties update -g "$RG" -n "$ST_NAME" \
+        --enable-versioning true \
+        --enable-delete-retention true --delete-retention-days 7 -o none
+    az storage account management-policy create -g "$RG" --account-name "$ST_NAME" \
+        --policy @"$SCRIPT_DIR/storage-lifecycle.json" -o none
+}
+
+storage_network_rule_add(){
+    # same-region traffic ignores IP rules, so the VM needs the subnet rule
+    az storage account network-rule add -g "$RG" --account-name "$ST_NAME" \
+        --subnet "$SUBNET_ID" -o none
+    # a bare address: storage IP rules reject /31 and /32 prefixes
+    az storage account network-rule add -g "$RG" --account-name "$ST_NAME" \
+        --ip-address "$HOME_IP" -o none
+}
+
+create_storage_container(){
+    # container-rm goes through Resource Manager, so it needs no data role
+    az storage container-rm create -g "$RG" --storage-account "$ST_NAME" \
+        -n "$ST_CONTAINER" --public-access off -o none
+}
+
+get_container_scope(){
+    echo "$(az storage account show -g "$RG" -n "$ST_NAME" --query id -o tsv)/blobServices/default/containers/$ST_CONTAINER"
+}
+
+storage_verify(){
+    az storage account show -g "$RG" -n "$ST_NAME" --query "{sharedKey:allowSharedKeyAccess, publicBlob:allowBlobPublicAccess, tls:minimumTlsVersion, acls:networkRuleSet}" -o jsonc
+    az role assignment list --scope "$CONTAINER_SCOPE" --query "[].{who:principalName, type:principalType, role:roleDefinitionName}" -o table
 }
 
 #################################
@@ -267,6 +328,22 @@ run_infra(){
     fi
     verify_role_assignment
 
+    # Blob Storage for the CSVs: deny by default, allow the VM subnet and
+    # home IP; data roles at container scope only
+    ST_NAME=stdsv$ENV
+    ST_CONTAINER=dinesafe
+    create_storage_account
+    configure_storage_protection
+    storage_network_rule_add
+    create_storage_container
+    CONTAINER_SCOPE=$(get_container_scope)
+    assign_role "$MI_PRINCIPAL" ServicePrincipal "Storage Blob Data Contributor" "$CONTAINER_SCOPE"
+    if [[ $SHORT == stg ]]; then
+        GROUP_ID=$(get_group_id sg-dsv-stg01-operators)
+        assign_role "$GROUP_ID" Group "Storage Blob Data Reader" "$CONTAINER_SCOPE"
+    fi
+    storage_verify
+
     echo ""
     echo "Infra done. Next, sign in as dsv-ops01 and run: ENV=$ENV $0 secrets"
 }
@@ -285,7 +362,7 @@ run_secrets(){
 main() {
     MODE=${1:-}
     if [[ $MODE != infra && $MODE != secrets ]]; then
-        echo "Usage: [ENV=stg01|prod01] $0 infra|secrets" >&2
+        echo "Usage: SUB_ID=<id> [ENV=stg01|prod01] $0 infra|secrets" >&2
         exit 1
     fi
 
@@ -315,9 +392,11 @@ main() {
     fi
     echo "HOME_IP=$HOME_IP"
 
-    # Authenticate and set your subscription environment
+    # Subscription by ID: display names can change (sub-dsv-<env>01), and
+    # both admin and ops accounts cache subscriptions with the same names.
+    SUB_ID=${SUB_ID:?set SUB_ID to the subscription ID of sub-dsv-$ENV}
     az login
-    az account set --subscription "dsv-$ENV"
+    az account set --subscription "$SUB_ID"
 
     case $MODE in
         infra)   run_infra ;;
