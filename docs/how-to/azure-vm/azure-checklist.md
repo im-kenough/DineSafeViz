@@ -147,8 +147,9 @@ up. The step that creates each resource assigns its roles.
 ### 1.4 Done: register resource providers and raise the vCPU quota
 
 New subscriptions don't have every resource provider registered, and their
-quota for the `standardBasv2Family` VM family, which includes
-`Standard_B2ats_v2`, starts with a limit of 0 vCPUs in Canada Central. Without
+quota for the `standardBasv2Family` VM family, which includes prod's
+`Standard_B2ats_v2` and stg's `Standard_B2als_v2`, starts with a limit of 0
+vCPUs in Canada Central. Without
 this step, `az vm create` in step 6.3 fails with `QuotaExceeded`, and on a
 subscription without `Microsoft.Compute`, `az vm list-usage` returns nothing.
 Both are subscription-scope changes, so run them as `dsv-admin01`. On October
@@ -553,13 +554,26 @@ has private IP address `10.20.0.4`. To do for prod.
 
 ### 6.3 Create the VM
 
-The VM is a `Standard_B2ats_v2` (2 vCPUs, 1 GiB) with Trusted Launch and a
-64 GiB Premium SSD, which the free account's VM and disk allowances cover in
-`dsv-prod01`. `id-dsv-<env>01-vm` is its only identity, so IMDS needs no
-client ID. For stg, the OS disk and NIC are deleted with the VM; for prod,
-they're kept. The VM needs the quota from step 1.4; without it, this step
-fails with `QuotaExceeded` before it creates anything. Done for stg on
-October 5, 2026. To do for prod.
+Each VM has Trusted Launch and a 64 GiB Premium SSD. The size depends on the
+environment:
+
+| Environment | Size | vCPUs | Memory | Cost |
+| --- | --- | --- | --- | --- |
+| prod | `Standard_B2ats_v2` | 2 | 1 GiB | Covered by the free account's VM and disk allowances in `dsv-prod01` |
+| stg | `Standard_B2als_v2` | 2 | 4 GiB | Billed, $0.0592 CAD per hour pay-as-you-go (about $43 per month if left running) |
+
+stg is larger because the 1 GiB size made the first deploy unreliable: the
+data load and Grafana's first start competed for memory, and Grafana failed
+its health check (October 6, 2026). Both sizes are in the same family, so the
+quota from step 1.4 covers them. Delete stg when you finish testing (step 9.5),
+because leaving it running all month would exceed its budget.
+
+`id-dsv-<env>01-vm` is the VM's only identity, so IMDS needs no client ID. For
+stg, the OS disk and NIC are deleted with the VM; for prod, they're kept. The
+VM needs the quota from step 1.4; without it, this step fails with
+`QuotaExceeded` before it creates anything. Done for stg on October 5, 2026,
+as a `Standard_B2ats_v2`; resize it as described under **Existing VM**
+below. To do for prod.
 
 The VM's patch orchestration is set to **Customer Managed Schedules**, so
 Azure Update Manager installs updates only in your maintenance
@@ -573,7 +587,8 @@ security updates daily, independently of that window.
   1. **Basics:** resource group `rg-dsv-<env>01`, name `vm-dsv-<env>01`, region
      **Canada Central**, no availability zone, security type **Trusted launch
      virtual machines** with **Secure boot** and **vTPM** on, image **Ubuntu
-     Server 24.04 LTS - x64 Gen2**, size `Standard_B2ats_v2`, authentication
+     Server 24.04 LTS - x64 Gen2**, size `Standard_B2ats_v2` for prod or
+     `Standard_B2als_v2` for stg, authentication
      **SSH public key** with your admin username and existing public key, and
      **Public inbound ports** **None**.
   2. **Disks:** OS disk size **64 GiB**, type **Premium SSD**; **Delete with
@@ -594,8 +609,9 @@ security updates daily, independently of that window.
   ```bash
   MI_ID=$(az identity show -g $RG -n id-dsv-$ENV-vm --query id -o tsv) && \
   DELETE_OPTION=$([ "$SHORT" = prod ] && echo Detach || echo Delete) && \
+  SIZE=$([ "$SHORT" = prod ] && echo Standard_B2ats_v2 || echo Standard_B2als_v2) && \
   az vm create -g $RG -n vm-dsv-$ENV -l $LOC \
-    --image Canonical:ubuntu-24_04-lts:server:latest --size Standard_B2ats_v2 \
+    --image Canonical:ubuntu-24_04-lts:server:latest --size $SIZE \
     --security-type TrustedLaunch --enable-secure-boot true --enable-vtpm true \
     --nics nic-dsv-$ENV --nic-delete-option $DELETE_OPTION \
     --os-disk-name osdisk-dsv-$ENV --os-disk-size-gb 64 --storage-sku Premium_LRS \
@@ -627,15 +643,31 @@ security updates daily, independently of that window.
   `osProfile.linuxConfiguration.patchSettings.patchMode=AutomaticByPlatform`
   to `--set`.
 
+  To move the existing stg VM from `Standard_B2ats_v2` to
+  `Standard_B2als_v2`, resize it. The resize restarts the VM, and the
+  static public IP, disk, and containers' volumes stay:
+
+  ```bash
+  az vm list-vm-resize-options -g rg-dsv-stg01 -n vm-dsv-stg01 \
+    --query "[?name=='Standard_B2als_v2'].name" -o tsv
+  az vm resize -g rg-dsv-stg01 -n vm-dsv-stg01 --size Standard_B2als_v2
+  ```
+
+  If the first command prints nothing, the current hardware cluster doesn't
+  offer the size. Deallocate the VM with `az vm deallocate`, then resize
+  and start it.
+
 - **Verify:**
 
   ```bash
+  az vm show -g $RG -n vm-dsv-$ENV --query hardwareProfile.vmSize -o tsv
   az vm identity show -g $RG -n vm-dsv-$ENV --query "{type:type, ids:keys(userAssignedIdentities)}"
   az vm show -g $RG -n vm-dsv-$ENV --query "securityProfile.securityType"
   az vm show -g $RG -n vm-dsv-$ENV --query "osProfile.linuxConfiguration.patchSettings"
   ```
 
-  The identity type is `UserAssigned`, with one ID, and the security type is
+  The size matches the table above. The identity type is `UserAssigned`,
+  with one ID, and the security type is
   `TrustedLaunch`. The patch settings show `patchMode` and `assessmentMode` as
   `AutomaticByPlatform`, and `bypassPlatformSafetyChecksOnUserSchedule` as
   `true`. In the portal, **Azure Update Manager** > **Machines** shows the

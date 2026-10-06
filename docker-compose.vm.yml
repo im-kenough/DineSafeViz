@@ -6,8 +6,10 @@
 # missing secret stops Compose instead of falling back to a local default.
 # Merge rules: https://docs.docker.com/reference/compose-file/merge/
 #
-# mem_limit values are first estimates for a 1 GiB VM with a 2 GiB swap file.
-# Revisit them with `docker stats` after the first week on stg.
+# mem_limit values are first estimates for prod's 1 GiB VM with a 2 GiB swap
+# file. stg runs on 4 GiB with the same limits, so a container that outgrows
+# its limit fails on stg too, but stg won't show prod's host memory pressure.
+# Revisit them with `docker stats` on prod.
 
 x-hardening: &hardening
   security_opt:
