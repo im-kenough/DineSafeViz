@@ -49,8 +49,10 @@ Sign out and back in for the group change to apply.
 
 ## 2. Add a swap file
 
-The B2ats_v2 VM has 1 GiB of memory. A swap file gives the containers headroom
-so a memory spike slows the VM down instead of killing Postgres.
+The prod VM, a B2ats_v2, has 1 GiB of memory, of which `free -h` reports about
+836 MiB. A swap file gives the containers headroom so a memory spike slows
+the VM down instead of killing Postgres. The stg VM, a B2als_v2, has 4 GiB
+and rarely needs swap, but add it anyway so both VMs are set up the same way.
 
 ```bash
 sudo fallocate -l 2G /swapfile
