@@ -145,18 +145,6 @@ deploys, so the clone must have no local changes. The clone must be at
     [Check Key Vault access from the VM](vm-first-time-setup.md#5-check-key-vault-access-from-the-vm).
     The output lists the five secret names.
 
-4.  Load the CSVs into Blob Storage for the first time. This downloads the
-    current and historical files from Toronto Open Data, validates them,
-    uploads them to `stdsvstg01`, and syncs them into `./data`:
-
-    ```bash
-    ./scripts/data.sh stg --historical
-    ```
-
-    The output ends with `Sync complete:` and a file count. A `403` right
-    after `setup-az-vms.sh` means the role assignment hasn't applied yet;
-    wait five minutes and run it again.
-
 ## 4. Deploy
 
 `scripts/deploy.sh stg main` resolves `origin/main` to a commit, confirms its
@@ -170,9 +158,12 @@ cd ~/DineSafeViz
 ./scripts/deploy.sh stg main
 ```
 
-The first deploy takes several minutes, because `dsv-init-db` loads the
-inspection CSVs from `./data` into a new database while Grafana runs its
-schema migrations. Later deploys run the shorter refresh instead. After the
+The first deploy takes several minutes. When `stdsvstg01` is empty,
+`data.sh` downloads the current and historical CSVs from Toronto Open Data,
+validates them, and uploads them before it syncs them into `./data`. Then
+`dsv-init-db` loads them into a new database while Grafana runs its schema
+migrations. A `403` from `data.sh` right after `setup-az-vms.sh` means the
+role assignment hasn't applied yet; wait five minutes and rerun the deploy. Later deploys run the shorter refresh instead. After the
 first deploy, schedule the business-day refresh as described in
 [Schedule the data refresh](vm-first-time-setup.md#7-schedule-the-data-refresh). The script ends with a line like this:
 
@@ -243,7 +234,7 @@ errors you're most likely to see on a first stg deploy.
 | `can't read ... from kv-dsv-stg01: ForbiddenByRbac` | `id-dsv-stg01-vm` lacks Key Vault Secrets User, or the role was just assigned. Wait a few minutes. |
 | `... must contain only letters, digits, and . _ ~ -` | Regenerate that secret with `openssl rand -hex 32`. See checklist step 4.4. |
 | `data: ... HTTP 403` | The storage firewall doesn't allow the VM's subnet, or `id-dsv-stg01-vm` lacks Storage Blob Data Contributor on the `dinesafe` container. Rerun `setup-az-vms.sh infra`, then wait a few minutes. |
-| `data: manifest.json isn't in the container` | Blob Storage is empty. Run step 3.4. |
+| `data: manifest.json isn't in the container` | Blob Storage is empty and the fetch before it failed. Fix the fetch error printed above it, then rerun the deploy. |
 | `deploy: warning: using the CSVs already in Blob Storage` | Toronto Open Data failed or its files didn't validate. The deploy continues on the last good data. |
 | `a container reached IMDS` | The metadata block isn't in place. Run `sudo systemctl restart dsv-imds-block`, then check its rules as in [the VM setup guide](vm-first-time-setup.md#4-block-containers-from-the-instance-metadata-service). |
 | `dsv-init-db` exits non-zero or is `OOMKilled` | Check `free -h` for the swap file, then `docker compose logs dsv-init-db`. |

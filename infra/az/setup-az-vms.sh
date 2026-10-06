@@ -361,7 +361,8 @@ run_infra(){
     storage_verify
 
     echo ""
-    echo "Infra done. Next, sign in as dsv-ops01 and run: ENV=$ENV $0 secrets"
+    echo "Infra done. If kv-dsv-$ENV has no secrets yet, sign in as dsv-ops01 and run:"
+    echo "  SUB_ID=$SUB_ID ENV=$ENV $0 secrets"
 }
 
 run_secrets(){
