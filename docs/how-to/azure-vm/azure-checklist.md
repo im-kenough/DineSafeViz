@@ -561,6 +561,13 @@ they're kept. The VM needs the quota from step 1.4; without it, this step
 fails with `QuotaExceeded` before it creates anything. Done for stg on
 October 5, 2026. To do for prod.
 
+The VM's patch orchestration is set to **Customer Managed Schedules**, so
+Azure Update Manager installs updates only in your maintenance
+configuration's window. Without it, the patch mode stays `ImageDefault`, and
+the portal reports the VM as incompatible when you assign it to a maintenance
+configuration. Ubuntu's `unattended-upgrades` stays on and keeps installing
+security updates daily, independently of that window.
+
 - **Portal:** Go to **Virtual machines** > **Create** > **Azure virtual
   machine**.
   1. **Basics:** resource group `rg-dsv-<env>01`, name `vm-dsv-<env>01`, region
@@ -576,7 +583,11 @@ October 5, 2026. To do for prod.
      public IP `pip-dsv-<env>01`, and NIC network security group **None**.
   4. **Management:** **Identity**: add the user-assigned identity
      `id-dsv-<env>01-vm`, with no system-assigned identity. **Boot
-     diagnostics**: **Enable with managed storage account**.
+     diagnostics**: **Enable with managed storage account**. **Guest OS
+     updates**: turn on **Periodic assessment**, and set **Patch
+     orchestration options** to **Azure-orchestrated**. On this page,
+     Azure-orchestrated sets both properties that Customer Managed Schedules
+     needs.
   5. **Tags:** add the tags. Then select **Review + create** > **Create**.
 - **CLI:**
 
@@ -590,7 +601,12 @@ October 5, 2026. To do for prod.
     --os-disk-name osdisk-dsv-$ENV --os-disk-size-gb 64 --storage-sku Premium_LRS \
     --os-disk-delete-option $DELETE_OPTION \
     --admin-username "$ADMIN_USER" --ssh-key-values "$SSH_KEY" \
-    --assign-identity "$MI_ID" --tags $TAGS -o none && \
+    --assign-identity "$MI_ID" --patch-mode AutomaticByPlatform \
+    --tags $TAGS -o none && \
+  az vm update -g $RG -n vm-dsv-$ENV --set \
+    osProfile.linuxConfiguration.patchSettings.assessmentMode=AutomaticByPlatform \
+    'osProfile.linuxConfiguration.patchSettings.automaticByPlatformSettings={"bypassPlatformSafetyChecksOnUserSchedule": true}' \
+    -o none && \
   az vm boot-diagnostics enable -g $RG -n vm-dsv-$ENV -o none && \
   echo "VM created"
   ```
@@ -598,18 +614,36 @@ October 5, 2026. To do for prod.
   The commands are chained, so a failure stops the rest. If `$SSH_KEY`
   doesn't point to an existing file, `az vm create` treats the path as a key
   value and fails with `An RSA key file or key value must be supplied`.
+  `az vm create` has no options for the assessment mode or the bypass flag,
+  so `az vm update` sets them. Without the bypass flag, `AutomaticByPlatform`
+  means **Azure Managed - Safe Deployment**, which patches on Azure's
+  schedule and ignores your maintenance window.
+
+- **Existing VM:** To switch a VM that was created with `ImageDefault`, go to
+  **Azure Update Manager** > **Machines**, select the VM, and select **Update
+  settings**. Set **Periodic assessment** to **Enable** and **Patch
+  orchestration** to **Customer Managed Schedules**, then select **Save**. Or
+  run the `az vm update` command above, adding
+  `osProfile.linuxConfiguration.patchSettings.patchMode=AutomaticByPlatform`
+  to `--set`.
 
 - **Verify:**
 
   ```bash
   az vm identity show -g $RG -n vm-dsv-$ENV --query "{type:type, ids:keys(userAssignedIdentities)}"
   az vm show -g $RG -n vm-dsv-$ENV --query "securityProfile.securityType"
+  az vm show -g $RG -n vm-dsv-$ENV --query "osProfile.linuxConfiguration.patchSettings"
   ```
 
   The identity type is `UserAssigned`, with one ID, and the security type is
-  `TrustedLaunch`.
+  `TrustedLaunch`. The patch settings show `patchMode` and `assessmentMode` as
+  `AutomaticByPlatform`, and `bypassPlatformSafetyChecksOnUserSchedule` as
+  `true`. In the portal, **Azure Update Manager** > **Machines** shows the
+  VM's **Patch orchestration** as **Customer Managed Schedules**.
 - **Source:** [az vm create](https://learn.microsoft.com/cli/azure/vm#az-vm-create),
-  [Delete a VM and attached resources](https://learn.microsoft.com/azure/virtual-machines/delete)
+  [Delete a VM and attached resources](https://learn.microsoft.com/azure/virtual-machines/delete),
+  [Manage update configuration settings](https://learn.microsoft.com/azure/update-manager/manage-update-settings),
+  [Prerequisites for scheduled patching](https://learn.microsoft.com/azure/update-manager/scheduled-patching)
 
 Now harden the OS and install Docker Engine and the Compose plugin, as you
 normally would, before step 6.4.
