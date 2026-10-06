@@ -124,7 +124,7 @@ The following table lists the per-environment values.
 
 | Setting              | stg                          | prod                          |
 | -------------------- | ---------------------------- | ----------------------------- |
-| Subscription         | `dsv-stg01`                  | `dsv-prod01`                  |
+| Subscription         | `sub-dsv-stg01`              | `sub-dsv-prod01`              |
 | Tunnel name          | `tun-dsv-stg01`              | `tun-dsv-prod01`              |
 | Published hostname   | `stg.dinesafeviz.com`        | `dinesafeviz.com`             |
 | Service URL          | `http://dsv-nginx:80`        | `http://dsv-nginx:80`         |

@@ -46,11 +46,12 @@ ssh dsv-vm-admin@vm-dsv-stg01
 ```
 
 If `vm-dsv-stg01` doesn't resolve from your workstation, use the VM's public
-IP address instead:
+IP address instead. Set `SUB_ID` to the ID of subscription `sub-dsv-stg01`
+first:
 
 ```bash
 ssh dsv-vm-admin@$(az vm show -d -g rg-dsv-stg01 -n vm-dsv-stg01 \
-  --subscription dsv-stg01 --query publicIps -o tsv)
+  --subscription "$SUB_ID" --query publicIps -o tsv)
 ```
 
 The NSG only allows SSH from your home IP address. If the connection times

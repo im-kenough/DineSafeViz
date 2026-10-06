@@ -58,13 +58,15 @@ Update both rules for each environment you use, then remove your old address.
     ```
 
 2.  Sign in with the account for the environment, and set the variables. This
-    example uses stg. For prod, use `dsv-admin01`, `ENV=prod01`, and
-    subscription `dsv-prod01`.
+    example uses stg. For prod, use `dsv-admin01`, `ENV=prod01`, and the ID
+    of subscription `sub-dsv-prod01`. Set `SUB_ID` to the subscription ID,
+    which `az account list -o table` shows.
 
     ```bash
     az login        # dsv-ops01 for stg, dsv-admin01 for prod
     ENV=stg01
-    az account set --subscription dsv-$ENV
+    SUB_ID=<subscription-id>
+    az account set --subscription "$SUB_ID"
     NEW_IP=$(curl -4 -s https://ifconfig.me)
     ```
 
