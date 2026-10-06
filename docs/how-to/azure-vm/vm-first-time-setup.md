@@ -174,8 +174,8 @@ Deploy the current `main` to stg, or the release tag to prod:
 docker compose ps
 ```
 
-All services show `running` or `healthy`, and `dsv-init-db` and
-`dsv-init-analytics` show `exited (0)`. The first deploy takes several minutes,
+All services show `running` or `healthy`, and `dsv-init-db` shows
+`exited (0)`. The first deploy takes several minutes,
 because `scripts/data.sh` syncs the CSVs from Blob Storage into `./data` and
 `dsv-init-db` loads them.
 

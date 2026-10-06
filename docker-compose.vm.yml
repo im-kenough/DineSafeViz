@@ -123,13 +123,6 @@ services:
     mem_limit: 256m
     restart: unless-stopped
 
-  dsv-init-analytics:
-    <<: *hardening
-    environment:
-      DSV_ANALYTICS_ADMIN_PASSWORD: ${DSV_ANALYTICS_ADMIN_PASSWORD:?}
-    networks: [backend]
-    mem_limit: 32m
-
 networks:
   # cloudflared's outbound connection to Cloudflare, and nginx for the tunnel.
   edge: {}

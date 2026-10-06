@@ -8,7 +8,7 @@ import os
 import threading
 import collections
 import itertools
-from contextlib import closing
+from contextlib import closing, contextmanager
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
@@ -149,27 +149,19 @@ def parse_year_quarter(args: Dict[str, str], first: date, last: date) -> Tuple[i
     Returns:
         A tuple of (year, quarter) with validated values.
     """
-    valid_years = get_valid_years(first, last)
-    latest_year = valid_years[-1]
-
-    # Parse and validate year, default to the latest year with data
-    try:
-        year = int(args["year"]) if "year" in args else latest_year
-    except (ValueError, TypeError):
-        year = latest_year
-    if year not in valid_years:
-        year = latest_year
-
-    # Parse and validate quarter, default to the latest valid quarter for that year
-    valid_qs = get_valid_quarters(year, first, last)
-    try:
-        q = int(args["q"]) if "q" in args else valid_qs[-1]
-    except (ValueError, TypeError):
-        q = valid_qs[-1]
-    if q not in valid_qs:
-        q = valid_qs[-1]
-
+    # Default to the latest year with data, then its latest valid quarter
+    year = _pick(args, "year", get_valid_years(first, last))
+    q = _pick(args, "q", get_valid_quarters(year, first, last))
     return year, q
+
+
+def _pick(args: Dict[str, str], key: str, valid: List[int]) -> int:
+    """Return int(args[key]) if it is in valid, else the last valid value."""
+    try:
+        value = int(args[key])
+    except (KeyError, ValueError, TypeError):
+        return valid[-1]
+    return value if value in valid else valid[-1]
 
 
 def _read_version() -> str:
@@ -308,6 +300,14 @@ DB_CONFIG = {
 }
 
 
+@contextmanager
+def _db_cursor(connect_timeout: int = 5, **cursor_kwargs):
+    """Open a connection and cursor, closing both on exit."""
+    with closing(psycopg2.connect(**DB_CONFIG, connect_timeout=connect_timeout)) as conn, \
+            closing(conn.cursor(**cursor_kwargs)) as cur:
+        yield cur
+
+
 def _cached_stats(now: datetime):
     """Return cached stats if still fresh, else None."""
     fetched_at = _stats_cache["fetched_at"]
@@ -328,8 +328,7 @@ def _get_home_stats() -> Dict:
         if cached is not None:
             return cached
 
-        with closing(psycopg2.connect(**DB_CONFIG, connect_timeout=5)) as conn, \
-                closing(conn.cursor()) as cur:
+        with _db_cursor() as cur:
             # One row per infraction, so count distinct inspections, not rows.
             # An inspection is an (establishment, date) pair: recent rows have
             # no inspection_id. The Grafana dashboard counts the same way.
@@ -369,8 +368,7 @@ def home():
 
 def _fetch_inspections(start: date, end: date) -> List[Dict]:
     """Fetch inspection rows between start and end (inclusive)."""
-    with closing(psycopg2.connect(**DB_CONFIG, connect_timeout=5)) as conn, \
-            closing(conn.cursor(cursor_factory=RealDictCursor)) as cur:
+    with _db_cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(
             "SELECT inspection_date, establishment_status, action, infraction_details,"
             "       establishment_name, establishment_address, establishment_type,"
@@ -467,8 +465,7 @@ def healthz():
 @app.route("/readyz")
 def readyz():
     try:
-        with closing(psycopg2.connect(**DB_CONFIG, connect_timeout=1)) as conn, \
-                closing(conn.cursor()) as cur:
+        with _db_cursor(connect_timeout=1) as cur:
             cur.execute("SELECT 1")
         return "ok", 200
     except Exception:

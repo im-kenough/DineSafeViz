@@ -188,8 +188,7 @@ connected. Check the stack and the site yourself the first time:
     ```
 
     `dsv-tunnel`, `dsv-nginx`, `dsv-app`, `dsv-db`, and `dsv-analytics` show
-    `running` or `healthy`. `dsv-init-db` and `dsv-init-analytics` show
-    `exited (0)`.
+    `running` or `healthy`. `dsv-init-db` shows `exited (0)`.
 
 2.  In the Cloudflare dashboard, go to **Networking** > **Tunnels**, and
     confirm that `tun-dsv-stg01` shows **Healthy**.
