@@ -20,7 +20,8 @@ import shutil
 import sys
 import zipfile
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen, urlretrieve
+from urllib.parse import quote
+from urllib.request import Request, urlopen
 
 from refresh import (
     HISTORICAL_COLUMN_MAP,
@@ -50,6 +51,10 @@ MIN_RECENT_ROWS = 50000
 MIN_HISTORICAL_ROWS = 1000
 
 API_VERSION = "2023-11-03"
+
+# Seconds without data before a download gives up, so a stalled server
+# can't hang a deploy or the timer.
+DOWNLOAD_TIMEOUT = 120
 
 
 class DataError(Exception):
@@ -84,6 +89,15 @@ def validate_csv(path, column_map, min_rows):
     return rows
 
 
+def http_download(url, path, opener=urlopen):
+    """Download url to path, raising DataError on any network failure."""
+    try:
+        with opener(url, timeout=DOWNLOAD_TIMEOUT) as resp, open(path, "wb") as out:
+            shutil.copyfileobj(resp, out)
+    except OSError as e:  # URLError, HTTPError, and timeouts are all OSErrors
+        raise DataError(f"download from {url} failed: {e}") from e
+
+
 class BlobStore:
     """Minimal Blob REST client authorized with a Microsoft Entra bearer token."""
 
@@ -107,14 +121,18 @@ class BlobStore:
         except URLError as e:
             raise DataError(f"{method} {name}: {e.reason}") from e
 
-    def get_md5(self, name):
+    def stat(self, name):
+        """Return (base64 MD5, current version ID) of a blob, or None if missing."""
         resp = self._request("HEAD", name)
         if resp is None:
             return None
         with resp:
-            return resp.headers.get("Content-MD5")
+            return resp.headers.get("Content-MD5"), resp.headers.get("x-ms-version-id")
 
-    def download_to(self, name, path):
+    def download_to(self, name, path, version_id=None):
+        """Download a blob, or one exact version of it, to path."""
+        if version_id:
+            name = f"{name}?versionid={quote(version_id, safe='')}"
         resp = self._request("GET", name)
         if resp is None:
             raise DataError(f"{name} isn't in the container")
@@ -132,7 +150,8 @@ class BlobStore:
         })
         if resp is None:
             raise DataError(f"PUT {name}: container not found")
-        resp.close()
+        with resp:
+            return resp.headers.get("x-ms-version-id")
 
     def read_manifest(self):
         resp = self._request("GET", MANIFEST_NAME)
@@ -156,12 +175,14 @@ def _is_historical(entry):
     return entry["name"].startswith(HISTORICAL_DIR + "/")
 
 
-def fetch(store, data_dir, historical, download=urlretrieve, now=None):
+def fetch(store, data_dir, historical, download=http_download, now=None):
     """Download from Toronto Open Data, validate, upload changes, then the manifest.
 
     Historical CSVs are downloaded only when historical is True or the
     current manifest has none; otherwise their entries are carried over.
-    Nothing is uploaded unless every downloaded file validates.
+    Nothing is uploaded unless every downloaded file validates. Each
+    manifest entry pins the blob version it describes, so a fetch that
+    fails after overwriting a blob doesn't break sync from the old manifest.
     """
     staging = os.path.join(data_dir, ".staging")
     shutil.rmtree(staging, ignore_errors=True)
@@ -182,7 +203,11 @@ def fetch(store, data_dir, historical, download=urlretrieve, now=None):
             zip_path = os.path.join(staging, "historical.zip")
             print(f"Downloading {HISTORICAL_ZIP_URL} ...")
             download(HISTORICAL_ZIP_URL, zip_path)
-            with zipfile.ZipFile(zip_path) as zf:
+            try:
+                zf = zipfile.ZipFile(zip_path)
+            except zipfile.BadZipFile as e:
+                raise DataError(f"historical download isn't a ZIP file: {e}") from e
+            with zf:
                 for member in zf.namelist():
                     base = os.path.basename(member)
                     if not base.endswith(".csv"):
@@ -196,10 +221,12 @@ def fetch(store, data_dir, historical, download=urlretrieve, now=None):
         entries = []
         for name, path, rows in staged:
             entry = _entry(name, path, rows)
-            if store.get_md5(name) == entry["md5"]:
+            current = store.stat(name)
+            if current and current[0] == entry["md5"]:
+                entry["version_id"] = current[1]
                 print(f"  {name}: unchanged")
             else:
-                store.upload(name, path, entry["md5"])
+                entry["version_id"] = store.upload(name, path, entry["md5"])
                 print(f"  {name}: uploaded ({rows} rows)")
             entries.append(entry)
 
@@ -238,7 +265,7 @@ def sync(store, data_dir):
             continue
         part = local + ".part"
         try:
-            store.download_to(name, part)
+            store.download_to(name, part, entry.get("version_id"))
             if md5_b64(part) != entry["md5"]:
                 raise DataError(f"{name}: MD5 doesn't match the manifest")
             os.replace(part, local)

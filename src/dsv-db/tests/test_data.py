@@ -7,7 +7,7 @@ import shutil
 import sys
 import zipfile as _zipfile
 from email.message import Message
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 import pytest
 
@@ -19,6 +19,7 @@ from data import (
     BlobStore,
     DataError,
     fetch,
+    http_download,
     main,
     md5_b64,
     sync,
@@ -102,30 +103,32 @@ class TestValidateCsv:
 
 class TestBlobStore:
     def test_requests_carry_bearer_token_and_version(self):
-        opener = FakeOpener({("HEAD", "Dinesafe.csv"): FakeResponse(headers={"Content-MD5": "abc="})})
+        opener = FakeOpener({("HEAD", "Dinesafe.csv"): FakeResponse(
+            headers={"Content-MD5": "abc=", "x-ms-version-id": "2026-10-06T00:00:00.0000000Z"})})
         store = BlobStore("stdsvstg01", "dinesafe", "tok", opener=opener)
-        assert store.get_md5("Dinesafe.csv") == "abc="
+        assert store.stat("Dinesafe.csv") == ("abc=", "2026-10-06T00:00:00.0000000Z")
         req = opener.requests[0]
         assert req.full_url == "https://stdsvstg01.blob.core.windows.net/dinesafe/Dinesafe.csv"
         assert req.get_header("Authorization") == "Bearer tok"
         assert req.get_header("X-ms-version") == "2023-11-03"
 
-    def test_get_md5_of_missing_blob_is_none(self):
+    def test_stat_of_missing_blob_is_none(self):
         store = BlobStore("a", "dinesafe", "t", opener=FakeOpener({}))
-        assert store.get_md5("nope.csv") is None
+        assert store.stat("nope.csv") is None
 
     def test_other_http_errors_raise_data_error(self):
         opener = FakeOpener({("HEAD", "x.csv"): 403})
         store = BlobStore("a", "dinesafe", "t", opener=opener)
         with pytest.raises(DataError, match="403"):
-            store.get_md5("x.csv")
+            store.stat("x.csv")
 
     def test_upload_sends_block_blob_with_md5(self, tmp_path):
         p = tmp_path / "f.csv"
         p.write_bytes(b"data")
-        opener = FakeOpener({("PUT", "dinesafe-historical/f.csv"): FakeResponse(status=201)})
+        opener = FakeOpener({("PUT", "dinesafe-historical/f.csv"): FakeResponse(
+            status=201, headers={"x-ms-version-id": "v1"})})
         store = BlobStore("a", "dinesafe", "t", opener=opener)
-        store.upload("dinesafe-historical/f.csv", str(p), b64md5(b"data"))
+        assert store.upload("dinesafe-historical/f.csv", str(p), b64md5(b"data")) == "v1"
         req = opener.requests[0]
         assert req.get_method() == "PUT"
         assert req.get_header("X-ms-blob-type") == "BlockBlob"
@@ -137,6 +140,12 @@ class TestBlobStore:
         store = BlobStore("a", "dinesafe", "t", opener=opener)
         store.download_to("Dinesafe.csv", str(tmp_path / "out"))
         assert (tmp_path / "out").read_bytes() == b"csv"
+
+    def test_download_to_a_pinned_version(self, tmp_path):
+        opener = FakeOpener({("GET", "Dinesafe.csv?versionid=2026-10-06T00%3A00%3A00Z"): FakeResponse(b"old")})
+        store = BlobStore("a", "dinesafe", "t", opener=opener)
+        store.download_to("Dinesafe.csv", str(tmp_path / "out"), "2026-10-06T00:00:00Z")
+        assert (tmp_path / "out").read_bytes() == b"old"
 
     def test_read_manifest_missing_is_none(self):
         assert BlobStore("a", "dinesafe", "t", opener=FakeOpener({})).read_manifest() is None
@@ -153,20 +162,29 @@ class FakeStore:
     def __init__(self, blobs=None):
         self.blobs = dict(blobs or {})
         self.uploads = []
+        self.versions = {}  # {(name, version id): bytes}, like Blob versioning
+        self.current = {}   # {name: current version id}
 
-    def get_md5(self, name):
-        return b64md5(self.blobs[name]) if name in self.blobs else None
-
-    def download_to(self, name, path):
+    def stat(self, name):
         if name not in self.blobs:
+            return None
+        return b64md5(self.blobs[name]), self.current.get(name)
+
+    def download_to(self, name, path, version_id=None):
+        data = self.versions.get((name, version_id)) if version_id else self.blobs.get(name)
+        if data is None:
             raise DataError(f"{name} isn't in the container")
         with open(path, "wb") as f:
-            f.write(self.blobs[name])
+            f.write(data)
 
     def upload(self, name, path, md5):
         with open(path, "rb") as f:
             self.blobs[name] = f.read()
+        version_id = f"v{len(self.versions) + 1}"
+        self.versions[(name, version_id)] = self.blobs[name]
+        self.current[name] = version_id
         self.uploads.append(name)
+        return version_id
 
     def read_manifest(self):
         raw = self.blobs.get("manifest.json")
@@ -243,6 +261,25 @@ class TestFetch:
                   download=fake_download(tmp_path, recent_header=bad))
         assert store.uploads == []
 
+    def test_manifest_pins_each_file_version(self, tmp_path):
+        store = FakeStore()
+        manifest = fetch(store, str(tmp_path / "data"), historical=False,
+                         download=fake_download(tmp_path))
+        for entry in manifest["files"]:
+            assert entry["version_id"] == store.current[entry["name"]]
+
+    def test_bad_zip_is_a_data_error(self, tmp_path):
+        good = fake_download(tmp_path)
+
+        def download(url, path):
+            good(url, path)
+            if not url.endswith("dinesafe.csv"):
+                with open(path, "wb") as f:
+                    f.write(b"<html>maintenance</html>")
+
+        with pytest.raises(DataError, match="ZIP"):
+            fetch(FakeStore(), str(tmp_path / "data"), historical=False, download=download)
+
     def test_staging_is_cleaned_up(self, tmp_path):
         fetch(FakeStore(), str(tmp_path / "data"), historical=False,
               download=fake_download(tmp_path))
@@ -296,6 +333,17 @@ class TestSync:
         sync(store, str(data))
         assert not stale.exists()
 
+    def test_sync_after_partial_upload_gets_the_manifest_versions(self, tmp_path):
+        store = self.seeded_store(tmp_path)
+        old = store.blobs["Dinesafe.csv"]
+        # A later fetch uploaded a new Dinesafe.csv, then failed before the manifest.
+        p = tmp_path / "new.csv"
+        p.write_bytes(old + b"x,y\n")
+        store.upload("Dinesafe.csv", str(p), b64md5(p.read_bytes()))
+        data = tmp_path / "fresh"
+        sync(store, str(data))
+        assert (data / "Dinesafe.csv").read_bytes() == old
+
     def test_sync_without_manifest_fails(self, tmp_path):
         with pytest.raises(DataError, match="manifest.json"):
             sync(FakeStore(), str(tmp_path / "data"))
@@ -315,3 +363,28 @@ class TestMain:
         monkeypatch.setenv("DSV_TOKEN_FILE", str(tmp_path / "nope"))
         assert main(["sync"]) == 1
         assert "token" in capsys.readouterr().err
+
+
+class TestHttpDownload:
+    def test_passes_a_timeout_and_writes_the_body(self, tmp_path):
+        seen = {}
+
+        def opener(url, timeout=None):
+            seen["timeout"] = timeout
+            return FakeResponse(b"body")
+
+        http_download("https://example.test/f.csv", str(tmp_path / "f"), opener=opener)
+        assert (tmp_path / "f").read_bytes() == b"body"
+        assert seen["timeout"] and seen["timeout"] <= 300
+
+    @pytest.mark.parametrize("error", [
+        URLError("timed out"),
+        HTTPError("https://example.test/f.csv", 503, "Service Unavailable", Message(), io.BytesIO(b"")),
+        TimeoutError("timed out"),
+    ])
+    def test_network_errors_are_data_errors(self, tmp_path, error):
+        def opener(url, timeout=None):
+            raise error
+
+        with pytest.raises(DataError, match="example.test"):
+            http_download("https://example.test/f.csv", str(tmp_path / "f"), opener=opener)
