@@ -44,20 +44,28 @@ fail() {
   exit 1
 }
 
-# Writes .env, syncs the CSVs, then builds and starts the stack. Same order
-# and waits as the VM deploy in main().
-deploy_dev() {
-  local repo_dir=$1 data_status=0
-  "$repo_dir/scripts/fetch-secrets.sh" dev
-  "$repo_dir/scripts/data.sh" dev || data_status=$?
-  [[ $data_status == 0 ]] || die "scripts/data.sh failed, so the stack wasn't started"
-  docker compose up -d --build --remove-orphans || fail
+# Starts the stack with `up $1` (--build or --no-build), waits for the
+# one-shot jobs, then waits for the long-running services named after $1 to be
+# healthy, and smoke-tests nginx. `up --wait` can't cover the jobs: it returns
+# while a job still runs, and fails with "exited (0)" if a job finishes before
+# its wait starts. So the jobs get `compose wait` (their exit code), and
+# --wait lists only the long-running services.
+start_stack() {
+  local up_flag=$1
+  shift
+  docker compose up -d "$up_flag" --remove-orphans || fail
   docker compose wait dsv-init-db >/dev/null || fail
   docker compose wait dsv-init-analytics >/dev/null || fail
-  docker compose up -d --no-build --wait --wait-timeout 600 \
-    dsv-nginx dsv-app dsv-db dsv-analytics || fail
+  docker compose up -d --no-build --wait --wait-timeout 600 "$@" || fail
   docker compose exec -T dsv-nginx wget -q -O /dev/null http://127.0.0.1/healthz \
     || fail dsv-nginx dsv-app
+}
+
+# Writes .env, syncs the CSVs, then builds and starts the stack.
+deploy_dev() {
+  scripts/fetch-secrets.sh dev
+  scripts/data.sh dev || die "scripts/data.sh failed, so the stack wasn't started"
+  start_stack --build dsv-nginx dsv-app dsv-db dsv-analytics
   echo "deploy: dev is running on http://localhost:8080"
 }
 
@@ -76,7 +84,7 @@ main() {
   [[ -f deploy/$env_name.env ]] \
     || die "deploy/$env_name.env is missing. Copy deploy/$env_name.env-example to deploy/$env_name.env first."
   if [[ $env_name == dev ]]; then
-    deploy_dev "$repo_dir"
+    deploy_dev
     return
   fi
 
@@ -113,11 +121,7 @@ $dirty"
   # 4. Write .env from Key Vault, pinned to this image tag.
   DSV_VERSION="$tag" "$repo_dir/scripts/fetch-secrets.sh" "$env_name"
 
-  # 5. Pull and start, wait for the one-shot jobs, then wait for health.
-  # `up --wait` can't cover the jobs: it returns while a job still runs, and
-  # fails with "exited (0)" if a job finishes before its wait starts. So the
-  # jobs get `compose wait` (their exit code), and --wait lists only the
-  # long-running services.
+  # 5. Pull, sync the CSVs, then start and wait for health.
   docker compose pull --quiet
   # Fetch and sync the CSVs so dsv-init-db has data, even on a new VM.
   # Exit 3 means Toronto Open Data failed but the Blob copy synced.
@@ -128,15 +132,10 @@ $dirty"
     3) echo "deploy: warning: using the CSVs already in Blob Storage" >&2 ;;
     *) die "scripts/data.sh failed, so the stack wasn't started" ;;
   esac
-  docker compose up -d --no-build --remove-orphans || fail
-  docker compose wait dsv-init-db >/dev/null || fail
-  docker compose wait dsv-init-analytics >/dev/null || fail
-  docker compose up -d --no-build --wait --wait-timeout 600 \
-    dsv-tunnel dsv-nginx dsv-app dsv-db dsv-analytics || fail
+  start_stack --no-build dsv-tunnel dsv-nginx dsv-app dsv-db dsv-analytics
 
-  # 6. Smoke test: nginx reaches the app, and the tunnel is connected.
-  docker compose exec -T dsv-nginx wget -q -O /dev/null http://127.0.0.1/healthz \
-    || fail dsv-nginx dsv-app
+  # 6. Smoke test: start_stack checked nginx reaches the app; check the VM's
+  # network isolation and that the tunnel is connected.
   # Containers must not reach IMDS (dsv-imds-block.service).
   # IMDS answers 400 without the header and api-version, which wget would
   # report as a failure, so ask properly: success means it's reachable.

@@ -8,8 +8,9 @@
 # On the VM, gets a token for Azure Storage (and nothing else) from IMDS as
 # the VM's managed identity, then runs dsv-data fetch and dsv-data sync.
 # On dev, gets the token from your az login (dsv-ops01, Blob Data Reader on
-# stg) and runs sync only. The account comes from deploy/<env>.env. The token reaches the container as a mode-600
-# file, never as an argument or environment variable, and is deleted on exit.
+# stg) and runs sync only. The account comes from deploy/<env>.env. The token
+# reaches the container as a mode-600 file, never as an argument or
+# environment variable, and is deleted on exit.
 #
 # Exit codes: 0 ok, 1 error, 2 usage, 3 fetch failed but the existing Blob
 # data was synced (and loaded with --load).
