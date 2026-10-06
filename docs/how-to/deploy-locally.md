@@ -49,6 +49,11 @@ Run these commands from the repository root.
     `DSV_ANALYTICS_ADMIN_USER` and `DSV_ANALYTICS_ADMIN_PASSWORD` from
     `deploy/dev.env`.
 
+Grafana runs the upstream `grafana/grafana` image, pinned by digest, and uses
+the PostgreSQL plugin bundled in it. It doesn't download plugins from
+grafana.com. For why, see
+[Grafana: the bundled PostgreSQL plugin](../explanation/grafana-postgres-plugin.md).
+
 <!-- prettier-ignore -->
 > [!IMPORTANT]
 > Edit `deploy/dev.env`, never `.env`: every deploy rewrites `.env`.
@@ -78,6 +83,18 @@ Changes to `src/dsv-db/init.sql` need `down -v`.
 | `can't get a storage token` | `az login` as `dsv-ops01`. |
 | `GET manifest.json: HTTP 403` | Your IP changed or the role is new. See [Troubleshoot: your home IP address changed](azure-vm/troubleshoot-home-ip-change.md). |
 | `manifest.json isn't in the container` | stg has no data yet. See [Deploy to stg](azure-vm/deploy-stg.md). |
+| Dashboards are empty, and the PostgreSQL data source is missing in Grafana | `docker-compose.yml` points `dsv-analytics` at an image without the bundled plugin, such as a `-slim` one. Use the full image. |
+| `docker compose logs dsv-analytics` shows `Skipping loading of plugin as it's a duplicate` for `grafana-postgresql-datasource` | Your Grafana volume holds a plugin that an earlier Grafana 13.2 downloaded, and Grafana uses it instead of the bundled one. Run the cleanup after this table once. |
+
+To remove the downloaded plugins from the Grafana volume, run the following
+commands. They keep Grafana's database, `grafana.db`, so dashboards and users
+survive.
+
+```bash
+docker compose run --rm --no-deps --entrypoint sh dsv-analytics \
+  -c 'rm -rf /var/lib/grafana/plugins/*'
+docker compose restart dsv-analytics
+```
 | `./data isn't writable` | Run the `sudo chown` command the message prints. |
 | `password authentication failed` in logs | `docker compose down -v`, then deploy again. |
 | Port 8080 or 3000 in use | Stop the other process or stack. |

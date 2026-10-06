@@ -195,7 +195,17 @@ connected. Check the stack and the site yourself the first time:
 3.  In a browser, open `https://stg.dinesafeviz.com`. The map loads with
     inspection data.
 4.  Open `https://stg.dinesafeviz.com/analytics/`. The Grafana dashboards load
-    without a sign-in.
+    without a sign-in and show data.
+
+    On the VM, confirm that Grafana uses the PostgreSQL plugin bundled in its
+    image:
+
+    ```bash
+    docker compose logs dsv-analytics | grep -c 'Skipping loading of plugin'
+    ```
+
+    The command prints `0`. For why the bundled plugin matters, see
+    [Grafana: the bundled PostgreSQL plugin](../../explanation/grafana-postgres-plugin.md).
 5.  Confirm that `https://stg.dinesafeviz.com/analytics/login` returns `404`.
     Admins sign in through an SSH tunnel instead, as described in
     [Sign in to Grafana as admin](vm-first-time-setup.md#sign-in-to-grafana-as-admin).
@@ -238,6 +248,7 @@ errors you're most likely to see on a first stg deploy.
 | `a container reached IMDS` | The metadata block isn't in place. Run `sudo systemctl restart dsv-imds-block`, then check its rules as in [the VM setup guide](vm-first-time-setup.md#4-block-containers-from-the-instance-metadata-service). |
 | `dsv-init-db` exits non-zero or is `OOMKilled` | Check `free -h` for the swap file, then `docker compose logs dsv-init-db`. |
 | `dependency failed to start: container dsv-dsv-analytics-1 is unhealthy` | Grafana's first-start migrations outlasted its health check, so nginx and the tunnel never started. Wait for `docker compose ps` to show `dsv-analytics` as `healthy`, then rerun `deploy.sh`. `docker-compose.vm.yml` allows 300 seconds, so this means the VM is short on memory. Check `free -h`, and confirm the VM is a `Standard_B2als_v2` (checklist step 6.3). |
+| Dashboards are empty, and the PostgreSQL data source is missing in Grafana | `dsv-analytics` runs an image without the bundled plugin, such as a `-slim` one. The `backend` network has no internet, so Grafana can't download the plugin. Use the full `grafana/grafana` image in `docker-compose.yml`. See [Grafana: the bundled PostgreSQL plugin](../../explanation/grafana-postgres-plugin.md). |
 | `dsv-db` never becomes healthy | `DSV_DB_NAME` must be `dinesafe`. Check `deploy/stg.env`. |
 | Smoke test fails on `dsv-tunnel` | The tunnel token is wrong or was rotated. See checklist step 9.3. |
 | Site returns `502` but the app is healthy | Run `docker compose restart dsv-nginx`. nginx kept the app's old IP address. |

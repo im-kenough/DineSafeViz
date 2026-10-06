@@ -85,7 +85,10 @@ services:
     restart: "no"
 
   dsv-analytics:
-    image: grafana/grafana:13.1
+    # grafana/grafana:13.2.3 linux/amd64. Bundles the PostgreSQL plugin
+    # (13.0.3); the -slim variant doesn't. See
+    # docs/explanation/grafana-postgres-plugin.md.
+    image: grafana/grafana:13.2.3@sha256:d84563330dc9d2fd2bc096d0fb96021b5319c75bf6ed555566709998e823dec4
     ports:
       - "3000:3000"
     environment:
@@ -98,6 +101,8 @@ services:
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
       GF_USERS_VIEWERS_CAN_EDIT: "true"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/dinesafe.json
+      # Use the plugins in the image; don't download them from grafana.com.
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
       <<: *db-app-env
     volumes:
       - ./src/dsv-analytics/provisioning:/etc/grafana/provisioning

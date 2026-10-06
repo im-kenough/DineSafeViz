@@ -120,7 +120,9 @@ services:
       backend:
         # Fixed so admins can tunnel to it: ssh -L 3000:172.30.10.30:3000
         ipv4_address: 172.30.10.30
-    mem_limit: 256m
+    # Idle with the data source connected: about 223 MiB on 13.1, 242 MiB on
+    # 13.2.3, where PostgreSQL runs as a separate plugin process (October 6, 2026).
+    mem_limit: 320m
     restart: unless-stopped
 
 networks:
