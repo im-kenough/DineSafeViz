@@ -78,9 +78,10 @@ containers that share one image but have different network access.
     `--historical`. Every file must have the expected columns, decode as
     UTF-8 or cp1252, and have more than a minimum number of rows before
     anything is uploaded. Only files whose MD5 changed are uploaded, and
-    `manifest.json` is uploaded last.
-4.  **Sync.** `data.py sync` downloads each file in the manifest whose MD5
-    differs from the local copy, checks the MD5, and only then replaces the
+    `manifest.json` is uploaded last. Each manifest entry records the blob
+    version ID it describes.
+4.  **Sync.** `data.py sync` downloads the exact blob version of each file
+    in the manifest whose MD5 differs from the local copy, checks the MD5, and only then replaces the
     file in `./data`. It removes CSVs that aren't in the manifest.
 5.  **Load.** `dsv-init-db` runs `refresh.py`. If the table is empty, it
     seeds the historical and recent files. Otherwise it replaces every row
@@ -110,7 +111,8 @@ The network controls behind these roles:
 - **Key Vault firewall:** default deny, with the same subnet and home IP
   rules.
 - **Metadata block:** `dsv-imds-block.service` drops container traffic to
-  `169.254.169.254` and `168.63.129.16`, so only host scripts get tokens.
+  `169.254.169.254` and to the WireServer agent ports on `168.63.129.16`,
+  so only host scripts get tokens.
   Each deploy checks that the block holds.
 - **Blob versioning and soft delete:** a bad write by the VM identity can be
   rolled back, and its data role can't turn these settings off.
