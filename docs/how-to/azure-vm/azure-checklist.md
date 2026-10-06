@@ -42,6 +42,31 @@ ADMIN_USER=<your-vm-admin-username>
 az account set --subscription dsv-$ENV
 ```
 
+### Scripts
+
+Steps 1.2 through 4.4 are also scripted in
+[`setup-az-vms.sh`](../../../infra/az/setup-az-vms.sh). It runs in two phases,
+one per account, so `dsv-admin01` never needs a standing role on the vaults.
+Each phase checks the signed-in account and is safe to run again; it doesn't
+overwrite existing secrets.
+
+```bash
+ENV=stg01 ./infra/az/setup-az-vms.sh infra     # as dsv-admin01
+ENV=stg01 ./infra/az/setup-az-vms.sh secrets   # as dsv-ops01
+```
+
+To record the current state of both environments, for example after you
+finish a part of this checklist, run
+[`dump-az-config.sh`](../../../infra/az/dump-az-config.sh) as `dsv-ops01`. It
+writes one Markdown file per environment to `az-config/`, with subscription
+IDs and IP addresses redacted. It lists secret names but never reads their
+values.
+
+```bash
+./infra/az/dump-az-config.sh                   # both environments
+ENV=prod01 ./infra/az/dump-az-config.sh        # one environment
+```
+
 ## 1. Entra ID and RBAC
 
 Accounts, groups, and the role assignments that don't depend on new resources
@@ -61,7 +86,8 @@ The following items exist and were verified on October 5, 2026.
 - [x] `budget-dsv-prod01-monthly` and `budget-dsv-stg01-monthly`: 40 CAD, alerts
       at 50, 80, and 100% actual and 100% forecast.
 - [x] `kv-dsv-prod01` and `kv-dsv-stg01`: Standard, RBAC permission model,
-      90-day soft delete. Purge protection is on for prod only (see 4.1).
+      90-day soft delete. Purge protection is on for both (stg's was turned on
+      in step 4.1).
 - [x] `rg-dsv-prod01-snapshots`, with no lock.
 
 ### 1.2 Done: tag the existing resource groups and vaults
@@ -100,14 +126,14 @@ created. On October 5, 2026, all four tags were verified on `rg-dsv-stg01`,
 
 ### 1.3 Role assignments still to do
 
-These assignments need resources that don't exist yet. The step that creates
-each resource assigns its roles.
+These assignments need resources that didn't exist when the accounts were set
+up. The step that creates each resource assigns its roles.
 
-| Assignment | Scope | Step |
-| ---------- | ----- | ---- |
-| `id-dsv-<env>01-vm`: Key Vault Secrets User | `kv-dsv-<env>01` | 4.3 |
-| `sg-dsv-prod01-operators`: Key Vault Secrets Officer | `kv-dsv-prod01` | 4.3 |
-| `sg-dsv-prod01-operators`: Virtual Machine Contributor | `vm-dsv-prod01` | 6.5 |
+| Assignment | Scope | Step | Status |
+| ---------- | ----- | ---- | ------ |
+| `id-dsv-<env>01-vm`: Key Vault Secrets User | `kv-dsv-<env>01` | 4.3 | Done |
+| `sg-dsv-prod01-operators`: Key Vault Secrets Officer | `kv-dsv-prod01` | 4.3 | Done |
+| `sg-dsv-prod01-operators`: Virtual Machine Contributor | `vm-dsv-prod01` | 6.5 | To do |
 
 ## 2. Network
 
@@ -115,11 +141,12 @@ Each environment gets one small VNet with one subnet. The NSG on the subnet
 allows SSH from your home IP address only, and the Key Vault service endpoint
 lets the VM reach its vault without the vault allowing the VM's public IP.
 
-### 2.1 Create the NSG and its SSH rule
+### 2.1 Done: create the NSG and its SSH rule
 
 The NSG's built-in rules already deny other inbound traffic from the
 internet. `AllowSshFromHome` is the only inbound rule; there are no web ports,
-because visitors arrive through Cloudflare Tunnel.
+because visitors arrive through Cloudflare Tunnel. Verified on both
+environments on October 5, 2026.
 
 - **Portal:**
   1. Go to **Network security groups** > **Create**. Select resource group
@@ -143,10 +170,13 @@ because visitors arrive through Cloudflare Tunnel.
   shows one rule.
 - **Source:** [Create, change, or delete a network security group](https://learn.microsoft.com/azure/virtual-network/manage-network-security-group)
 
-### 2.2 Create the VNet and subnet
+### 2.2 Done: create the VNet and subnet
 
 A `/24` per environment with a `/27` subnet leaves room for later subnets.
 The prod and stg ranges don't overlap, so they could be peered later.
+Verified on both environments on October 5, 2026. `snet-dsv-prod01-app` was
+first created as a `/24` and was resized to `/27` the same day, before
+anything was attached to it.
 
 - **Portal:** Go to **Virtual networks** > **Create**. Select
   `rg-dsv-<env>01`, name `vnet-dsv-<env>01`, region **Canada Central**. On
@@ -165,11 +195,12 @@ The prod and stg ranges don't overlap, so they could be peered later.
 
 - **Source:** [az network vnet create](https://learn.microsoft.com/cli/azure/network/vnet#az-network-vnet-create)
 
-### 2.3 Attach the NSG and the Key Vault service endpoint to the subnet
+### 2.3 Done: attach the NSG and the Key Vault service endpoint to the subnet
 
 The NSG goes on the subnet, not the NIC, so it survives stg VMs being deleted
 and recreated. The `Microsoft.KeyVault` service endpoint is free; it lets the
-vault firewall allow this subnet by name.
+vault firewall allow this subnet by name. Verified on both environments on
+October 5, 2026.
 
 - **Portal:** Open `vnet-dsv-<env>01` > **Subnets** > `snet-dsv-<env>01-app`.
   Set **Network security group** to `nsg-dsv-<env>01-app`, and under
@@ -196,10 +227,12 @@ The VM signs in to Key Vault as a user-assigned managed identity. Unlike a
 system-assigned identity, it outlives the VM, so recreating the stg VM doesn't
 require new role assignments.
 
-### 3.1 Create `id-dsv-<env>01-vm`
+### 3.1 Done: create `id-dsv-<env>01-vm`
 
 The identity is created empty. Step 4.3 gives it one role on one vault, and
-step 6.3 attaches it to the VM as the VM's only identity.
+step 6.3 attaches it to the VM as the VM's only identity. Verified on both
+environments on October 5, 2026. A stray `id-dsv-prod01-m`, created with a
+mistyped name and no role assignments, was deleted the same day.
 
 - **Portal:** Go to **Managed Identities** > **Create**. Select
   `rg-dsv-<env>01`, region **Canada Central**, name `id-dsv-<env>01-vm`, add
@@ -219,11 +252,12 @@ Each environment's vault holds that environment's five secrets. The vault
 uses RBAC, so Owner and Contributor don't grant access to secrets, and a
 firewall allows only the VM's subnet and your home IP address.
 
-### 4.1 Turn on purge protection (stg)
+### 4.1 Done: turn on purge protection (stg)
 
 Purge protection stops anyone, including you, from permanently deleting the
 vault or its secrets before the 90-day soft-delete period ends. `kv-dsv-prod01`
-already has it. `kv-dsv-stg01` doesn't.
+had it from creation, and it was turned on for `kv-dsv-stg01` on October 5,
+2026.
 
 <!-- prettier-ignore -->
 > [!CAUTION]
@@ -244,12 +278,13 @@ already has it. `kv-dsv-stg01` doesn't.
   returns `true` for both vaults.
 - **Source:** [Azure Key Vault soft-delete overview](https://learn.microsoft.com/azure/key-vault/general/soft-delete-overview)
 
-### 4.2 Restrict the vault firewall
+### 4.2 Done: restrict the vault firewall
 
 The firewall allows only the VM's subnet, through its service endpoint, and
 your home IP address `/32`. Trusted Microsoft services can't bypass it, because
 nothing in this design needs them. Add the allow rules before you switch the
-default action to **Deny**, so you don't lock yourself out.
+default action to **Deny**, so you don't lock yourself out. Verified on both
+vaults on October 5, 2026.
 
 - **Portal:** Open the vault > **Settings** > **Networking** > **Firewalls and
   virtual networks**. Select **Allow public access from specific virtual
@@ -279,12 +314,14 @@ default action to **Deny**, so you don't lock yourself out.
   [Troubleshoot: your home IP address changed](troubleshoot-home-ip-change.md).
 - **Source:** [Configure network security for Azure Key Vault](https://learn.microsoft.com/azure/key-vault/general/network-security)
 
-### 4.3 Assign the vault roles
+### 4.3 Done: assign the vault roles
 
 The VM's identity gets **Key Vault Secrets User**, which reads secret values
 and nothing else, on its own vault only. For prod, the operator group gets
 **Key Vault Secrets Officer** on `kv-dsv-prod01` so that `dsv-ops01` can set
-secrets. The stg operator group already has it on `kv-dsv-stg01`.
+secrets. The stg operator group already has it on `kv-dsv-stg01`. No user
+account has a direct role on either vault. Verified on both vaults on October
+5, 2026.
 
 - **Portal:** Open the vault > **Access control (IAM)** > **Add** > **Add role
   assignment**. Select **Key Vault Secrets User**, then **Managed identity**
@@ -309,13 +346,14 @@ secrets. The stg operator group already has it on `kv-dsv-stg01`.
 - **Verify:** `az role assignment list --scope "$KV_ID" --query "[].{who:principalName, role:roleDefinitionName}" -o table`
 - **Source:** [Azure built-in roles for Key Vault data plane operations](https://learn.microsoft.com/azure/key-vault/general/rbac-guide)
 
-### 4.4 Set the generated secrets
+### 4.4 Done: set the generated secrets
 
 As `dsv-ops01`, from your home network, store four random values. They're
 hexadecimal because they end up in `.env` and in a URL, where hex never needs
 quoting. The fifth secret, `dsv-tunnel-token`, comes from Cloudflare in step
 5.1. A new role assignment can take a few minutes to apply; if you get
-`ForbiddenByRbac`, wait and retry.
+`ForbiddenByRbac`, wait and retry. All four names were verified in both vaults
+on October 5, 2026.
 
 - **Portal:** Open the vault > **Objects** > **Secrets** > **Generate/Import**.
   For each name below, paste the output of `openssl rand -hex 32` as the value,
