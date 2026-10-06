@@ -6,25 +6,43 @@
 version: 2
 
 updates:
-  # Update python packages in the webapp
+  # Python packages in the webapp and the data loader
   - package-ecosystem: "pip"
-    directory: "/src/dsv-app"
+    directories:
+      - "/src/dsv-app"
+      - "/src/dsv-db"
     target-branch: "main"
     schedule:
       interval: "weekly"
+    groups:
+      pip-minor-patch:
+        update-types: ["minor", "patch"]
 
-  # Update docker base image in the webapp
+  # Dockerfile base images in the webapp and the data loader
   - package-ecosystem: "docker"
-    directory: "/src/dsv-app"
+    directories:
+      - "/src/dsv-app"
+      - "/src/dsv-db"
     target-branch: "main"
     schedule:
       interval: "weekly"
-  # Update docker base image in the database
-  - package-ecosystem: "docker"
-    directory: "/src/dsv-db"
+    groups:
+      docker-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # Upstream images pinned in the Compose files. Postgres major versions need
+  # a data migration, not just a new tag, so they're ignored.
+  - package-ecosystem: "docker-compose"
+    directory: "/"
     target-branch: "main"
     schedule:
       interval: "weekly"
+    groups:
+      compose-minor-patch:
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "postgres"
+        update-types: ["version-update:semver-major"]
 
   # Update GitHub Actions versions in workflows files
   - package-ecosystem: "github-actions"
@@ -32,3 +50,6 @@ updates:
     target-branch: "main"
     schedule:
       interval: "weekly"
+    groups:
+      actions-minor-patch:
+        update-types: ["minor", "patch"]

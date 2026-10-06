@@ -1,0 +1,124 @@
+# Azure VM override for stg and prod. Never used locally.
+#
+# scripts/fetch-secrets.sh selects this file by writing
+# COMPOSE_FILE=docker-compose.yml:docker-compose.vm.yml into .env, and
+# scripts/deploy.sh sets DSV_VERSION. Required values use ${VAR:?} so a
+# missing secret stops Compose instead of falling back to a local default.
+# Merge rules: https://docs.docker.com/reference/compose-file/merge/
+#
+# mem_limit values are first estimates for a 1 GiB VM with a 2 GiB swap file.
+# Revisit them with `docker stats` after the first week on stg.
+
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+
+services:
+  dsv-tunnel:
+    <<: *hardening
+    image: cloudflare/cloudflared:2026.10.0
+    # The image's entrypoint is `cloudflared --no-autoupdate`. The token comes
+    # from TUNNEL_TOKEN, so it doesn't appear in the process list.
+    command: ["tunnel", "run"]
+    environment:
+      TUNNEL_TOKEN: ${DSV_TUNNEL_TOKEN:?}
+      # /ready on this port is deploy.sh's smoke check. Reachable on edge only.
+      TUNNEL_METRICS: 0.0.0.0:2000
+    networks: [edge]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    mem_limit: 64m
+    restart: unless-stopped
+    depends_on:
+      - dsv-nginx
+
+  dsv-nginx:
+    <<: *hardening
+    ports: !reset []
+    volumes:
+      - ./src/dsv-nginx/snippets:/etc/nginx/snippets:ro
+    networks: [edge, backend]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, NET_BIND_SERVICE, SETGID, SETUID]
+    mem_limit: 64m
+    restart: unless-stopped
+
+  dsv-app:
+    <<: *hardening
+    image: ghcr.io/im-kenough/dsv-app:${DSV_VERSION:?}
+    environment:
+      DSV_DB_PASSWORD: ${DSV_DB_APP_PASSWORD:?}
+    networks: [backend]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    mem_limit: 192m
+    restart: unless-stopped
+
+  dsv-db:
+    <<: *hardening
+    environment:
+      POSTGRES_PASSWORD: ${DSV_DB_PASSWORD:?}
+      DSV_DB_APP_PASSWORD: ${DSV_DB_APP_PASSWORD:?}
+      DSV_DB_MIGRATOR_PASSWORD: ${DSV_DB_MIGRATOR_PASSWORD:?}
+    networks: [backend]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    mem_limit: 320m
+    restart: unless-stopped
+
+  dsv-init-db:
+    <<: *hardening
+    image: ghcr.io/im-kenough/dsv-init-db:${DSV_VERSION:?}
+    environment:
+      DSV_DB_PASSWORD: ${DSV_DB_PASSWORD:?}
+    # egress: downloads the inspection CSVs from the Toronto Open Data portal.
+    networks: [backend, egress]
+    # Measured peak about 430 MiB on the full data load (October 5, 2026);
+    # refresh.py reads each CSV into memory. One-shot, so swap absorbs it.
+    mem_limit: 640m
+
+  dsv-analytics:
+    <<: *hardening
+    ports: !reset []
+    environment:
+      GF_SERVER_ROOT_URL: ${DSV_ANALYTICS_ROOT_URL:?}
+      GF_SECURITY_ADMIN_PASSWORD: ${DSV_ANALYTICS_ADMIN_PASSWORD:?}
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_USERS_VIEWERS_CAN_EDIT: "false"
+      GF_AUTH_ANONYMOUS_HIDE_VERSION: "true"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      DSV_DB_PASSWORD: ${DSV_DB_APP_PASSWORD:?}
+    networks:
+      backend:
+        # Fixed so admins can tunnel to it: ssh -L 3000:172.30.10.30:3000
+        ipv4_address: 172.30.10.30
+    mem_limit: 256m
+    restart: unless-stopped
+
+  dsv-init-analytics:
+    <<: *hardening
+    environment:
+      DSV_ANALYTICS_ADMIN_PASSWORD: ${DSV_ANALYTICS_ADMIN_PASSWORD:?}
+    networks: [backend]
+    mem_limit: 32m
+
+networks:
+  # cloudflared's outbound connection to Cloudflare, and nginx for the tunnel.
+  edge: {}
+  # Everything else. internal: no route to the internet or to IMDS.
+  backend:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.10.0/24
+  # Only dsv-init-db, for the CSV download.
+  egress: {}

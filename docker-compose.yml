@@ -40,9 +40,14 @@ services:
       POSTGRES_USER: ${DSV_DB_USER}
       POSTGRES_PASSWORD: ${DSV_DB_PASSWORD}
       POSTGRES_DB: ${DSV_DB_NAME}
+      # Read once by set-passwords.sh on first start. Defaults match the
+      # app-role defaults in x-db-app-env.
+      DSV_DB_APP_PASSWORD: ${DSV_DB_APP_PASSWORD:-dinesafe_app}
+      DSV_DB_MIGRATOR_PASSWORD: ${DSV_DB_MIGRATOR_PASSWORD:-dinesafe_migrator}
     volumes:
       - dsv-db-data:/var/lib/postgresql/data
       - ./src/dsv-db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./src/dsv-db/set-passwords.sh:/docker-entrypoint-initdb.d/set-passwords.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DSV_DB_USER}"]
       interval: 5s

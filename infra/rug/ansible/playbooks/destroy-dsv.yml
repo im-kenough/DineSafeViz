@@ -1,0 +1,7 @@
+# infra/ansible/playbooks/destroy-dsv.yml
+---
+- name: Destroy DineSafeViz application
+  hosts: dsv
+  become: true
+  roles:
+    - destroy
