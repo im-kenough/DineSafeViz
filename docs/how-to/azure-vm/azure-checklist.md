@@ -898,7 +898,8 @@ new database connections between the two steps.
 
 Grafana creates its admin user on first start only, so a new
 `GF_SECURITY_ADMIN_PASSWORD` alone doesn't change it. Reset it with the
-Grafana CLI, then redeploy so `dsv-init-analytics` uses the new value.
+Grafana CLI, then redeploy so `.env` and the container's environment
+match the new value.
 
 1.  On your workstation, as `dsv-ops01`:
 

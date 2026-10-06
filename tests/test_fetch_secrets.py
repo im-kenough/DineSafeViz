@@ -50,7 +50,7 @@ def test_prod_reads_the_prod_vault(vm_repo):
 
 def test_rejects_unknown_environment(vm_repo):
     repo, env, log = vm_repo
-    result = fetch(repo, env, "dev")
+    result = fetch(repo, env, "local")
     assert result.returncode == 2
     assert "usage" in result.stderr
     assert log.read_text() == ""
@@ -141,8 +141,8 @@ def test_dollar_and_slash_survive_compose_interpolation(vm_repo, tmp_path):
     assert result.stdout == "a$b/c+d=\n"
 
 
-# The Grafana admin password goes into a basic-auth URL in
-# dsv-init-analytics, where / @ : # ? % would corrupt it silently.
+# Generated secrets stay URL-safe: / @ : # ? % would corrupt a connection
+# string or basic-auth URL silently.
 def test_rejects_url_unsafe_generated_secret(vm_repo):
     repo, env, _ = vm_repo
     (repo / ".env").write_text("OLD=1\n")
@@ -169,3 +169,47 @@ def test_version_from_environment_wins(vm_repo):
     assert fetch(repo, env | {"DSV_VERSION": "0.5.0"}, "prod").returncode == 0
     assert env_text(repo).count("DSV_VERSION=") == 1
     assert "DSV_VERSION=0.5.0\n" in env_text(repo)
+
+
+# Dev has no Key Vault or tunnel: its throwaway secrets are in deploy/dev.env.
+def test_dev_writes_env_from_dev_env_without_azure(vm_repo):
+    repo, env, log = vm_repo
+    result = fetch(repo, env, "dev")
+    assert result.returncode == 0, result.stderr
+    assert log.read_text() == ""  # no IMDS, no Key Vault
+    text = env_text(repo)
+    assert "COMPOSE_FILE=docker-compose.yml\n" in text
+    assert "DSV_STORAGE_ACCOUNT=stdsvstg01\n" in text
+    assert "DSV_ANALYTICS_ROOT_URL=http://localhost:8080/analytics/\n" in text
+    assert "DSV_DB_PASSWORD='dev-db-password'\n" in text
+    assert "DSV_DB_MIGRATOR_PASSWORD='dev-db-migrator-password'\n" in text
+    assert "DSV_DB_APP_PASSWORD='dev-db-app-password'\n" in text
+    assert "DSV_ANALYTICS_ADMIN_PASSWORD='dev-analytics-admin-password'\n" in text
+    assert "DSV_TUNNEL_TOKEN" not in text
+    assert "DSV_KEY_VAULT" not in text
+    assert text.count("DSV_DB_PASSWORD=") == 1
+    assert stat.S_IMODE(os.stat(repo / ".env").st_mode) == 0o600
+
+
+def test_dev_missing_secret_names_the_variable(vm_repo):
+    repo, env, _ = vm_repo
+    (repo / ".env").write_text("OLD=1\n")
+    settings = repo / "deploy" / "dev.env"
+    settings.write_text("".join(
+        line for line in settings.read_text().splitlines(keepends=True)
+        if not line.startswith("DSV_DB_APP_PASSWORD=")
+    ))
+    result = fetch(repo, env, "dev")
+    assert result.returncode == 1
+    assert "DSV_DB_APP_PASSWORD in deploy/dev.env" in result.stderr
+    assert env_text(repo) == "OLD=1\n"
+
+
+def test_dev_secrets_follow_the_key_vault_rules(vm_repo):
+    repo, env, _ = vm_repo
+    with open(repo / "deploy" / "dev.env", "a") as f:
+        f.write("DSV_ANALYTICS_ADMIN_PASSWORD=pa/ss@word\n")
+    result = fetch(repo, env, "dev")
+    assert result.returncode == 1
+    assert "DSV_ANALYTICS_ADMIN_PASSWORD" in result.stderr
+    assert not (repo / ".env").exists()

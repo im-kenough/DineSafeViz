@@ -48,7 +48,6 @@ def test_stg_deploys_main_by_its_commit_tag(vm_repo):
     assert ("docker compose up -d --no-build --wait --wait-timeout 600 "
             "dsv-tunnel dsv-nginx dsv-app dsv-db dsv-analytics") in lines
     assert "docker compose wait dsv-init-db" in lines
-    assert "docker compose wait dsv-init-analytics" in lines
     assert ran(lines, "docker image prune")
     assert "DSV_VERSION=sha-abc1234\n" in (repo / ".env").read_text()
     assert "kv-dsv-stg01" in log.read_text()
@@ -75,7 +74,7 @@ def test_jobs_are_waited_on_before_health_and_wait_skips_them(vm_repo):
     assert deploy(repo, env, "stg", "main").returncode == 0
     lines = calls(log)
     up_wait = first(lines, "docker compose up -d --no-build --wait")
-    assert first(lines, "docker compose wait dsv-init-analytics") < up_wait
+    assert first(lines, "docker compose wait dsv-init-db") < up_wait
     assert "dsv-init" not in lines[up_wait]
 
 
@@ -249,3 +248,46 @@ def test_reachable_imds_fails_the_deploy(vm_repo):
     result = deploy(repo, {**env, "FAKE_IMDS_REACHABLE": "1"}, "stg", "main")
     assert result.returncode != 0
     assert "IMDS" in result.stderr
+
+
+def test_dev_builds_and_starts_the_working_tree(vm_repo):
+    repo, env, log = vm_repo
+    result = deploy(repo, env, "dev")
+    assert result.returncode == 0, result.stderr
+    lines = calls(log)
+    assert not ran(lines, "git")  # deploys the working tree as it is
+    assert not ran(lines, "curl")  # no IMDS or Key Vault
+    assert not ran(lines, "docker manifest")
+    assert not ran(lines, "docker compose pull")
+    assert not ran(lines, "docker image prune")  # not on a workstation
+    assert (
+        first(lines, "az account get-access-token")
+        < first(lines, "docker compose --profile data run")
+        < first(lines, "docker compose up -d --build --remove-orphans")
+        < first(lines, "docker compose wait dsv-init-db")
+        < first(lines, "docker compose up -d --no-build --wait")
+    )
+    up_wait = lines[first(lines, "docker compose up -d --no-build --wait")]
+    assert up_wait.endswith("dsv-nginx dsv-app dsv-db dsv-analytics")
+    assert ("docker compose exec -T dsv-nginx wget -q -O /dev/null "
+            "http://127.0.0.1/healthz") in lines
+    assert "DSV_DB_PASSWORD='dev-db-password'\n" in (repo / ".env").read_text()
+    assert "http://localhost:8080" in result.stdout
+
+
+def test_dev_without_az_login_starts_nothing(vm_repo):
+    repo, env, log = vm_repo
+    result = deploy(repo, env | {"FAKE_AZ_LOGGED_OUT": "1"}, "dev")
+    assert result.returncode == 1
+    assert "az login" in result.stderr
+    assert not ran(calls(log), "docker compose up")
+
+
+def test_dev_failed_data_load_shows_its_logs(vm_repo):
+    repo, env, log = vm_repo
+    result = deploy(repo, env | {
+        "FAKE_INIT_DB_EXIT": "1",
+        "FAKE_PS_JSON": '{"Service":"dsv-init-db","State":"exited","ExitCode":1,"Health":""}',
+    }, "dev")
+    assert result.returncode == 1
+    assert result.stderr.rstrip().endswith("fake logs for dsv-init-db")

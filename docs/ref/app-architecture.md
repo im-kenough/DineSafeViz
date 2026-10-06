@@ -24,7 +24,6 @@ published images, networks, hardening, and memory limits.
 | `dsv-app`            | `ghcr.io/im-kenough/dsv-app`         | `backend`           | Flask app. Read-only database role.                         |
 | `dsv-db`             | `postgres`                           | `backend`           | Postgres with the `inspections` table.                      |
 | `dsv-analytics`      | `grafana/grafana`                    | `backend`           | Dashboards. Read-only database role.                        |
-| `dsv-init-analytics` | `curlimages/curl`                    | `backend`           | One-shot: lets anonymous viewers see the dashboard.         |
 | `dsv-init-db`        | `ghcr.io/im-kenough/dsv-init-db`     | `backend`           | One-shot: loads `./data` into Postgres with `refresh.py`.   |
 | `dsv-data`           | `ghcr.io/im-kenough/dsv-init-db`     | `egress`            | On demand: `data.py fetch` and `sync`. Profile `data`.      |
 
@@ -122,13 +121,15 @@ For the full list of accounts and roles, see
 
 ## Local development
 
-Local runs use the same data as stg. Your account syncs it from the stg
-container with Reader access, from your home IP address:
+Local runs, the dev environment, use the same data as stg. Your account
+syncs it from the stg container with Reader access, from your home IP
+address. Dev settings and throwaway passwords live in `deploy/dev.env`, like
+`deploy/stg.env` and `deploy/prod.env` on the VMs:
 
 ```bash
-az login                      # as dsv-ops01
-scripts/data.sh local         # syncs into ./data
-docker compose up -d --build
+cp deploy/dev.env-example deploy/dev.env   # once
+az login                                   # as dsv-ops01
+scripts/deploy.sh dev                      # .env, ./data, build, start
 ```
 
 For the full steps, see [Deploy DineSafeViz locally](../how-to/deploy-locally.md).

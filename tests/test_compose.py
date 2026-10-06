@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from helpers import ROOT
+from helpers import ROOT, run
 
 COMPOSE_DIR = Path(__file__).resolve().parent / "compose"
 
@@ -58,7 +58,7 @@ def test_local_db_runs_set_passwords_after_init_sql(local):
 
 
 LONG_RUNNING = ["dsv-tunnel", "dsv-nginx", "dsv-app", "dsv-db", "dsv-analytics"]
-ONE_SHOT = ["dsv-init-db", "dsv-init-analytics", "dsv-data"]
+ONE_SHOT = ["dsv-init-db", "dsv-data"]
 VM_FILES = ("docker-compose.yml", "docker-compose.vm.yml")
 
 
@@ -122,7 +122,6 @@ def test_vm_networks(vm):
         "dsv-analytics": {"backend"},
         "dsv-init-db": {"backend"},
         "dsv-data": {"egress"},
-        "dsv-init-analytics": {"backend"},
     }
 
 
@@ -236,3 +235,24 @@ def test_vm_data_service_is_hardened(vm):
     assert svc["cap_drop"] == ["ALL"]
     assert "/tmp" in svc["tmpfs"]
     assert int(svc["mem_limit"]) <= 384 * 1024 * 1024
+
+
+# The .env that `fetch-secrets.sh dev` writes drives the local stack, so the
+# dev passwords replace the built-in defaults everywhere they're used.
+def test_dev_env_reaches_every_service(vm_repo):
+    repo, env, _ = vm_repo
+    result = run([repo / "scripts" / "fetch-secrets.sh", "dev"], env)
+    assert result.returncode == 0, result.stderr
+    services = load(repo / ".env", "docker-compose.yml")["services"]
+    assert "dsv-tunnel" not in services
+    db = services["dsv-db"]["environment"]
+    assert db["POSTGRES_USER"] == "dsv_admin"
+    assert db["POSTGRES_PASSWORD"] == "dev-db-password"
+    assert db["DSV_DB_APP_PASSWORD"] == "dev-db-app-password"
+    assert db["DSV_DB_MIGRATOR_PASSWORD"] == "dev-db-migrator-password"
+    assert services["dsv-init-db"]["environment"]["DSV_DB_PASSWORD"] == "dev-db-password"
+    for name in ("dsv-app", "dsv-analytics"):
+        assert services[name]["environment"]["DSV_DB_PASSWORD"] == "dev-db-app-password"
+    grafana = services["dsv-analytics"]["environment"]
+    assert grafana["GF_SECURITY_ADMIN_PASSWORD"] == "dev-analytics-admin-password"
+    assert grafana["GF_SERVER_ROOT_URL"] == "http://localhost:8080/analytics/"

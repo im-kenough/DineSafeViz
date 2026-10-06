@@ -20,7 +20,7 @@ matching, and you see these errors:
 - **Key Vault returns `403 Forbidden` with `ForbiddenByFirewall`.** The vault
   firewall only allows your old address. In the portal, you can open the vault
   but can't list its secrets.
-- **`scripts/data.sh local` fails with HTTP 403 (`AuthorizationFailure`).**
+- **`scripts/data.sh dev` fails with HTTP 403 (`AuthorizationFailure`).**
   The storage account firewall on `stdsv<env>01` only allows your old address.
 
 The site itself isn't affected. Visitors reach it through Cloudflare Tunnel,
@@ -117,7 +117,7 @@ Update every rule for each environment you use, then remove your old address.
     ```bash
     az keyvault secret list --vault-name kv-dsv-$ENV --query "[].name" -o tsv
     ssh <admin-user>@<vm-public-ip> true && echo "SSH OK"
-    scripts/data.sh local        # stg only: syncs the CSVs into ./data
+    scripts/data.sh dev        # stg only: syncs the CSVs into ./data
     ```
 
 Rule changes can take a few minutes to apply. If verification fails right away,
