@@ -23,7 +23,7 @@ x-hardening: &hardening
 services:
   dsv-tunnel:
     <<: *hardening
-    image: cloudflare/cloudflared:2026.10.0
+    image: cloudflare/cloudflared:2026.10.0@sha256:1a50cc8893b3f0dd283805d2efcd3336210aced60a83d967fb2bbc8ab69b5f35
     # The image's entrypoint is `cloudflared --no-autoupdate`. The token comes
     # from TUNNEL_TOKEN, so it doesn't appear in the process list.
     command: ["tunnel", "run"]
