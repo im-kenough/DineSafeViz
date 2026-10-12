@@ -99,8 +99,8 @@ resource group of the environment it serves.
 
 | Identity               | Consumer                         | Purpose                                | Phase | Status  |
 | ---------------------- | -------------------------------- | -------------------------------------- | ----- | ------- |
-| `id-dsv-prod01-vm`     | `vm-dsv-prod01`                  | Read app secrets at deploy time        | 1     | Planned |
-| `id-dsv-stg01-vm`      | `vm-dsv-stg01`                   | Read app secrets at deploy time        | 1     | Planned |
+| `id-dsv-prod01-vm`     | `vm-dsv-prod01`                  | Read app secrets at deploy time; ingest into and load from the prod raw zone | 1     | Exists  |
+| `id-dsv-stg01-vm`      | `vm-dsv-stg01`                   | Read app secrets at deploy time; ingest into and load from the stg raw zone  | 1     | Exists  |
 | `id-dsv-prod01-deploy` | GitHub Actions, environment `prod` | Run the deploy script on the prod VM | 2     | Planned |
 | `id-dsv-stg01-deploy`  | GitHub Actions, environment `stg`  | Run the deploy script on the stg VM  | 2     | Planned |
 
@@ -117,9 +117,9 @@ deployment.
 | ------------------------- | ---------------------------- | -------------------- | ------------------------------------------------- | ------- |
 | `id-dsv-prod01-vm`        | Key Vault Secrets User       | `kv-dsv-prod01`      | `fetch-secrets.sh` reads secrets (read-only)      | Planned |
 | `id-dsv-stg01-vm`         | Key Vault Secrets User       | `kv-dsv-stg01`       | Same, for stg                                     | Planned |
-| `id-dsv-prod01-vm`        | Storage Blob Data Contributor | `stdsvprod01/dinesafe` container | `data.sh` uploads and syncs the CSVs  | Planned |
-| `id-dsv-stg01-vm`         | Storage Blob Data Contributor | `stdsvstg01/dinesafe` container  | Same, for stg                         | Planned |
-| `sg-dsv-stg01-operators`  | Storage Blob Data Reader     | `stdsvstg01/dinesafe` container  | `data.sh dev` syncs the CSVs for local development | Planned |
+| `id-dsv-prod01-vm`        | Storage Blob Data Contributor | `stdsvprod01/dinesafe` container | The data pipeline writes, prunes, and reads the raw zone | Planned |
+| `id-dsv-stg01-vm`         | Storage Blob Data Contributor | `stdsvstg01/dinesafe` container  | Same, for stg                         | Exists  |
+| `sg-dsv-stg01-operators`  | Storage Blob Data Reader     | `stdsvstg01/dinesafe` container  | Dev loads its local database from stg's raw zone | Exists  |
 | `sg-dsv-prod01-operators` | Reader                       | `rg-dsv-prod01`      | See prod resources                                | Exists  |
 | `sg-dsv-prod01-operators` | Virtual Machine Contributor  | `vm-dsv-prod01`      | Start, stop, restart, and serial console          | Planned |
 | `sg-dsv-prod01-operators` | Disk Snapshot Contributor    | `rg-dsv-prod01-snapshots` | Create and delete pre-deploy snapshots       | Exists  |
@@ -148,9 +148,64 @@ Notes on these assignments:
   unlocked group. Reader on `rg-dsv-prod01` lets operators read the source
   disk. Disk Snapshot Contributor also includes storage account actions; the
   group holds no storage accounts, so they grant nothing in practice.
+- **The VM identities need Contributor, not Reader, on the raw zone.** The
+  pipeline's ingest stage uploads new files and prunes `recent/` to the
+  newest 30 folders, and its load stage reads them. The role is scoped to
+  the `dinesafe` container, not the storage account. Blob versioning and
+  soft delete are control-plane settings, so this data role can't turn them
+  off or remove the way back from a bad write or delete.
+- **Dev reads stg's raw zone, never prod's.** No identity has a role on the
+  other environment's storage account.
 - **After a vault is recovered from soft delete, recreate its assignments.**
   Soft-deleting a vault deletes its role assignments, and recovery doesn't
   restore them.
+
+## Storage network access
+
+A role assignment isn't enough to reach a storage account. Each account also
+has shared key access turned off, so every request needs an Entra ID token,
+and a firewall that denies everything not listed below. The firewall is set
+by `infra/az/setup-az-vms.sh`.
+
+| Account       | Allowed source                   | Why                                                    | Status  |
+| ------------- | -------------------------------- | ------------------------------------------------------ | ------- |
+| `stdsvstg01`  | stg VM subnet (service endpoint) | The VM's data pipeline. Same-region traffic ignores IP rules, so the VM needs a subnet rule. | Exists  |
+| `stdsvstg01`  | Operator's home IP               | `dsv-ops01` loads a local dev database from stg's raw zone | Exists  |
+| `stdsvprod01` | prod VM subnet (service endpoint) | The VM's data pipeline                                | Planned |
+| `stdsvprod01` | Operator's home IP               | Admin troubleshooting only. No operator group has a data role on prod storage. | Planned |
+
+Firewall exceptions for trusted Azure services are off (`--bypass None`).
+When your home IP changes, update the IP rule. See
+[Troubleshoot: your home IP address changed](../how-to/azure-vm/troubleshoot-home-ip-change.md).
+
+## Database roles
+
+Postgres has its own roles, separate from Azure. The `dsv-db` container
+creates them from `src/dsv-db/init.sql` and `src/dsv-db/set-passwords.sh` the
+first time its data volume is empty. Each password comes from Key Vault on
+the VMs, and from Compose defaults in dev.
+
+| Role                     | Used by                               | Privileges                                                       | Status  |
+| ------------------------ | ------------------------------------- | ---------------------------------------------------------------- | ------- |
+| Bootstrap superuser (`DSV_DB_USER`, for example `dsv_admin`) | Postgres image initialization; `refresh.py` today | Superuser                         | Exists  |
+| `dinesafe_migrator`      | The data pipeline's load stage        | `SELECT`, `INSERT`, and `DELETE` on `inspections` and `load_log`    | Planned |
+| `dinesafe_app`           | `dsv-app` and Grafana (`dsv-analytics`) | `SELECT` on `inspections`; every query capped at 10 seconds      | Exists  |
+
+Notes on these roles:
+
+- **The loader moves off the superuser.** `refresh.py` connects as the
+  bootstrap superuser today. The data landing zone design switches the load
+  to `dinesafe_migrator`, which can change only the two tables it loads. See
+  [Data landing zone](../explanation/data-landing-zone.md#database-role).
+- **`dinesafe_migrator` exists today with more privileges than it needs.**
+  `init.sql` grants it `ALL PRIVILEGES` on `inspections` and `CREATE` on the
+  `public` schema. Narrow these grants when the pipeline starts using the
+  role.
+- **The app can't write.** `dinesafe_app` has `SELECT` only, so a flaw in the
+  web app or an anonymous Grafana query can't change data.
+- **Changing a password later needs `ALTER ROLE`.** `set-passwords.sh` runs
+  only when the volume is created. See "Rotate a database password" in
+  [the Azure checklist](../how-to/azure-vm/azure-checklist.md).
 
 ## Custom role: DSV VM Deployer
 
