@@ -6,11 +6,12 @@
 #        scripts/deploy.sh dev
 #
 # stg and prod: resolves the ref to a commit, confirms that commit's images
-# are in GHCR, checks it out, writes .env from Key Vault, syncs the CSVs from
-# Blob Storage, then pulls and starts the stack.
+# are in GHCR, checks it out, writes .env from Key Vault, pulls and starts
+# the stack, then runs the database migrations and loads the newest data
+# from the Blob raw zone. Deploys never contact Toronto Open Data.
 # dev: deploys the working tree as it is. Writes .env from deploy/dev.env,
-# syncs the CSVs from stg Blob Storage (needs az login), then builds and
-# starts the stack on http://localhost:8080.
+# builds and starts the stack on http://localhost:8080, then migrates and
+# loads from stg's raw zone (needs az login).
 # Exits non-zero, with the failing services' logs printed last, if anything
 # goes wrong. Everything runs inside main() so bash reads the whole script
 # before the checkout can replace this file.
@@ -45,26 +46,42 @@ fail() {
 }
 
 # Starts the stack with `up $1` (--build or --no-build), waits for the
-# one-shot jobs, then waits for the long-running services named after $1 to be
-# healthy, and smoke-tests nginx. `up --wait` can't cover the jobs: it returns
-# while a job still runs, and fails with "exited (0)" if a job finishes before
-# its wait starts. So the jobs get `compose wait` (their exit code), and
-# --wait lists only the long-running services.
+# long-running services named after $1 to be healthy, and smoke-tests nginx.
 start_stack() {
   local up_flag=$1
   shift
   docker compose up -d "$up_flag" --remove-orphans || fail
-  docker compose wait dsv-init-db >/dev/null || fail
   docker compose up -d --no-build --wait --wait-timeout 600 "$@" || fail
   docker compose exec -T dsv-nginx wget -q -O /dev/null http://127.0.0.1/healthz \
     || fail dsv-nginx dsv-app
 }
 
-# Writes .env, syncs the CSVs, then builds and starts the stack.
+# Applies every migration as the database superuser, then loads the newest
+# raw-zone data (scripts/pipeline.sh <env> load). Migrations are idempotent.
+# A failed load keeps the site up on the data it has, unless there's none.
+load_data() {
+  local env_name=$1 migration has_rows
+  for migration in src/dsv-db/migrations/*.sql; do
+    docker compose exec -T dsv-db sh -c \
+      'psql -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <"$migration" \
+      || fail dsv-db
+  done
+  if scripts/pipeline.sh "$env_name" load; then
+    return
+  fi
+  has_rows=$(docker compose exec -T dsv-db sh -c \
+    'psql -tA -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT EXISTS (SELECT 1 FROM inspections)"') \
+    || has_rows=f
+  [[ $has_rows == t ]] \
+    || die "the data load failed and the site has an empty database. Fix the error above, then rerun."
+  echo "deploy: warning: the data load failed; serving the data already in the database" >&2
+}
+
+# Writes .env, builds and starts the stack, then loads stg's raw zone.
 deploy_dev() {
   scripts/fetch-secrets.sh dev
-  scripts/data.sh dev || die "scripts/data.sh failed, so the stack wasn't started"
   start_stack --build dsv-nginx dsv-app dsv-db dsv-analytics
+  load_data dev
   echo "deploy: dev is running on http://localhost:8080"
 }
 
@@ -120,18 +137,11 @@ $dirty"
   # 4. Write .env from Key Vault, pinned to this image tag.
   DSV_VERSION="$tag" "$repo_dir/scripts/fetch-secrets.sh" "$env_name"
 
-  # 5. Pull, sync the CSVs, then start and wait for health.
-  docker compose pull --quiet
-  # Fetch and sync the CSVs so dsv-init-db has data, even on a new VM.
-  # Exit 3 means Toronto Open Data failed but the Blob copy synced.
-  local data_status=0
-  "$repo_dir/scripts/data.sh" "$env_name" || data_status=$?
-  case $data_status in
-    0) ;;
-    3) echo "deploy: warning: using the CSVs already in Blob Storage" >&2 ;;
-    *) die "scripts/data.sh failed, so the stack wasn't started" ;;
-  esac
+  # 5. Pull (including the pipeline image, which is in a profile), start and
+  # wait for health, then migrate and load.
+  docker compose --profile pipeline pull --quiet
   start_stack --no-build dsv-tunnel dsv-nginx dsv-app dsv-db dsv-analytics
+  load_data "$env_name"
 
   # 6. Smoke test: start_stack checked nginx reaches the app; check the VM's
   # network isolation and that the tunnel is connected.
@@ -158,6 +168,9 @@ $dirty"
   done
 
   docker image prune -af >/dev/null
+  # No container keeps the pipeline image (compose run --rm), so prune
+  # removed it. Pull it back so the timer doesn't depend on GHCR at 07:30.
+  docker compose --profile pipeline pull --quiet dsv-pipeline
   echo "deploy: $env_name is running $tag ($commit)"
 }
 

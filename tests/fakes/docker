@@ -33,6 +33,16 @@ case "$1 $2" in
     echo "fake logs for ${*: -1}"
     ;;
   "compose exec")
+    # deploy.sh: does inspections have rows?
+    if [[ $* == *"FROM inspections"* ]]; then
+      echo "${FAKE_DB_HAS_ROWS:-t}"
+      exit 0
+    fi
+    # deploy.sh: a migration piped into psql
+    if [[ $* == *"ON_ERROR_STOP"* ]]; then
+      cat >/dev/null
+      exit "${FAKE_MIGRATE_EXIT:-0}"
+    fi
     if [[ $* == *"dsv-tunnel:2000/ready"* && -n ${FAKE_TUNNEL_NOT_READY:-} ]]; then
       echo "wget: server returned error: HTTP/1.1 503 Service Unavailable" >&2
       exit 1
