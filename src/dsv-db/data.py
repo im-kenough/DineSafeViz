@@ -16,7 +16,9 @@ import io
 import json
 import os
 import shutil
+import tempfile
 import xml.etree.ElementTree as ET
+import zipfile
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
@@ -223,3 +225,129 @@ def newest_historical(store):
         return None
     folder = f"{HISTORICAL_PREFIX}{complete[-1]}/"
     return folder, sorted(n for n in blobs if n.startswith(folder) and n.endswith(".csv"))
+
+
+STALE_AFTER = datetime.timedelta(days=10)
+
+
+def _download_historical(url, tmp, download):
+    """Download the historical ZIP into tmp and validate every CSV in it.
+    Returns [(file name, local path)]."""
+    zip_path = os.path.join(tmp, "historical.zip")
+    print(f"Downloading {url} ...")
+    download(url, zip_path)
+    try:
+        zf = zipfile.ZipFile(zip_path)
+    except zipfile.BadZipFile as e:
+        raise DataError(f"historical download isn't a ZIP file: {e}") from e
+    out_dir = os.path.join(tmp, "historical")
+    os.makedirs(out_dir)
+    staged = []
+    with zf:
+        for member in zf.namelist():
+            base = os.path.basename(member)
+            if not base.endswith(".csv"):
+                continue
+            path = os.path.join(out_dir, base)
+            with zf.open(member) as src, open(path, "wb") as out:
+                shutil.copyfileobj(src, out)
+            validate_csv(path, HISTORICAL_COLUMN_MAP, MIN_HISTORICAL_ROWS)
+            staged.append((base, path))
+    os.remove(zip_path)
+    if not staged:
+        raise DataError("the historical ZIP has no CSV files")
+    return sorted(staged)
+
+
+def ingest(store, force=False, historical=False, resolve=resolve_resources,
+           download=http_download, now=None):
+    """Toronto Open Data -> raw zone. Returns the new recent blob path, or
+    None when no recent file was uploaded.
+
+    Downloads the recent CSV only when CKAN's last_modified is newer than the
+    newest blob's source_last_modified, or with force. With force, skips the
+    upload when the content matches the newest blob. Downloads the historical
+    ZIP only when there's no complete historical folder, or with historical.
+    Every file is validated before anything is uploaded. Historical files go
+    up first and _SUCCESS last, then the recent file, then prune_recent.
+    """
+    now = now or datetime.datetime.now(datetime.timezone.utc)
+    stamp = now.strftime("%Y%m%dT%H%M%SZ")
+    resources = resolve()
+    source = resources["recent"]["last_modified"]
+    newest = newest_recent(store)
+    newest_source = newest[1].metadata.get("source_last_modified", "") if newest else ""
+    need_recent = force or newest is None or source > newest_source
+    need_historical = historical or newest_historical(store) is None
+    if not need_recent and not need_historical:
+        print(f"No new data: Toronto Open Data last modified {source}, already in {newest[0]}.")
+        return None
+
+    with tempfile.TemporaryDirectory() as tmp:
+        staged_historical = []
+        if need_historical:
+            staged_historical = _download_historical(resources["historical"]["url"], tmp, download)
+        recent_path = None
+        if need_recent:
+            recent_path = os.path.join(tmp, RECENT_NAME)
+            print(f"Downloading {resources['recent']['url']} ...")
+            download(resources["recent"]["url"], recent_path)
+            rows = validate_csv(recent_path, RECENT_COLUMN_MAP, MIN_RECENT_ROWS)
+            recent_md5 = md5_b64(recent_path)
+            if newest and newest[1].md5 == recent_md5:
+                print(f"Recent file unchanged since {newest[0]}; not uploading it.")
+                recent_path = None
+            else:
+                print(f"  {RECENT_NAME}: {rows} rows, valid")
+
+        for name, path in staged_historical:
+            store.upload(f"{HISTORICAL_PREFIX}{stamp}/{name}", path, md5_b64(path))
+        if staged_historical:
+            marker = os.path.join(tmp, SUCCESS_MARKER)
+            open(marker, "wb").close()
+            store.upload(f"{HISTORICAL_PREFIX}{stamp}/{SUCCESS_MARKER}", marker, md5_b64(marker))
+            print(f"Uploaded {len(staged_historical)} historical files to {HISTORICAL_PREFIX}{stamp}/")
+
+        if recent_path is None:
+            return None
+        name = f"{RECENT_PREFIX}{stamp}/{RECENT_NAME}"
+        store.upload(name, recent_path, recent_md5, metadata={"source_last_modified": source})
+        print(f"Uploaded {name}")
+    prune_recent(store)
+    return name
+
+
+def prune_recent(store, keep=KEEP_RECENT):
+    """Delete recent/ folders beyond the newest `keep`. Never deletes the newest."""
+    if keep < 1:
+        raise ValueError("keep must be at least 1")
+    blobs = store.list(RECENT_PREFIX)
+    old = folders(blobs, RECENT_PREFIX)[:-keep]
+    for folder in old:
+        for name in sorted(n for n in blobs if n.startswith(f"{RECENT_PREFIX}{folder}/")):
+            store.delete(name)
+    if old:
+        print(f"Pruned {len(old)} old {RECENT_PREFIX} folders.")
+
+
+def check_fresh(store, now=None):
+    """Raise DataError if the newest recent file's source is over 10 days old.
+
+    Toronto Open Data publishes most business days, so a long gap usually
+    means the dataset moved or its ID changed.
+    """
+    newest = newest_recent(store)
+    if newest is None:
+        raise DataError(f"{RECENT_PREFIX} is empty. Run ingest first.")
+    source = newest[1].metadata.get("source_last_modified")
+    if not source:
+        raise DataError(f"{newest[0]} has no source_last_modified metadata")
+    when = datetime.datetime.fromisoformat(source)
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=datetime.timezone.utc)
+    now = now or datetime.datetime.now(datetime.timezone.utc)
+    if now - when > STALE_AFTER:
+        raise DataError(
+            f"the newest data is from {source}, more than {STALE_AFTER.days} days old. "
+            "Check that Toronto Open Data still publishes the DineSafe dataset."
+        )

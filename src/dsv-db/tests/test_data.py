@@ -226,3 +226,181 @@ class TestNewest:
 
     def test_newest_historical_of_empty_zone_is_none(self):
         assert newest_historical(FakeStore()) is None
+import datetime
+import shutil
+import zipfile as _zipfile
+
+from data import (
+    KEEP_RECENT, MIN_HISTORICAL_ROWS, MIN_RECENT_ROWS, check_fresh, ingest, prune_recent,
+)
+
+NOW = datetime.datetime(2026, 10, 12, 11, 30, 12, tzinfo=datetime.timezone.utc)
+STAMP = "20261012T113012Z"
+
+
+def resolver(recent_modified="2026-10-12T09:14:00"):
+    def resolve():
+        return {"recent": {"url": "https://t.test/dinesafe.csv", "last_modified": recent_modified},
+                "historical": {"url": "https://t.test/hist.zip", "last_modified": "2026-07-06T13:07:17"}}
+    return resolve
+
+
+def downloader(tmp_path, recent_header=RECENT_HEADER, recent_extra=b""):
+    """Serves a valid recent CSV and a 2-file historical ZIP. Records URLs."""
+    src = tmp_path / "src"
+    src.mkdir(exist_ok=True)
+    recent = write_csv(src / "dinesafe.csv", recent_header, MIN_RECENT_ROWS)
+    if recent_extra:
+        recent.write_bytes(recent.read_bytes() + recent_extra)
+    zpath = src / "hist.zip"
+    with _zipfile.ZipFile(zpath, "w") as zf:
+        for year in (2001, 2002):
+            h = write_csv(src / f"dinesafe_hist_{year}.csv", HIST_HEADER, MIN_HISTORICAL_ROWS)
+            zf.write(h, f"some folder/dinesafe_hist_{year}.csv")
+        zf.writestr("readme.txt", "not a csv")
+    calls = []
+
+    def download(url, path):
+        calls.append(url)
+        shutil.copy(recent if url.endswith("dinesafe.csv") else zpath, path)
+
+    download.calls = calls
+    return download
+
+
+def seeded(tmp_path):
+    """A raw zone after one ingest on October 9."""
+    store = FakeStore()
+    ingest(store, resolve=resolver("2026-10-09T08:00:00"), download=downloader(tmp_path),
+           now=datetime.datetime(2026, 10, 9, 11, 30, 5, tzinfo=datetime.timezone.utc))
+    store.uploads.clear()
+    return store
+
+
+class TestIngest:
+    def test_first_ingest_uploads_historical_then_success_then_recent(self, tmp_path):
+        store = FakeStore()
+        path = ingest(store, resolve=resolver(), download=downloader(tmp_path), now=NOW)
+        assert path == f"recent/{STAMP}/Dinesafe.csv"
+        assert store.uploads == [
+            f"historical/{STAMP}/dinesafe_hist_2001.csv",
+            f"historical/{STAMP}/dinesafe_hist_2002.csv",
+            f"historical/{STAMP}/_SUCCESS",
+            f"recent/{STAMP}/Dinesafe.csv",
+        ]
+        assert store.blobs[path][1] == {"source_last_modified": "2026-10-12T09:14:00"}
+
+    def test_not_newer_downloads_nothing(self, tmp_path):
+        store = seeded(tmp_path)
+        dl = downloader(tmp_path)
+        assert ingest(store, resolve=resolver("2026-10-09T08:00:00"), download=dl, now=NOW) is None
+        assert dl.calls == []
+        assert store.uploads == []
+
+    def test_newer_uploads_a_new_recent_folder_only(self, tmp_path):
+        store = seeded(tmp_path)
+        dl = downloader(tmp_path, recent_extra=b"x\n")
+        assert ingest(store, resolve=resolver(), download=dl, now=NOW) == f"recent/{STAMP}/Dinesafe.csv"
+        assert dl.calls == ["https://t.test/dinesafe.csv"]
+        assert store.uploads == [f"recent/{STAMP}/Dinesafe.csv"]
+
+    def test_force_with_same_content_uploads_nothing(self, tmp_path):
+        store = seeded(tmp_path)
+        dl = downloader(tmp_path)
+        assert ingest(store, force=True, resolve=resolver("2026-10-09T08:00:00"),
+                      download=dl, now=NOW) is None
+        assert dl.calls == ["https://t.test/dinesafe.csv"]
+        assert store.uploads == []
+
+    def test_force_with_new_content_uploads(self, tmp_path):
+        store = seeded(tmp_path)
+        dl = downloader(tmp_path, recent_extra=b"x\n")
+        path = ingest(store, force=True, resolve=resolver("2026-10-09T08:00:00"), download=dl, now=NOW)
+        assert path == f"recent/{STAMP}/Dinesafe.csv"
+
+    def test_historical_flag_redownloads_the_zip(self, tmp_path):
+        store = seeded(tmp_path)
+        dl = downloader(tmp_path)
+        ingest(store, historical=True, resolve=resolver("2026-10-09T08:00:00"), download=dl, now=NOW)
+        assert dl.calls == ["https://t.test/hist.zip"]
+        assert f"historical/{STAMP}/_SUCCESS" in store.uploads
+
+    def test_incomplete_historical_folder_is_downloaded_again(self, tmp_path):
+        store = FakeStore()
+        store.put("recent/20261009T113005Z/Dinesafe.csv", b"r", source_last_modified="2026-10-12T09:14:00")
+        store.put("historical/20261009T113005Z/dinesafe_hist_2001.csv", b"partial")
+        dl = downloader(tmp_path)
+        ingest(store, resolve=resolver(), download=dl, now=NOW)
+        assert dl.calls == ["https://t.test/hist.zip"]
+
+    def test_failed_validation_uploads_nothing(self, tmp_path):
+        store = FakeStore()
+        bad = RECENT_HEADER.replace("estId", "establishmentId")
+        with pytest.raises(DataError, match="estId"):
+            ingest(store, resolve=resolver(), download=downloader(tmp_path, recent_header=bad), now=NOW)
+        assert store.uploads == []
+
+    def test_bad_zip_is_a_data_error_and_uploads_nothing(self, tmp_path):
+        good = downloader(tmp_path)
+
+        def download(url, path):
+            good(url, path)
+            if url.endswith(".zip"):
+                with open(path, "wb") as f:
+                    f.write(b"<html>maintenance</html>")
+
+        store = FakeStore()
+        with pytest.raises(DataError, match="ZIP"):
+            ingest(store, resolve=resolver(), download=download, now=NOW)
+        assert store.uploads == []
+
+
+class TestPrune:
+    def fill(self, count):
+        store = FakeStore()
+        for day in range(count):
+            store.put(f"recent/202601{day + 1:02d}T000000Z/Dinesafe.csv", b"x")
+        return store
+
+    def test_keeps_the_newest(self):
+        store = self.fill(KEEP_RECENT + 2)
+        prune_recent(store)
+        assert store.deleted == ["recent/20260101T000000Z/Dinesafe.csv",
+                                 "recent/20260102T000000Z/Dinesafe.csv"]
+        assert len(store.list("recent/")) == KEEP_RECENT
+
+    def test_never_deletes_the_newest(self):
+        store = self.fill(3)
+        prune_recent(store, keep=1)
+        assert list(store.list("recent/")) == ["recent/20260103T000000Z/Dinesafe.csv"]
+
+    def test_ingest_prunes_after_upload(self, tmp_path):
+        store = self.fill(KEEP_RECENT)
+        for name in ("a.csv", "_SUCCESS"):
+            store.put(f"historical/20260101T000000Z/{name}", b"x")
+        ingest(store, resolve=resolver(), download=downloader(tmp_path), now=NOW)
+        assert store.deleted == ["recent/20260101T000000Z/Dinesafe.csv"]
+
+
+class TestCheckFresh:
+    def store(self, modified):
+        store = FakeStore()
+        store.put("recent/20261012T113012Z/Dinesafe.csv", b"x", source_last_modified=modified)
+        return store
+
+    def test_ten_days_is_fresh(self):
+        check_fresh(self.store("2026-10-02T11:30:12"), now=NOW)
+
+    def test_older_than_ten_days_is_stale(self):
+        with pytest.raises(DataError, match="10 days"):
+            check_fresh(self.store("2026-10-02T11:30:11"), now=NOW)
+
+    def test_missing_metadata_is_an_error(self):
+        store = FakeStore()
+        store.put("recent/20261012T113012Z/Dinesafe.csv", b"x")
+        with pytest.raises(DataError, match="source_last_modified"):
+            check_fresh(store, now=NOW)
+
+    def test_empty_zone_is_an_error(self):
+        with pytest.raises(DataError, match="recent/ is empty"):
+            check_fresh(FakeStore(), now=NOW)
