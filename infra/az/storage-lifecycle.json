@@ -7,7 +7,7 @@
       "definition": {
         "filters": { "blobTypes": ["blockBlob"] },
         "actions": {
-          "version": { "delete": { "daysAfterCreationGreaterThan": 90 } }
+          "version": { "delete": { "daysAfterCreationGreaterThan": 30 } }
         }
       }
     }

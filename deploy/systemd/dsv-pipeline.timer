@@ -1,5 +1,5 @@
 [Unit]
-Description=Run dsv-data.service on business-day mornings
+Description=Run dsv-pipeline.service on business-day mornings
 
 [Timer]
 OnCalendar=Mon..Fri *-*-* 07:30:00 America/Toronto

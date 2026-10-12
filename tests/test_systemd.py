@@ -14,18 +14,18 @@ def unit(name):
     return parser
 
 
-def test_data_service_runs_data_sh_with_load_as_admin():
-    svc = unit("dsv-data.service")
+def test_pipeline_service_runs_pipeline_sh_as_admin():
+    svc = unit("dsv-pipeline.service")
     assert svc["Service"]["Type"] == "oneshot"
     assert svc["Service"]["User"] == "@ADMIN_USER@"
-    assert svc["Service"]["ExecStart"] == "@REPO_DIR@/scripts/data.sh @ENV@ --load"
+    assert svc["Service"]["ExecStart"] == "@REPO_DIR@/scripts/pipeline.sh @ENV@ run"
     assert "docker.service" in svc["Unit"]["Requires"]
     # A stalled run must end, or the timer can't start the next one.
     assert svc["Service"]["TimeoutStartSec"] == "30min"
 
 
 def test_timer_runs_business_day_mornings_toronto_time():
-    timer = unit("dsv-data.timer")
+    timer = unit("dsv-pipeline.timer")
     assert timer["Timer"]["OnCalendar"] == "Mon..Fri *-*-* 07:30:00 America/Toronto"
     assert timer["Timer"]["Persistent"] == "true"
     assert timer["Install"]["WantedBy"] == "timers.target"
@@ -45,7 +45,7 @@ def test_imds_block_drops_metadata_and_wireserver_from_containers():
 
 def test_shell_variables_are_escaped_from_systemd():
     # systemd expands $VAR in ExecStart itself; the shell needs $$VAR.
-    for name in ("dsv-imds-block.service", "dsv-data.service"):
+    for name in ("dsv-imds-block.service", "dsv-pipeline.service"):
         for key in ("ExecStart", "ExecStop"):
             line = unit(name)["Service"].get(key, "")
             assert not re.search(r"\$", line.replace("$$", "")), (name, key)
