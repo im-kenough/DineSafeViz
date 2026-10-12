@@ -1,74 +1,20 @@
-"""init.sql and set-passwords.sh in the real Postgres image."""
+"""init.sql, the migrations, and set-passwords.sh in the real Postgres image."""
 import os
 import subprocess
-import time
-import uuid
 
 import pytest
 
-from helpers import ROOT
+from db_helpers import DB_DIR, docker, psql, start_db, wait_ready
 
-IMAGE = "postgres:17.10"  # keep in sync with docker-compose.yml
-SET_PASSWORDS = ROOT / "src" / "dsv-db" / "set-passwords.sh"
+SET_PASSWORDS = DB_DIR / "set-passwords.sh"
+MIGRATION = DB_DIR / "migrations" / "001_load_log.sql"
 # A quote and a dollar sign prove the psql quoting in set-passwords.sh.
 APP_PW = "app'pw$x"
 MIGRATOR_PW = "migrator-pw"
 
 
-def docker(*args, check=True):
-    return subprocess.run(
-        ["docker", *args], capture_output=True, text=True, check=check, timeout=120
-    )
-
-
-def start_db(env):
-    name = f"dsv-dbtest-{uuid.uuid4().hex[:8]}"
-    args = [
-        "run", "-d", "--name", name,
-        "-e", "POSTGRES_USER=test_superuser",
-        "-e", "POSTGRES_PASSWORD=superpw",
-        "-e", "POSTGRES_DB=dinesafe",
-        # --mount fails on a missing source; -v would create a root-owned dir.
-        "--mount", f"type=bind,src={ROOT}/src/dsv-db/init.sql,dst=/docker-entrypoint-initdb.d/init.sql,readonly",
-        "--mount", f"type=bind,src={SET_PASSWORDS},dst=/docker-entrypoint-initdb.d/set-passwords.sh,readonly",
-    ]
-    for key, value in env.items():
-        args += ["-e", f"{key}={value}"]
-    docker(*args, IMAGE)
-    return name
-
-
-def wait_ready(name, timeout=90):
-    """True once Postgres accepts TCP connections, False if it exits.
-
-    During init the image's temporary server listens on the Unix socket
-    only, so a TCP answer means every init script has finished.
-    """
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        state = docker("inspect", "-f", "{{.State.Status}}", name).stdout.strip()
-        if state != "running":
-            return False
-        ready = docker(
-            "exec", name, "pg_isready", "-h", "127.0.0.1", "-U", "test_superuser",
-            check=False,
-        )
-        if ready.returncode == 0:
-            return True
-        time.sleep(1)
-    raise TimeoutError(f"{name} didn't become ready in {timeout}s")
-
-
 def login(name, user, password, sql="SELECT 1"):
-    """Connect over TCP to the container's own address, which uses password auth."""
-    ip = docker(
-        "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", name
-    ).stdout.strip()
-    return docker(
-        "exec", "-e", f"PGPASSWORD={password}", name,
-        "psql", "-h", ip, "-U", user, "-d", "dinesafe", "-tAc", sql,
-        check=False,
-    )
+    return psql(name, sql, user=user, password=password)
 
 
 @pytest.fixture
@@ -135,3 +81,55 @@ def test_init_fails_when_a_password_is_unset(db, missing):
     assert wait_ready(name) is False
     logs = docker("logs", name)
     assert missing in logs.stdout + logs.stderr
+
+
+def migrate(name):
+    """Apply the migration as the superuser, the way deploy.sh does."""
+    return subprocess.run(
+        ["docker", "exec", "-i", name, "sh", "-c",
+         'psql -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'],
+        stdin=open(MIGRATION), capture_output=True, text=True, timeout=60,
+    )
+
+
+def test_new_volume_has_load_log(ready_db):
+    result = login(ready_db, "dinesafe_migrator", MIGRATOR_PW, "SELECT count(*) FROM load_log")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "0"
+
+
+def test_migration_runs_again_without_errors(ready_db):
+    for _ in range(2):
+        result = migrate(ready_db)
+        assert result.returncode == 0, result.stderr
+
+
+def test_migrator_can_load(ready_db):
+    sql = (
+        "BEGIN;"
+        "INSERT INTO inspections (establishment_name) VALUES ('x');"
+        "DELETE FROM inspections WHERE establishment_name = 'x';"
+        "INSERT INTO load_log (kind, recent_path, rows_deleted, rows_inserted)"
+        " VALUES ('seed', 'recent/t/Dinesafe.csv', 0, 1);"
+        "ROLLBACK;"
+    )
+    result = login(ready_db, "dinesafe_migrator", MIGRATOR_PW, sql)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("sql", [
+    "CREATE TABLE sneaky (id int)",
+    "TRUNCATE inspections",
+    "DROP TABLE load_log",
+    "UPDATE inspections SET severity = 'x'",
+])
+def test_migrator_can_do_nothing_else(ready_db, sql):
+    result = login(ready_db, "dinesafe_migrator", MIGRATOR_PW, sql)
+    assert result.returncode != 0
+    assert "permission denied" in result.stderr or "must be owner" in result.stderr
+
+
+def test_app_can_read_load_log_but_not_write(ready_db):
+    assert login(ready_db, "dinesafe_app", APP_PW, "SELECT count(*) FROM load_log").returncode == 0
+    result = login(ready_db, "dinesafe_app", APP_PW, "DELETE FROM load_log")
+    assert "permission denied" in result.stderr

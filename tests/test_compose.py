@@ -53,6 +53,7 @@ def test_local_db_runs_set_passwords_after_init_sql(local):
     # The image runs these in name order: init.sql creates the roles first.
     assert targets == [
         "/docker-entrypoint-initdb.d/init.sql",
+        "/docker-entrypoint-initdb.d/migrations-001_load_log.sql",
         "/docker-entrypoint-initdb.d/set-passwords.sh",
     ]
 
