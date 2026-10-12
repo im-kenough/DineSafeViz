@@ -44,11 +44,11 @@ case "$1 $2" in
     fi
     ;;
   "compose --profile")
-    # data.sh: docker compose --profile data run --rm ... dsv-data fetch|sync
-    if [[ " $* " == *" fetch"* ]]; then
-      exit "${FAKE_FETCH_EXIT:-0}"
+    # pipeline.sh: docker compose --profile pipeline run --rm ... dsv-pipeline <command>
+    # deploy.sh:   docker compose --profile pipeline pull --quiet [dsv-pipeline]
+    if [[ $4 == run ]]; then
+      exit "${FAKE_PIPELINE_EXIT:-0}"
     fi
-    exit "${FAKE_SYNC_EXIT:-0}"
     ;;
   "compose run")
     exit "${FAKE_LOAD_EXIT:-0}"
