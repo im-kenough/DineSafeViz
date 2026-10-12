@@ -1,49 +1,41 @@
-"""DineSafe data producer and mirror: Toronto Open Data -> Blob -> DSV_DATA_DIR.
+"""DineSafe raw zone: Toronto Open Data -> the Blob container.
 
-Runs as the dsv-data compose service (same image as dsv-init-db):
-  python3 data.py fetch [--historical]   VM only: download, validate, upload
-  python3 data.py sync                   mirror the Blob container locally
-
-scripts/data.sh mounts a bearer token for https://storage.azure.com/ at
-DSV_TOKEN_FILE. The token never comes from IMDS inside the container.
+pipeline.py uses this module. The raw zone, in the dinesafe container:
+  recent/<YYYYMMDDTHHMMSSZ>/Dinesafe.csv          metadata: source_last_modified
+  historical/<YYYYMMDDTHHMMSSZ>/<year>.csv         plus _SUCCESS, written last
+Blobs are never overwritten. The newest folder is the last in sorted order,
+because the folder names are UTC timestamps.
 """
 
-import argparse
-import base64
+import collections
 import csv
 import datetime
 import hashlib
+import base64
 import io
 import json
 import os
 import shutil
-import sys
-import zipfile
+import xml.etree.ElementTree as ET
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
-from refresh import (
-    HISTORICAL_COLUMN_MAP,
-    HISTORICAL_DIR,
-    MANIFEST_NAME,
-    RECENT_COLUMN_MAP,
-    RECENT_NAME,
-    decode_csv,
-)
+from refresh import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP, RECENT_NAME, decode_csv
 
-RECENT_CSV_URL = (
-    "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/"
-    "b6b4f3fb-2e2c-47e7-931d-b87d22806948/resource/"
-    "af0f5b8a-4b73-4a50-8781-65e949792b40/download/dinesafe.csv"
+CKAN_PACKAGE_URL = (
+    "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/package_show?id=dinesafe"
 )
+# Exact names and formats. The package also lists "Dinesafe™.csv", a stale
+# copy in the old schema, so a looser match would pick the wrong file.
+RECENT_RESOURCE = ("Dinesafe.csv", "CSV")
+HISTORICAL_RESOURCE = ("Dinesafe Historical Data", "ZIP")
 
-HISTORICAL_ZIP_URL = (
-    "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/"
-    "b6b4f3fb-2e2c-47e7-931d-b87d22806948/resource/"
-    "c0a5f6b0-534a-47c3-867d-d4b5cc84a656/download/"
-    "Dinesafe%20Historical%20Data.zip"
-)
+RECENT_PREFIX = "recent/"
+HISTORICAL_PREFIX = "historical/"
+# Written after every historical file, so a half-uploaded folder is ignored.
+SUCCESS_MARKER = "_SUCCESS"
+KEEP_RECENT = 30
 
 # Sanity floors, well under today's counts (about 120,000 recent rows and
 # at least 6,000 rows per historical year), so a truncated download fails.
@@ -56,9 +48,11 @@ API_VERSION = "2023-11-03"
 # can't hang a deploy or the timer.
 DOWNLOAD_TIMEOUT = 120
 
+BlobInfo = collections.namedtuple("BlobInfo", ["metadata", "md5"])
+
 
 class DataError(Exception):
-    """A fetch or sync problem that should stop the run with a message."""
+    """A raw-zone problem that should stop the run with a message."""
 
 
 def md5_b64(path):
@@ -98,227 +92,134 @@ def http_download(url, path, opener=urlopen):
         raise DataError(f"download from {url} failed: {e}") from e
 
 
+def resolve_resources(opener=urlopen):
+    """Find the recent CSV and the historical ZIP in the CKAN package.
+
+    Returns {"recent": {"url", "last_modified"}, "historical": {...}}.
+    Looking resources up by name survives a changed resource ID, which
+    happened once already, in June 2026.
+    """
+    try:
+        with opener(CKAN_PACKAGE_URL, timeout=DOWNLOAD_TIMEOUT) as resp:
+            body = resp.read()
+    except OSError as e:
+        raise DataError(f"CKAN package_show failed: {e}") from e
+    try:
+        resources = json.loads(body)["result"]["resources"]
+    except (ValueError, KeyError, TypeError) as e:
+        raise DataError(f"CKAN package_show didn't return the expected JSON: {e}") from e
+    found = {}
+    for key, (name, fmt) in (("recent", RECENT_RESOURCE), ("historical", HISTORICAL_RESOURCE)):
+        matches = [r for r in resources if r.get("name") == name and r.get("format") == fmt]
+        if len(matches) != 1:
+            raise DataError(
+                f"CKAN package has {len(matches)} resources named {name!r} ({fmt}); expected 1"
+            )
+        found[key] = {"url": matches[0]["url"], "last_modified": matches[0].get("last_modified") or ""}
+    return found
+
+
 class BlobStore:
     """Minimal Blob REST client authorized with a Microsoft Entra bearer token."""
 
     def __init__(self, account, container, token, opener=urlopen):
-        self.base = f"https://{account}.blob.core.windows.net/{container}/"
+        self.container_url = f"https://{account}.blob.core.windows.net/{container}"
         self.token = token
         self.opener = opener
 
-    def _request(self, method, name, data=None, headers=None):
-        req = Request(self.base + name, data=data, method=method)
+    def _request(self, method, url, data=None, headers=None):
+        """Send one request. Returns the response, or None on HTTP 404."""
+        req = Request(url, data=data, method=method)
         req.add_header("Authorization", f"Bearer {self.token}")
         req.add_header("x-ms-version", API_VERSION)
         for key, value in (headers or {}).items():
             req.add_header(key, value)
         try:
-            return self.opener(req, timeout=120)
+            return self.opener(req, timeout=DOWNLOAD_TIMEOUT)
         except HTTPError as e:
             if e.code == 404:
                 return None
-            raise DataError(f"{method} {name}: HTTP {e.code}") from e
+            raise DataError(f"{method} {url}: HTTP {e.code}") from e
         except URLError as e:
-            raise DataError(f"{method} {name}: {e.reason}") from e
+            raise DataError(f"{method} {url}: {e.reason}") from e
 
-    def stat(self, name):
-        """Return (base64 MD5, current version ID) of a blob, or None if missing."""
-        resp = self._request("HEAD", name)
-        if resp is None:
-            return None
-        with resp:
-            return resp.headers.get("Content-MD5"), resp.headers.get("x-ms-version-id")
+    def _blob_url(self, name):
+        return f"{self.container_url}/{quote(name)}"
 
-    def download_to(self, name, path, version_id=None):
-        """Download a blob, or one exact version of it, to path."""
-        if version_id:
-            name = f"{name}?versionid={quote(version_id, safe='')}"
-        resp = self._request("GET", name)
+    def list(self, prefix):
+        """Return {name: BlobInfo} for every blob under prefix."""
+        blobs, marker = {}, ""
+        while True:
+            query = {"restype": "container", "comp": "list", "prefix": prefix, "include": "metadata"}
+            if marker:
+                query["marker"] = marker
+            resp = self._request("GET", f"{self.container_url}?{urlencode(query)}")
+            if resp is None:
+                raise DataError(f"{self.container_url}: container not found")
+            with resp:
+                root = ET.fromstring(resp.read())
+            for blob in root.iter("Blob"):
+                meta = blob.find("Metadata")
+                blobs[blob.findtext("Name")] = BlobInfo(
+                    {m.tag: m.text or "" for m in meta} if meta is not None else {},
+                    blob.findtext("Properties/Content-MD5") or "",
+                )
+            marker = root.findtext("NextMarker") or ""
+            if not marker:
+                return blobs
+
+    def download_to(self, name, path):
+        resp = self._request("GET", self._blob_url(name))
         if resp is None:
             raise DataError(f"{name} isn't in the container")
         with resp, open(path, "wb") as out:
             shutil.copyfileobj(resp, out)
 
-    def upload(self, name, path, md5):
+    def upload(self, name, path, md5, metadata=None):
         with open(path, "rb") as f:
             body = f.read()
-        content_type = "application/json" if name.endswith(".json") else "text/csv"
-        resp = self._request("PUT", name, data=body, headers={
-            "x-ms-blob-type": "BlockBlob",
-            "Content-MD5": md5,
-            "Content-Type": content_type,
-        })
+        headers = {"x-ms-blob-type": "BlockBlob", "Content-MD5": md5, "Content-Type": "text/csv"}
+        for key, value in (metadata or {}).items():
+            headers[f"x-ms-meta-{key}"] = value
+        resp = self._request("PUT", self._blob_url(name), data=body, headers=headers)
         if resp is None:
             raise DataError(f"PUT {name}: container not found")
-        with resp:
-            return resp.headers.get("x-ms-version-id")
+        resp.close()
 
-    def read_manifest(self):
-        resp = self._request("GET", MANIFEST_NAME)
-        if resp is None:
-            return None
-        with resp:
-            return json.loads(resp.read())
-
-    def write_manifest(self, manifest, staging_dir):
-        path = os.path.join(staging_dir, MANIFEST_NAME)
-        with open(path, "w") as f:
-            json.dump(manifest, f, indent=2)
-        self.upload(MANIFEST_NAME, path, md5_b64(path))
+    def delete(self, name):
+        """Delete a blob. Soft delete keeps it recoverable for 7 days."""
+        resp = self._request("DELETE", self._blob_url(name))
+        if resp is not None:
+            resp.close()
 
 
-def _entry(name, path, rows):
-    return {"name": name, "md5": md5_b64(path), "size": os.path.getsize(path), "rows": rows}
+def folders(names, prefix):
+    """Sorted, unique folder names directly under prefix."""
+    return sorted({
+        n[len(prefix):].split("/", 1)[0]
+        for n in names
+        if n.startswith(prefix) and "/" in n[len(prefix):]
+    })
 
 
-def _is_historical(entry):
-    return entry["name"].startswith(HISTORICAL_DIR + "/")
+def newest_recent(store):
+    """Return (blob path, BlobInfo) of the newest recent file, or None."""
+    blobs = store.list(RECENT_PREFIX)
+    paths = sorted(n for n in blobs if n.endswith("/" + RECENT_NAME))
+    if not paths:
+        return None
+    return paths[-1], blobs[paths[-1]]
 
 
-def fetch(store, data_dir, historical, download=http_download, now=None):
-    """Download from Toronto Open Data, validate, upload changes, then the manifest.
-
-    Historical CSVs are downloaded only when historical is True or the
-    current manifest has none; otherwise their entries are carried over.
-    Nothing is uploaded unless every downloaded file validates. Each
-    manifest entry pins the blob version it describes, so a fetch that
-    fails after overwriting a blob doesn't break sync from the old manifest.
-    """
-    staging = os.path.join(data_dir, ".staging")
-    shutil.rmtree(staging, ignore_errors=True)
-    os.makedirs(os.path.join(staging, HISTORICAL_DIR))
-    try:
-        remote = store.read_manifest() or {"files": []}
-        carried = [e for e in remote["files"] if _is_historical(e)]
-        staged = []  # (blob name, local path, row count)
-
-        recent_path = os.path.join(staging, RECENT_NAME)
-        print(f"Downloading {RECENT_CSV_URL} ...")
-        download(RECENT_CSV_URL, recent_path)
-        staged.append((RECENT_NAME, recent_path,
-                       validate_csv(recent_path, RECENT_COLUMN_MAP, MIN_RECENT_ROWS)))
-
-        if historical or not carried:
-            carried = []
-            zip_path = os.path.join(staging, "historical.zip")
-            print(f"Downloading {HISTORICAL_ZIP_URL} ...")
-            download(HISTORICAL_ZIP_URL, zip_path)
-            try:
-                zf = zipfile.ZipFile(zip_path)
-            except zipfile.BadZipFile as e:
-                raise DataError(f"historical download isn't a ZIP file: {e}") from e
-            with zf:
-                for member in zf.namelist():
-                    base = os.path.basename(member)
-                    if not base.endswith(".csv"):
-                        continue
-                    path = os.path.join(staging, HISTORICAL_DIR, base)
-                    with zf.open(member) as src, open(path, "wb") as out:
-                        shutil.copyfileobj(src, out)
-                    staged.append((f"{HISTORICAL_DIR}/{base}", path,
-                                   validate_csv(path, HISTORICAL_COLUMN_MAP, MIN_HISTORICAL_ROWS)))
-
-        entries = []
-        for name, path, rows in staged:
-            entry = _entry(name, path, rows)
-            current = store.stat(name)
-            if current and current[0] == entry["md5"]:
-                entry["version_id"] = current[1]
-                print(f"  {name}: unchanged")
-            else:
-                entry["version_id"] = store.upload(name, path, entry["md5"])
-                print(f"  {name}: uploaded ({rows} rows)")
-            entries.append(entry)
-
-        now = now or datetime.datetime.now(datetime.timezone.utc)
-        manifest = {
-            "fetched_at": now.isoformat(timespec="seconds"),
-            "source_url": {"recent": RECENT_CSV_URL, "historical": HISTORICAL_ZIP_URL},
-            "files": sorted(entries + carried, key=lambda e: e["name"]),
-        }
-        store.write_manifest(manifest, staging)
-        print(f"Fetch complete: {len(manifest['files'])} files in the manifest.")
-        return manifest
-    finally:
-        shutil.rmtree(staging, ignore_errors=True)
-
-
-def sync(store, data_dir):
-    """Mirror the container's manifest files into data_dir, verifying MD5s.
-
-    Each file is downloaded to <name>.part and renamed only after its MD5
-    matches, so a failed sync leaves the previous files in place. CSVs not
-    in the manifest are removed so the loader never reads them. The local
-    manifest.json is written last.
-    """
-    os.makedirs(os.path.join(data_dir, HISTORICAL_DIR), exist_ok=True)
-    manifest = store.read_manifest()
-    if manifest is None:
-        raise DataError(f"{MANIFEST_NAME} isn't in the container. Run fetch on the VM first.")
-
-    wanted = set()
-    for entry in manifest["files"]:
-        name = entry["name"]
-        wanted.add(os.path.normpath(name))
-        local = os.path.join(data_dir, name)
-        if os.path.exists(local) and md5_b64(local) == entry["md5"]:
-            continue
-        part = local + ".part"
-        try:
-            store.download_to(name, part, entry.get("version_id"))
-            if md5_b64(part) != entry["md5"]:
-                raise DataError(f"{name}: MD5 doesn't match the manifest")
-            os.replace(part, local)
-            print(f"  {name}: updated")
-        finally:
-            if os.path.exists(part):
-                os.remove(part)
-
-    for root, _dirs, files in os.walk(data_dir):
-        for f in files:
-            rel = os.path.normpath(os.path.relpath(os.path.join(root, f), data_dir))
-            if f.endswith(".csv") and rel not in wanted:
-                os.remove(os.path.join(root, f))
-                print(f"  {rel}: removed (not in the manifest)")
-
-    tmp = os.path.join(data_dir, MANIFEST_NAME + ".part")
-    with open(tmp, "w") as f:
-        json.dump(manifest, f, indent=2)
-    os.replace(tmp, os.path.join(data_dir, MANIFEST_NAME))
-    print(f"Sync complete: {len(manifest['files'])} files.")
-
-
-def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    sub = parser.add_subparsers(dest="command", required=True)
-    fetch_p = sub.add_parser("fetch", help="Toronto Open Data -> Blob (VM only)")
-    fetch_p.add_argument("--historical", action="store_true",
-                         help="re-download the historical ZIP")
-    sub.add_parser("sync", help="Blob -> DSV_DATA_DIR")
-    args = parser.parse_args(argv)
-
-    data_dir = os.environ.get("DSV_DATA_DIR", "/data")
-    account = os.environ.get("DSV_STORAGE_ACCOUNT", "").strip()
-    container = os.environ.get("DSV_STORAGE_CONTAINER", "dinesafe")
-    token_file = os.environ.get("DSV_TOKEN_FILE", "/run/secrets/storage-token")
-    try:
-        if not account:
-            raise DataError("DSV_STORAGE_ACCOUNT isn't set")
-        try:
-            with open(token_file) as f:
-                token = f.read().strip()
-        except OSError as e:
-            raise DataError(f"can't read the storage token at {token_file}: {e.strerror}") from e
-        store = BlobStore(account, container, token)
-        if args.command == "fetch":
-            fetch(store, data_dir, args.historical)
-        else:
-            sync(store, data_dir)
-    except DataError as e:
-        print(f"data: {e}", file=sys.stderr)
-        return 1
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+def newest_historical(store):
+    """Return (folder path, [CSV blob names]) of the newest complete
+    historical folder, or None. A folder is complete once it has _SUCCESS."""
+    blobs = store.list(HISTORICAL_PREFIX)
+    complete = [
+        f for f in folders(blobs, HISTORICAL_PREFIX)
+        if f"{HISTORICAL_PREFIX}{f}/{SUCCESS_MARKER}" in blobs
+    ]
+    if not complete:
+        return None
+    folder = f"{HISTORICAL_PREFIX}{complete[-1]}/"
+    return folder, sorted(n for n in blobs if n.startswith(folder) and n.endswith(".csv"))
