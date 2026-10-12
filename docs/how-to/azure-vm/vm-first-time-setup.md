@@ -199,11 +199,14 @@ at 07:30 Toronto time. It checks Toronto Open Data for newer data, uploads it
 to the Blob raw zone, and loads it into Postgres. The unit files are in the
 clone, at `deploy/systemd/`.
 
-If the VM still has the old `dsv-data.timer`, remove it first:
+If the VM still has the old `dsv-data.timer`, remove it and its old CSV
+folder first. Git no longer ignores `./data`, so a leftover copy could be
+committed by mistake:
 
 ```bash
 sudo systemctl disable --now dsv-data.timer
 sudo rm /etc/systemd/system/dsv-data.service /etc/systemd/system/dsv-data.timer
+rm -rf ~/DineSafeViz/data
 ```
 
 1.  Install the service and the timer, filling in your user, the clone path,

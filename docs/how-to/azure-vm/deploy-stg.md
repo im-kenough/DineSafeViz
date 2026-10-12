@@ -245,9 +245,9 @@ errors you're most likely to see on a first stg deploy.
 | `can't read ... from kv-dsv-stg01: ForbiddenByFirewall` | The vault firewall doesn't allow the VM's subnet. See checklist step 4.2. |
 | `can't read ... from kv-dsv-stg01: ForbiddenByRbac` | `id-dsv-stg01-vm` lacks Key Vault Secrets User, or the role was just assigned. Wait a few minutes. |
 | `... must contain only letters, digits, and . _ ~ -` | Regenerate that secret with `openssl rand -hex 32`. See checklist step 4.4. |
-| `data: ... HTTP 403` | The storage firewall doesn't allow the VM's subnet, or `id-dsv-stg01-vm` lacks Storage Blob Data Contributor on the `dinesafe` container. Rerun `setup-az-vms.sh infra`, then wait a few minutes. |
+| `pipeline: GET https://stdsvstg01... HTTP 403` | The storage firewall doesn't allow the VM's subnet, or `id-dsv-stg01-vm` lacks Storage Blob Data Contributor on the `dinesafe` container. Rerun `setup-az-vms.sh infra`, then wait a few minutes. |
 | `pipeline: recent/ is empty` | Blob Storage has no data yet. Run `./scripts/pipeline.sh stg ingest`, then rerun the deploy. |
-| `deploy: warning: using the CSVs already in Blob Storage` | Toronto Open Data failed or its files didn't validate. The deploy continues on the last good data. |
+| `deploy: warning: the data load failed; serving the data already in the database` | The load from Blob Storage failed, so the site keeps its last good data. Read the `pipeline:` error above it, fix it, then run `./scripts/pipeline.sh stg load`. |
 | `a container reached IMDS` | The metadata block isn't in place. Run `sudo systemctl restart dsv-imds-block`, then check its rules as in [the VM setup guide](vm-first-time-setup.md#4-block-containers-from-the-instance-metadata-service). |
 | `pipeline.sh load` exits 137 | Out of memory. Check `free -h` for the swap file. |
 | `dependency failed to start: container dsv-dsv-analytics-1 is unhealthy` | Grafana's first-start migrations outlasted its health check, so nginx and the tunnel never started. Wait for `docker compose ps` to show `dsv-analytics` as `healthy`, then rerun `deploy.sh`. `docker-compose.vm.yml` allows 300 seconds, so this means the VM is short on memory. Check `free -h`, and confirm the VM is a `Standard_B2als_v2` (checklist step 6.3). |
