@@ -88,7 +88,7 @@ cp deploy/stg.env-example deploy/stg.env
 
 Any process that can reach `169.254.169.254` can request a token as the VM's
 identity, for Key Vault or for the storage account. Only the host scripts
-`fetch-secrets.sh` and `data.sh` need that, so a systemd unit blocks it for
+`fetch-secrets.sh` and `pipeline.sh` need that, so a systemd unit blocks it for
 containers with rules in Docker's `DOCKER-USER` chain. The same unit blocks
 the Azure WireServer's agent ports on `168.63.129.16`. The unit file is in the clone, at
 `deploy/systemd/dsv-imds-block.service`.
@@ -174,10 +174,17 @@ Deploy the current `main` to stg, or the release tag to prod:
 docker compose ps
 ```
 
-All services show `running` or `healthy`, and `dsv-init-db` shows
-`exited (0)`. The first deploy takes several minutes,
-because `scripts/data.sh` syncs the CSVs from Blob Storage into `./data` and
-`dsv-init-db` loads them.
+All services show `running` or `healthy`. The first deploy takes several
+minutes, because the data pipeline seeds the database from Blob Storage.
+
+On a brand-new environment, Blob Storage is empty, so the deploy stops with
+`the data load failed and the site has an empty database`. Fill Blob Storage
+from Toronto Open Data, then rerun the deploy:
+
+```bash
+./scripts/pipeline.sh stg ingest
+./scripts/deploy.sh stg main
+```
 
 Then check the tunnel and the site:
 
@@ -187,39 +194,46 @@ Then check the tunnel and the site:
 
 ## 7. Schedule the data refresh
 
-A systemd timer runs `scripts/data.sh stg --load` each business-day morning
-at 07:30 Toronto time. It fetches the CSVs from Toronto Open Data, uploads
-changed files to Blob Storage, syncs them into `./data`, and reloads
-Postgres. The unit files are in the clone, at `deploy/systemd/`.
+A systemd timer runs `scripts/pipeline.sh stg run` each business-day morning
+at 07:30 Toronto time. It checks Toronto Open Data for newer data, uploads it
+to the Blob raw zone, and loads it into Postgres. The unit files are in the
+clone, at `deploy/systemd/`.
+
+If the VM still has the old `dsv-data.timer`, remove it first:
+
+```bash
+sudo systemctl disable --now dsv-data.timer
+sudo rm /etc/systemd/system/dsv-data.service /etc/systemd/system/dsv-data.timer
+```
 
 1.  Install the service and the timer, filling in your user, the clone path,
     and the environment (`stg` or `prod`):
 
     ```bash
     cd ~/DineSafeViz
-    for f in dsv-data.service dsv-data.timer; do
+    for f in dsv-pipeline.service dsv-pipeline.timer; do
       sed -e "s|@ADMIN_USER@|$USER|" -e "s|@REPO_DIR@|$PWD|" -e "s|@ENV@|stg|" \
         "deploy/systemd/$f" | sudo tee "/etc/systemd/system/$f" >/dev/null
     done
     sudo systemctl daemon-reload
-    sudo systemctl enable --now dsv-data.timer
+    sudo systemctl enable --now dsv-pipeline.timer
     ```
 
 2.  Confirm the next run time:
 
     ```bash
-    systemctl list-timers dsv-data.timer
+    systemctl list-timers dsv-pipeline.timer
     ```
 
 3.  Optional: run it once now and read its log:
 
     ```bash
-    sudo systemctl start dsv-data.service
-    journalctl -u dsv-data.service -n 50 --no-pager
+    sudo systemctl start dsv-pipeline.service
+    journalctl -u dsv-pipeline.service -n 50 --no-pager
     ```
 
-If Toronto Open Data is down, the run still loads the data already in Blob
-Storage, but the unit shows `failed` so you notice it.
+If Toronto Open Data is down, or the newest data is over 10 days old, the
+unit shows `failed`. The site keeps serving the data it already has.
 
 ## 8. Confirm the setup survives a reboot
 
@@ -231,7 +245,7 @@ sudo reboot
 # after reconnecting:
 swapon --show
 sudo iptables -S DOCKER-USER | grep -E '169.254.169.254|168.63.129.16'
-systemctl list-timers dsv-data.timer
+systemctl list-timers dsv-pipeline.timer
 cd ~/DineSafeViz && docker compose ps
 ```
 

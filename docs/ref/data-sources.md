@@ -26,8 +26,9 @@ about once per business day. Existing rows aren't rewritten. Each batch:
 - mostly holds the latest inspections, but can also backfill older inspections
   dated as far back as 2023-11
 
-`refresh.py` downloads the whole file on every run and replaces all rows on or
-after the file's earliest `inspectionDate`.
+`dsv-pipeline ingest` downloads the whole file when Toronto Open Data's
+`last_modified` is newer than the raw zone's copy. The load replaces all rows
+on or after the file's earliest `inspectionDate`.
 
 It uses this new schema (post 06-2026):
 

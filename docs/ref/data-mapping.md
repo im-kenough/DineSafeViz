@@ -18,17 +18,19 @@ The source of truth is the code:
 The database is built in two stages. Postgres creates an empty schema, and
 then a one-shot container fills it.
 
-1. `dsv-db` (`postgres:17.10`) starts. On the first start only, when the
-   `dsv-db-data` volume is empty, Postgres runs `init.sql` from
-   `/docker-entrypoint-initdb.d/`. This script creates:
+1. `dsv-db` (`postgres:18.6`) starts. On the first start only, when the
+   `dsv-db-data` volume is empty, Postgres runs `init.sql` and
+   `migrations/001_load_log.sql` from `/docker-entrypoint-initdb.d/`. They
+   create:
    - the `inspections` table and an index on `inspection_date`.
+   - the `load_log` table, which records each load.
    - `dinesafe_app`, a role with `SELECT` only. `dsv-app` and Grafana use
      this role.
-   - `dinesafe_migrator`, a role with read and write access. Nothing uses it
-     yet: `refresh.py` still connects as the bootstrap superuser
-     (`DSV_DB_USER`).
-2. `dsv-init-db` runs `refresh.py` once and exits (`restart: "no"`). It
-   checks whether `inspections` has any rows:
+   - `dinesafe_migrator`, the role the data pipeline loads as, with
+     `SELECT`, `INSERT`, and `DELETE` on `inspections` and `load_log`.
+2. `dsv-pipeline load` fills it. It downloads the newest files from the Blob
+   raw zone and runs `refresh.py`'s seed or refresh in one transaction,
+   together with a `load_log` row:
    - **Empty:** it runs `seed()`, which loads the historical data and then the
      recent data.
    - **Not empty:** it runs `refresh()`, which replaces the recent data.
@@ -38,25 +40,10 @@ then a one-shot container fills it.
 > `init.sql` grants privileges on a database named `dinesafe`. If you set
 > `DSV_DB_NAME` to anything else, the grants fail.
 
-<!-- prettier-ignore -->
-> [!NOTE]
-> On the Azure VMs, `dsv-data.timer` runs `scripts/data.sh <env> --load`
-> each business-day morning, which runs `dsv-init-db`. Locally, the refresh
-> only runs when `dsv-init-db` runs, for example on `docker compose up`.
-
-### Data sources at runtime
-
-`refresh.py` has no network code. It reads the files under `DSV_DATA_DIR`
-(`/data`, the read-only `./data` bind mount) and exits non-zero if
-`manifest.json` is missing. `scripts/data.sh` fills `./data` from the
-`dinesafe` Blob container; `data.py fetch` fills the container from the
-Toronto Open Data CKAN portal (`RECENT_CSV_URL` and `HISTORICAL_ZIP_URL`).
-See [App architecture](app-architecture.md#data-path).
-
-- `manifest.json`: each file's name, base64 MD5, size, and row count.
-
-- `Dinesafe.csv`: the recent dataset.
-- `dinesafe-historical/*.csv`: the historical files, one per year.
+On the Azure VMs, `dsv-pipeline.timer` runs `scripts/pipeline.sh <env> run`
+each business-day morning. Locally, it runs on `./scripts/deploy.sh dev` or
+`./scripts/pipeline.sh dev load`, never on `docker compose up`. See
+[Data landing zone](../explanation/data-landing-zone.md#the-etl-logic).
 
 ### Seed path
 

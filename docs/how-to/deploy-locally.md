@@ -39,8 +39,9 @@ Run these commands from the repository root.
     ./scripts/deploy.sh dev
     ```
 
-    The script writes `.env` from `deploy/dev.env`, syncs the CSVs into
-    `./data`, builds, starts, waits for health, and checks nginx. It ends with
+    The script writes `.env` from `deploy/dev.env`, builds, starts, waits for
+    health, and checks nginx. It then loads stg's raw zone into your
+    database, if your database isn't already current. It ends with
     `deploy: dev is running on http://localhost:8080`. The first run loads
     about 500,000 records and takes a few minutes; later runs take seconds.
 
@@ -66,12 +67,15 @@ grafana.com. For why, see
 | Task | Command |
 | ---- | ------- |
 | Redeploy after a code change | `./scripts/deploy.sh dev` |
-| Pull stg's latest CSVs and reload | `./scripts/data.sh dev --load` |
+| Load stg's newest data, if it's newer than yours | `./scripts/pipeline.sh dev load` |
+| Reload stg's newest data | `./scripts/pipeline.sh dev load --force` |
 | Rebuild one service | `docker compose up -d --build dsv-app` |
 | Stop, keep the database | `docker compose down` |
 | Stop and wipe the database and Grafana | `docker compose down -v` |
 
-`./data` survives `down -v`, so the next deploy reloads without downloading.
+After `down -v`, the next deploy or `./scripts/pipeline.sh dev load` seeds the
+database again from stg's raw zone. Restarting or rebuilding the stack never
+changes the data.
 Changes to `src/dsv-db/init.sql` need `down -v`.
 
 ## Troubleshoot
@@ -81,10 +85,13 @@ Changes to `src/dsv-db/init.sql` need `down -v`.
 | `deploy/dev.env is missing` | `cp deploy/dev.env-example deploy/dev.env` |
 | `... must contain only letters, digits` or `... is empty` | Fix the named password in `deploy/dev.env`. |
 | `can't get a storage token` | `az login` as `dsv-ops01`. |
-| `GET manifest.json: HTTP 403` | Your IP changed or the role is new. See [Troubleshoot: your home IP address changed](azure-vm/troubleshoot-home-ip-change.md). |
-| `manifest.json isn't in the container` | stg has no data yet. See [Deploy to stg](azure-vm/deploy-stg.md). |
+| `GET https://stdsvstg01... HTTP 403` | Your IP changed or the role is new. See [Troubleshoot: your home IP address changed](azure-vm/troubleshoot-home-ip-change.md). |
+| `recent/ is empty` | stg has no data yet. Run `./scripts/pipeline.sh stg ingest` on the stg VM. |
 | Dashboards are empty, and the PostgreSQL data source is missing in Grafana | `docker-compose.yml` points `dsv-analytics` at an image without the bundled plugin, such as a `-slim` one. Use the full image. |
 | `docker compose logs dsv-analytics` shows `Skipping loading of plugin as it's a duplicate` for `grafana-postgresql-datasource` | Your Grafana volume holds a plugin that an earlier Grafana 13.2 downloaded, and Grafana uses it instead of the bundled one. Run the cleanup after this table once. |
+| `password authentication failed` in logs | `docker compose down -v`, then deploy again. |
+| Port 8080 or 3000 in use | Stop the other process or stack. |
+| You still have a `./data` folder | It's no longer used. Delete it: `rm -rf data` |
 
 To remove the downloaded plugins from the Grafana volume, run the following
 commands. They keep Grafana's database, `grafana.db`, so dashboards and users
@@ -95,9 +102,6 @@ docker compose run --rm --no-deps --entrypoint sh dsv-analytics \
   -c 'rm -rf /var/lib/grafana/plugins/*'
 docker compose restart dsv-analytics
 ```
-| `./data isn't writable` | Run the `sudo chown` command the message prints. |
-| `password authentication failed` in logs | `docker compose down -v`, then deploy again. |
-| Port 8080 or 3000 in use | Stop the other process or stack. |
 
 ## Next steps
 

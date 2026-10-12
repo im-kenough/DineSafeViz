@@ -187,20 +187,17 @@ the VMs, and from Compose defaults in dev.
 
 | Role                     | Used by                               | Privileges                                                       | Status  |
 | ------------------------ | ------------------------------------- | ---------------------------------------------------------------- | ------- |
-| Bootstrap superuser (`DSV_DB_USER`, for example `dsv_admin`) | Postgres image initialization; `refresh.py` today | Superuser                         | Exists  |
-| `dinesafe_migrator`      | The data pipeline's load stage        | `SELECT`, `INSERT`, and `DELETE` on `inspections` and `load_log`    | Planned |
-| `dinesafe_app`           | `dsv-app` and Grafana (`dsv-analytics`) | `SELECT` on `inspections` (and on `load_log` once it exists); every query capped at 10 seconds | Exists  |
+| Bootstrap superuser (`DSV_DB_USER`, for example `dsv_admin`) | Postgres image initialization; migrations in `deploy.sh` | Superuser                         | Exists  |
+| `dinesafe_migrator`      | The data pipeline's load stage        | `SELECT`, `INSERT`, and `DELETE` on `inspections` and `load_log`    | Exists  |
+| `dinesafe_app`           | `dsv-app` and Grafana (`dsv-analytics`) | `SELECT` on `inspections` and `load_log`; every query capped at 10 seconds | Exists  |
 
 Notes on these roles:
 
-- **The loader moves off the superuser.** `refresh.py` connects as the
-  bootstrap superuser today. The data landing zone design switches the load
-  to `dinesafe_migrator`, which can change only the two tables it loads. See
+- **The loader doesn't use the superuser.** The data pipeline loads as
+  `dinesafe_migrator`, which can change only the two tables it loads.
+  `migrations/001_load_log.sql` revokes the broader grants `init.sql` gives
+  it. See
   [Data landing zone](../explanation/data-landing-zone.md#database-role).
-- **`dinesafe_migrator` exists today with more privileges than it needs.**
-  `init.sql` grants it `ALL PRIVILEGES` on `inspections` and `CREATE` on the
-  `public` schema. Narrow these grants when the pipeline starts using the
-  role.
 - **The app can't write.** `dinesafe_app` has `SELECT` only, so a flaw in the
   web app or an anonymous Grafana query can't change data.
 - **Changing a password later needs `ALTER ROLE`.** `set-passwords.sh` runs

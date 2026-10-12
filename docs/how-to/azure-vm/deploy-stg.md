@@ -158,14 +158,17 @@ cd ~/DineSafeViz
 ./scripts/deploy.sh stg main
 ```
 
-The first deploy takes several minutes. When `stdsvstg01` is empty,
-`data.sh` downloads the current and historical CSVs from Toronto Open Data,
-validates them, and uploads them before it syncs them into `./data`. Then
-`dsv-init-db` loads them into a new database while Grafana runs its schema
-migrations. A `403` from `data.sh` right after `setup-az-vms.sh` means the
-role assignment hasn't applied yet; wait five minutes and rerun the deploy. Later deploys run the shorter refresh instead. After the
-first deploy, schedule the business-day refresh as described in
-[Schedule the data refresh](vm-first-time-setup.md#7-schedule-the-data-refresh). The script ends with a line like this:
+The first deploy takes several minutes. `deploy.sh` runs the database
+migrations, then `pipeline.sh stg load`, which loads the newest files from the
+Blob raw zone. It never contacts Toronto Open Data. If `stdsvstg01` is still
+empty, the deploy stops with `the data load failed and the site has an empty
+database`: run `./scripts/pipeline.sh stg ingest`, then rerun the deploy. A
+`403` from `pipeline.sh` right after `setup-az-vms.sh` means the role
+assignment hasn't propagated yet; wait a few minutes and rerun. Later deploys
+skip the load when the database already has the newest file. After the first
+deploy, schedule the business-day refresh as described in
+[Schedule the data refresh](vm-first-time-setup.md#7-schedule-the-data-refresh).
+The script ends with a line like this:
 
 ```text
 deploy: stg is running sha-4626289 (4626289...)
@@ -188,7 +191,7 @@ connected. Check the stack and the site yourself the first time:
     ```
 
     `dsv-tunnel`, `dsv-nginx`, `dsv-app`, `dsv-db`, and `dsv-analytics` show
-    `running` or `healthy`. `dsv-init-db` shows `exited (0)`.
+    `running` or `healthy`.
 
 2.  In the Cloudflare dashboard, go to **Networking** > **Tunnels**, and
     confirm that `tun-dsv-stg01` shows **Healthy**.
@@ -243,10 +246,10 @@ errors you're most likely to see on a first stg deploy.
 | `can't read ... from kv-dsv-stg01: ForbiddenByRbac` | `id-dsv-stg01-vm` lacks Key Vault Secrets User, or the role was just assigned. Wait a few minutes. |
 | `... must contain only letters, digits, and . _ ~ -` | Regenerate that secret with `openssl rand -hex 32`. See checklist step 4.4. |
 | `data: ... HTTP 403` | The storage firewall doesn't allow the VM's subnet, or `id-dsv-stg01-vm` lacks Storage Blob Data Contributor on the `dinesafe` container. Rerun `setup-az-vms.sh infra`, then wait a few minutes. |
-| `data: manifest.json isn't in the container` | Blob Storage is empty and the fetch before it failed. Fix the fetch error printed above it, then rerun the deploy. |
+| `pipeline: recent/ is empty` | Blob Storage has no data yet. Run `./scripts/pipeline.sh stg ingest`, then rerun the deploy. |
 | `deploy: warning: using the CSVs already in Blob Storage` | Toronto Open Data failed or its files didn't validate. The deploy continues on the last good data. |
 | `a container reached IMDS` | The metadata block isn't in place. Run `sudo systemctl restart dsv-imds-block`, then check its rules as in [the VM setup guide](vm-first-time-setup.md#4-block-containers-from-the-instance-metadata-service). |
-| `dsv-init-db` exits non-zero or is `OOMKilled` | Check `free -h` for the swap file, then `docker compose logs dsv-init-db`. |
+| `pipeline.sh load` exits 137 | Out of memory. Check `free -h` for the swap file. |
 | `dependency failed to start: container dsv-dsv-analytics-1 is unhealthy` | Grafana's first-start migrations outlasted its health check, so nginx and the tunnel never started. Wait for `docker compose ps` to show `dsv-analytics` as `healthy`, then rerun `deploy.sh`. `docker-compose.vm.yml` allows 300 seconds, so this means the VM is short on memory. Check `free -h`, and confirm the VM is a `Standard_B2als_v2` (checklist step 6.3). |
 | Dashboards are empty, and the PostgreSQL data source is missing in Grafana | `dsv-analytics` runs an image without the bundled plugin, such as a `-slim` one. The `backend` network has no internet, so Grafana can't download the plugin. Use the full `grafana/grafana` image in `docker-compose.yml`. See [Grafana: the bundled PostgreSQL plugin](../../explanation/grafana-postgres-plugin.md). |
 | `dsv-db` never becomes healthy | `DSV_DB_NAME` must be `dinesafe`. Check `deploy/stg.env`. |

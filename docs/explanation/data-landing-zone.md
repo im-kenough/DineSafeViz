@@ -6,12 +6,6 @@ scheduled refresh runs, where the load and transform happen, and what happens
 to the data when you restart the Docker Compose stack. It records design
 decisions made on October 12, 2026.
 
-<!-- prettier-ignore -->
-> [!NOTE]
-> This page describes a proposed design. It isn't implemented yet. For the
-> pipeline as it runs today, see
-> [Dataset download and refresh](dataset-refresh.md).
-
 The short version: raw CSVs land in a private, Entra-only Blob container, a
 one-shot job loads them into Postgres, and Postgres serves the app. Nothing
 contacts Toronto Open Data except the scheduled timer or a command you run
@@ -309,8 +303,8 @@ CREATE TABLE load_log (
 
 The pipeline connects as `dinesafe_migrator`, which `src/dsv-db/init.sql`
 already defines. It gets `SELECT`, `INSERT`, and `DELETE` on `inspections` and
-`load_log`, and nothing else. Today `refresh.py` connects as the Postgres
-superuser, so this change also closes an existing least-privilege gap.
+`load_log`, and nothing else. Before this design, `refresh.py` connected as
+the Postgres superuser.
 
 ## Failure handling and retention
 
@@ -391,20 +385,20 @@ The following diagram shows one run of the job.
 
 ### One container instead of two
 
-Today the work is split across two containers. `dsv-data` holds a storage
-token but no database credentials. `dsv-init-db` holds database credentials
-but has no network access. Merging them puts both in one container, which is
+Before this design, the work was split across two containers. `dsv-data`
+held a storage token but no database credentials. `dsv-init-db` held
+database credentials but had no network access. Merging them puts both in one container, which is
 how most enterprise loaders work: the loader identity reads the raw zone and
 writes the database.
 
-The extra exposure is small. The fetch side already parses CSVs from the
-internet while it holds a storage write token, and the loader already writes
+The extra exposure is small. The fetch side already parsed CSVs from the
+internet while it held a storage write token, and the loader already wrote
 the `inspections` table. The design limits what the merged container can do:
 
 - It connects as `dinesafe_migrator`, which can write only `inspections`
   and `load_log`, not as the Postgres superuser.
 - Its storage token is minted for each run, passed as a mode-600 file, and
-  deleted on exit, as it is today.
+  deleted on exit, as it was before.
 - It's the only service on both the `egress` and `backend` networks.
 
 Keeping two containers is possible, but they'd have to pass the file through
