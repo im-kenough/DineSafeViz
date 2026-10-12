@@ -21,6 +21,11 @@ import data
 import refresh
 from data import BlobStore, DataError
 
+# Arbitrary advisory lock key. load() holds it for its whole transaction, so
+# a deploy's load and the timer's load can't both seed or both refresh: the
+# second waits, then sees the first one's load_log row.
+LOAD_LOCK = 0x44535640AD
+
 
 def decide(table_empty, last_loaded, newest, force):
     """Seed an empty table; otherwise refresh unless newest is already loaded."""
@@ -42,9 +47,12 @@ def load(store, conn, force=False):
     if newest is None:
         raise DataError("recent/ is empty. Run ingest first: scripts/pipeline.sh <env> ingest")
     recent_path = newest[0]
+    with conn.cursor() as cur:
+        cur.execute("SELECT pg_advisory_xact_lock(%s)", (LOAD_LOCK,))
     action = decide(refresh.is_empty(conn), refresh.last_loaded_path(conn), recent_path, force)
     if action == "skip":
         print(f"Already current: {recent_path} is loaded.")
+        conn.rollback()  # releases the lock
         return action
 
     historical_path = None

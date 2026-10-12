@@ -125,3 +125,28 @@ def test_seed_without_complete_historical_is_an_error(conn, store):
         pipeline.load(store, conn)
     conn.rollback()
     assert count(conn, "SELECT count(*) FROM inspections") == 0
+
+
+# Final review: a deploy's load overlapping the timer's load must not both
+# seed or both refresh. The second waits, then finds the data current.
+def test_concurrent_loads_wait_for_each_other(db, conn, store):
+    import threading
+
+    other = psycopg2.connect(host=container_ip(db), dbname="dinesafe",
+                             user="dinesafe_migrator", password=MIGRATOR_PW)
+    try:
+        with other.cursor() as cur:
+            cur.execute("SELECT pg_advisory_lock(%s)", (pipeline.LOAD_LOCK,))
+        result = {}
+        worker = threading.Thread(target=lambda: result.setdefault("action", pipeline.load(store, conn)))
+        worker.start()
+        worker.join(timeout=1)
+        assert worker.is_alive(), "load didn't wait for the lock"
+        with other.cursor() as cur:
+            cur.execute("SELECT pg_advisory_unlock(%s)", (pipeline.LOAD_LOCK,))
+        worker.join(timeout=30)
+        assert result["action"] == "seed"
+    finally:
+        other.close()
+    assert pipeline.load(store, conn) == "skip"
+    assert count(conn, "SELECT count(*) FROM inspections") == 3
