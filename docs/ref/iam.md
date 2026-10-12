@@ -189,7 +189,7 @@ the VMs, and from Compose defaults in dev.
 | ------------------------ | ------------------------------------- | ---------------------------------------------------------------- | ------- |
 | Bootstrap superuser (`DSV_DB_USER`, for example `dsv_admin`) | Postgres image initialization; `refresh.py` today | Superuser                         | Exists  |
 | `dinesafe_migrator`      | The data pipeline's load stage        | `SELECT`, `INSERT`, and `DELETE` on `inspections` and `load_log`    | Planned |
-| `dinesafe_app`           | `dsv-app` and Grafana (`dsv-analytics`) | `SELECT` on `inspections`; every query capped at 10 seconds      | Exists  |
+| `dinesafe_app`           | `dsv-app` and Grafana (`dsv-analytics`) | `SELECT` on `inspections` (and on `load_log` once it exists); every query capped at 10 seconds | Exists  |
 
 Notes on these roles:
 

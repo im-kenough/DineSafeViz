@@ -258,6 +258,7 @@ stdsvprod01 / dinesafe
   recent/20261012T113012Z/Dinesafe.csv      metadata: source_last_modified=2026-10-12T09:14:00
   recent/20261009T113005Z/Dinesafe.csv
   historical/20261012T113012Z/dinesafe-2001.csv … dinesafe-2023.csv
+  historical/20261012T113012Z/_SUCCESS
 ```
 
 - **Newest.** The newest file is the last folder in a sorted listing of
@@ -269,7 +270,12 @@ stdsvprod01 / dinesafe
   newest blob's `source_last_modified` metadata. With `--force`, it always
   downloads, but skips the upload when the MD5 matches the newest blob.
 - **Historical files.** `ingest` downloads the historical ZIP only when
-  `historical/` is empty, or when you pass `--historical`.
+  `historical/` has no complete folder, or when you pass `--historical`.
+- **The `_SUCCESS` marker.** The historical folder holds 23 files, and an
+  upload can stop partway. `ingest` writes an empty `_SUCCESS` blob after the
+  last file, and `load` ignores folders without it. The name is a convention
+  from Hadoop and Spark. The recent file is a single upload, so it doesn't
+  need a marker.
 
 ### The `load_log` table
 
