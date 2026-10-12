@@ -1,9 +1,9 @@
-"""DineSafe data loader: initial seed and refresh from local CSVs.
+"""DineSafe data loader: transforms and the seed and refresh SQL.
 
-Reads the CSVs that scripts/data.sh mirrors from Azure Blob Storage into
-DSV_DATA_DIR. Detects whether the inspections table is empty:
-- Empty:     seeds historical (2001-2022) + recent (2023-present) data
-- Non-empty: replaces recent data from Dinesafe.csv
+pipeline.py downloads the raw-zone files into a temp directory laid out as
+<data_dir>/Dinesafe.csv and <data_dir>/dinesafe-historical/*.csv, then calls
+seed() or refresh(). Neither commits: pipeline.py records the load in
+load_log and commits once, so the data and its log row land together.
 """
 
 import csv
@@ -23,11 +23,8 @@ DSV_DB_NAME = os.environ.get("DSV_DB_NAME", "dinesafe")
 DSV_DB_USER = os.environ.get("DSV_DB_USER", "dinesafe")
 DSV_DB_PASSWORD = os.environ.get("DSV_DB_PASSWORD", "dinesafe")
 
-# Mirror of the Blob container, written by scripts/data.sh (dsv-data sync).
-DSV_DATA_DIR = os.environ.get("DSV_DATA_DIR", "/data")
 RECENT_NAME = "Dinesafe.csv"
 HISTORICAL_DIR = "dinesafe-historical"
-MANIFEST_NAME = "manifest.json"
 
 # Column order for COPY into the inspections table (excludes serial `id`)
 INSPECTIONS_COLUMNS = [
@@ -238,7 +235,7 @@ def bulk_insert(conn, rows):
 
 
 # ---------------------------------------------------------------------------
-# Seed path — first deploy, table is empty
+# Seed and refresh — called by pipeline.py, which commits
 # ---------------------------------------------------------------------------
 
 
@@ -262,15 +259,6 @@ def _read_csv_rows(csv_path, column_map):
     return [map_row(r, column_map) for r in reader]
 
 
-def require_manifest(data_dir):
-    """Exit with a clear message unless data_dir holds a synced mirror."""
-    if not os.path.isfile(os.path.join(data_dir, MANIFEST_NAME)):
-        raise SystemExit(
-            f"{data_dir}/{MANIFEST_NAME} is missing. Run scripts/data.sh to "
-            "sync the CSVs from Azure Blob Storage first."
-        )
-
-
 def _insert_historical_csv(conn, csv_path, name, cutoff):
     """Parse one historical CSV file and bulk-insert its rows.
 
@@ -283,19 +271,23 @@ def _insert_historical_csv(conn, csv_path, name, cutoff):
     rows = exclude_on_or_after(rows, cutoff)
     bulk_insert(conn, rows)
     print(f"  Loaded {name}: {len(rows)} rows")
+    return len(rows)
 
 
 def load_historical(conn, cutoff, data_dir):
     """Load every historical CSV under data_dir/dinesafe-historical.
 
     cutoff is the earliest inspection_date in the recent CSV; historical
-    rows on or after it are skipped to avoid double-counting.
+    rows on or after it are skipped to avoid double-counting. Returns the
+    number of rows inserted.
     """
     csv_dir = os.path.join(data_dir, HISTORICAL_DIR)
     print(f"Reading historical data from {csv_dir} ...")
+    inserted = 0
     for name in sorted(os.listdir(csv_dir)):
         if name.endswith(".csv"):
-            _insert_historical_csv(conn, os.path.join(csv_dir, name), name, cutoff)
+            inserted += _insert_historical_csv(conn, os.path.join(csv_dir, name), name, cutoff)
+    return inserted
 
 
 def _read_recent_rows(data_dir):
@@ -311,67 +303,53 @@ def _read_recent_rows(data_dir):
     return rows
 
 
-def seed(conn):
-    """Full seed: load recent data, then historical data excluding the
-    recent CSV's date window, so overlapping inspections aren't
-    double-counted. Commits once.
+def seed(conn, data_dir):
+    """Full seed: historical data before the recent CSV's date window, then
+    the recent data, so overlapping inspections aren't double-counted.
+    Doesn't commit. Returns (rows deleted, rows inserted).
     """
-    recent_rows = _read_recent_rows(DSV_DATA_DIR)
+    recent_rows = _read_recent_rows(data_dir)
     cutoff = min_inspection_date(recent_rows)
-    load_historical(conn, cutoff, DSV_DATA_DIR)
+    inserted = load_historical(conn, cutoff, data_dir)
     bulk_insert(conn, recent_rows)
     print(f"  Loaded recent CSV: {len(recent_rows)} rows")
-    conn.commit()
-    print("Seed complete.")
+    return 0, inserted + len(recent_rows)
 
 
-# ---------------------------------------------------------------------------
-# Refresh path — business-day timer, table already has data
-# ---------------------------------------------------------------------------
-
-
-def refresh(conn):
-    """Replace all recent data in a single transaction.
-
-    Reads the CSV first, then deletes + inserts inside one
-    transaction so the table is never in a partial state.
-    The delete cutoff is derived from the earliest date in the
-    fresh CSV so it tracks the upstream data window automatically.
+def refresh(conn, data_dir):
+    """Replace all recent data: delete every row on or after the earliest
+    date in the fresh CSV, then insert the CSV. The cutoff tracks the
+    upstream data window automatically. Doesn't commit, so the caller's
+    single transaction covers the delete, the insert, and the log row.
+    Returns (rows deleted, rows inserted).
     """
-    rows = _read_recent_rows(DSV_DATA_DIR)
+    rows = _read_recent_rows(data_dir)
     cutoff = min_inspection_date(rows)
     with conn.cursor() as cur:
-        cur.execute(
-            "DELETE FROM inspections WHERE inspection_date >= %s",
-            (cutoff,),
-        )
+        cur.execute("DELETE FROM inspections WHERE inspection_date >= %s", (cutoff,))
         deleted = cur.rowcount
     bulk_insert(conn, rows)
-    conn.commit()
-    print(f"Refresh complete: deleted {deleted}, inserted {len(rows)} rows.")
+    return deleted, len(rows)
 
 
 # ---------------------------------------------------------------------------
-# CLI entrypoint
+# load_log: which raw-zone file is loaded
 # ---------------------------------------------------------------------------
 
 
-def main():
-    require_manifest(DSV_DATA_DIR)
-    conn = get_connection()
-    try:
-        if is_empty(conn):
-            print("Table is empty — running full seed...")
-            seed(conn)
-        else:
-            print("Table has data — running daily refresh...")
-            refresh(conn)
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+def last_loaded_path(conn):
+    """Return the recent blob path of the newest load, or None."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT recent_path FROM load_log ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+    return row[0] if row else None
 
 
-if __name__ == "__main__":
-    main()
+def record_load(conn, kind, recent_path, historical_path, deleted, inserted):
+    """Insert one load_log row. Doesn't commit."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO load_log (kind, recent_path, historical_path, rows_deleted, rows_inserted) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            (kind, recent_path, historical_path, deleted, inserted),
+        )
