@@ -1,57 +1,46 @@
 # Data sources
 
-This page describes the two DineSafe datasets that DineSafeViz loads: their
-columns, their values, and the quirks that affect how you read them. Counts
-come from the October 14, 2026 downloads.
+This page describes the datasets DineSafeViz loads, including their columns,
+their values, and the quirks that affect how you read them.
 
 ## The DineSafe package
 
 Toronto Public Health (TPH) publishes DineSafe on Toronto Open Data at
-https://open.toronto.ca/dataset/dinesafe/.
+https://open.toronto.ca/dataset/dinesafe/. You can download the files from
+the website or through the portal's CKAN API, where DineSafe is the `dinesafe`
+package.
 
-- **Refresh rate:** listed as "Daily." In practice, the recent CSV is
-  republished about once per business day.
-- **Recent dataset:** November 10, 2023 to the last business day. One CSV,
-  replaced on each publish.
-- **Historical dataset:** 2001 to December 29, 2023. One ZIP of yearly CSVs,
-  static.
-- **Overlap:** November 10 to December 29, 2023 is in both. The load keeps the
-  recent rows and drops the historical ones. See
-  [Seed path](../../docs/ref/data-mapping.md#seed-path).
-- **Schema change:** in May 2026, TPH replaced the recent CSV with a new
-  resource that has a new schema and resource ID. The historical data still
-  uses the old schema.
+DineSafeViz combines two datasets from the package:
 
-### Resources
+| Dataset    | Covers                                   | Shape                  | Updates                                 |
+| ---------- | ---------------------------------------- | ---------------------- | --------------------------------------- |
+| Recent     | November 10, 2023 to the last business day | One CSV              | Replaced about once per business day    |
+| Historical | 2001 to December 29, 2023                | One ZIP of yearly CSVs | Static                                  |
 
-The package lists more resources than the pipeline uses.
+- **Different schemas:** the two datasets have different columns. In May
+  2026, TPH replaced the recent CSV with a new file in a new schema. The
+  historical data still uses the old one.
+- **Overlap:** November 10 to December 29, 2023 is in both datasets.
+  DineSafeViz keeps the recent rows for that window and drops the historical
+  ones. See [Seed path](../../docs/ref/data-mapping.md#seed-path).
 
-| Resource name              | Format | Used                 | Notes                                                   |
-| -------------------------- | ------ | -------------------- | ------------------------------------------------------- |
-| `Dinesafe.csv`             | CSV    | Yes, recent data     | Created May 20, 2026. Updated each publish.             |
-| `Dinesafe Historical Data` | ZIP    | Yes, historical data | Last modified July 6, 2026.                             |
-| `Dinesafe™.csv`            | CSV    | No                   | Stale copy, last modified July 8, 2026.                 |
-| `Dinesafe`                 | JSON   | No                   | CKAN DataStore table with the same rows as the recent CSV. |
-| XML and JSON copies        | —      | No                   | `Dinesafe.xml`, `Dinesafe.json`, and their `™` versions. |
+### Files in the package
+
+The package lists eight files. DineSafeViz uses two of them.
+
+| File                       | Format | Used for        | Notes                                                     |
+| -------------------------- | ------ | --------------- | --------------------------------------------------------- |
+| `Dinesafe.csv`             | CSV    | Recent data     | Current file, updated with each publish.                  |
+| `Dinesafe Historical Data` | ZIP    | Historical data | Last changed July 6, 2026.                                |
+| `Dinesafe™.csv`            | CSV    | Not used        | Old copy of the recent data, frozen on July 8, 2026.      |
+| `Dinesafe`                 | JSON   | Not used        | Same rows as `Dinesafe.csv`, served through the CKAN API. |
+| XML and JSON copies        | —      | Not used        | `Dinesafe.xml`, `Dinesafe.json`, and their `™` versions.  |
 
 <!-- prettier-ignore -->
 > [!WARNING]
-> `Dinesafe™.csv` differs from `Dinesafe.csv` only by the `™` sign and has
-> the same columns, but it stopped updating on July 8, 2026. A loose name
-> match loads stale data.
-
-### How the pipeline finds the files
-
-`dsv-pipeline ingest` (`src/dsv-db/data.py`) reads the package through CKAN's
-`package_show` API.
-
-- Picks resources by exact name and format, not by resource ID, so a new
-  resource ID doesn't break it.
-- Downloads the recent CSV only when its CKAN `last_modified` is newer than
-  the `source_last_modified` metadata on the newest file in the raw zone.
-- Downloads the historical ZIP only when the raw zone has no complete
-  historical folder, or when you pass `--historical`.
-- See [Data landing zone](../../docs/explanation/data-landing-zone.md#the-etl-logic).
+> `Dinesafe™.csv` looks like the recent data: the name differs only by the
+> `™` sign and the columns are the same. It stopped updating on July 8, 2026,
+> so always use `Dinesafe.csv`.
 
 ## Recent dataset
 
