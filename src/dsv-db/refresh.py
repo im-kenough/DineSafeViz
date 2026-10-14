@@ -251,11 +251,15 @@ def decode_csv(raw):
         return raw.decode("cp1252")
 
 
+def read_csv_text(csv_path):
+    """Read a DineSafe CSV file as text, in whichever encoding it uses."""
+    with open(csv_path, "rb") as f:
+        return decode_csv(f.read())
+
+
 def _read_csv_rows(csv_path, column_map):
     """Read a DineSafe CSV file into mapped rows."""
-    with open(csv_path, "rb") as f:
-        text = decode_csv(f.read())
-    reader = csv.DictReader(io.StringIO(text))
+    reader = csv.DictReader(io.StringIO(read_csv_text(csv_path)))
     return [map_row(r, column_map) for r in reader]
 
 
@@ -295,9 +299,9 @@ def _read_recent_rows(data_dir):
     source = os.path.join(data_dir, RECENT_NAME)
     print(f"Reading recent data from {source} ...")
     rows = _read_csv_rows(source, RECENT_COLUMN_MAP)
-    deduped = drop_old_id_duplicates(rows)
-    print(f"  Dropped old-ID duplicate rows: {len(rows) - len(deduped)}")
-    rows = deduped
+    before = len(rows)
+    rows = drop_old_id_duplicates(rows)
+    print(f"  Dropped old-ID duplicate rows: {before - len(rows)}")
     # Non-zero means the upstream address format changed; the raw address is kept in street.
     print(f"  Unparsed recent addresses: {count_unparsed_addresses(rows)}")
     return rows

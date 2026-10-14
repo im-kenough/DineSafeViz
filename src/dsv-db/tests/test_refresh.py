@@ -1,9 +1,6 @@
-import sys
-import os
-
 import pytest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from fakes import historical_csv, historical_row, recent_csv, recent_row
 
 from refresh import (
     normalize,
@@ -333,7 +330,6 @@ class TestDecodeCsv:
 
 
 
-from fakes import historical_csv, historical_row, recent_csv, recent_row
 from refresh import (
     HISTORICAL_DIR, RECENT_NAME, last_loaded_path, record_load, refresh, seed,
 )

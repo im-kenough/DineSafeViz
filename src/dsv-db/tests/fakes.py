@@ -60,13 +60,6 @@ def historical_csv(path, rows):
 
 
 class FakeResponse(io.BytesIO):
-    def __init__(self, body=b"", headers=None, status=200):
-        super().__init__(body)
-        self.status = status
-        self.headers = Message()
-        for k, v in (headers or {}).items():
-            self.headers[k] = v
-
     def __enter__(self):
         return self
 
@@ -75,7 +68,7 @@ class FakeResponse(io.BytesIO):
 
 
 class FakeOpener:
-    """Records requests. Answers from {(method, suffix): FakeResponse | int},
+    """Records requests, reading a streamed body into req.body. Answers from {(method, suffix): FakeResponse | int},
     where suffix is the URL after the container URL, for example
     "/recent/x/Dinesafe.csv" or "?restype=container&comp=list&...".
     Unknown requests get 404."""
@@ -87,6 +80,7 @@ class FakeOpener:
         self.requests = []
 
     def __call__(self, req, timeout=None):
+        req.body = req.data.read() if hasattr(req.data, "read") else req.data
         self.requests.append(req)
         suffix = req.full_url[len(self.CONTAINER):]
         answer = self.answers.get((req.get_method(), suffix), 404)

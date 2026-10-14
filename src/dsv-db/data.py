@@ -23,7 +23,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
-from refresh import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP, RECENT_NAME, decode_csv
+from refresh import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP, RECENT_NAME, read_csv_text
 
 CKAN_PACKAGE_URL = (
     "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/package_show?id=dinesafe"
@@ -38,6 +38,10 @@ HISTORICAL_PREFIX = "historical/"
 # Written after every historical file, so a half-uploaded folder is ignored.
 SUCCESS_MARKER = "_SUCCESS"
 KEEP_RECENT = 30
+# Blob metadata on each recent file: CKAN's last_modified when it was ingested.
+SOURCE_MODIFIED_KEY = "source_last_modified"
+# check_fresh fails when the newest source data is older than this.
+STALE_AFTER = datetime.timedelta(days=10)
 
 # Sanity floors, well under today's counts (about 120,000 recent rows and
 # at least 6,000 rows per historical year), so a truncated download fails.
@@ -69,11 +73,10 @@ def md5_b64(path):
 def validate_csv(path, column_map, min_rows):
     """Check headers and row count; return the row count or raise DataError."""
     name = os.path.basename(path)
-    with open(path, "rb") as f:
-        try:
-            text = decode_csv(f.read())
-        except UnicodeDecodeError as e:
-            raise DataError(f"{name}: not UTF-8 or cp1252 ({e})") from e
+    try:
+        text = read_csv_text(path)
+    except UnicodeDecodeError as e:
+        raise DataError(f"{name}: not UTF-8 or cp1252 ({e})") from e
     reader = csv.reader(io.StringIO(text))
     header = next(reader, [])
     missing = [c for c in column_map if c not in header]
@@ -178,12 +181,14 @@ class BlobStore:
             shutil.copyfileobj(resp, out)
 
     def upload(self, name, path, md5, metadata=None):
-        with open(path, "rb") as f:
-            body = f.read()
-        headers = {"x-ms-blob-type": "BlockBlob", "Content-MD5": md5, "Content-Type": "text/csv"}
+        # Streams the file. Put Blob needs Content-Length; without it, urllib
+        # would send the file chunked.
+        headers = {"x-ms-blob-type": "BlockBlob", "Content-MD5": md5, "Content-Type": "text/csv",
+                   "Content-Length": str(os.path.getsize(path))}
         for key, value in (metadata or {}).items():
             headers[f"x-ms-meta-{key}"] = value
-        resp = self._request("PUT", self._blob_url(name), data=body, headers=headers)
+        with open(path, "rb") as body:
+            resp = self._request("PUT", self._blob_url(name), data=body, headers=headers)
         if resp is None:
             raise DataError(f"PUT {name}: container not found")
         resp.close()
@@ -225,9 +230,6 @@ def newest_historical(store):
         return None
     folder = f"{HISTORICAL_PREFIX}{complete[-1]}/"
     return folder, sorted(n for n in blobs if n.startswith(folder) and n.endswith(".csv"))
-
-
-STALE_AFTER = datetime.timedelta(days=10)
 
 
 def _download_historical(url, tmp, download):
@@ -276,7 +278,7 @@ def ingest(store, force=False, historical=False, resolve=resolve_resources,
     resources = resolve()
     source = resources["recent"]["last_modified"]
     newest = newest_recent(store)
-    newest_source = newest[1].metadata.get("source_last_modified", "") if newest else ""
+    newest_source = newest[1].metadata.get(SOURCE_MODIFIED_KEY, "") if newest else ""
     need_recent = force or newest is None or source > newest_source
     need_historical = historical or newest_historical(store) is None
     if not need_recent and not need_historical:
@@ -311,7 +313,7 @@ def ingest(store, force=False, historical=False, resolve=resolve_resources,
         if recent_path is None:
             return None
         name = f"{RECENT_PREFIX}{stamp}/{RECENT_NAME}"
-        store.upload(name, recent_path, recent_md5, metadata={"source_last_modified": source})
+        store.upload(name, recent_path, recent_md5, metadata={SOURCE_MODIFIED_KEY: source})
         print(f"Uploaded {name}")
     prune_recent(store)
     return name
@@ -331,7 +333,7 @@ def prune_recent(store, keep=KEEP_RECENT):
 
 
 def check_fresh(store, now=None):
-    """Raise DataError if the newest recent file's source is over 10 days old.
+    """Raise DataError if the newest recent file's source is older than STALE_AFTER.
 
     Toronto Open Data publishes most business days, so a long gap usually
     means the dataset moved or its ID changed.
@@ -339,9 +341,9 @@ def check_fresh(store, now=None):
     newest = newest_recent(store)
     if newest is None:
         raise DataError(f"{RECENT_PREFIX} is empty. Run ingest first.")
-    source = newest[1].metadata.get("source_last_modified")
+    source = newest[1].metadata.get(SOURCE_MODIFIED_KEY)
     if not source:
-        raise DataError(f"{newest[0]} has no source_last_modified metadata")
+        raise DataError(f"{newest[0]} has no {SOURCE_MODIFIED_KEY} metadata")
     when = datetime.datetime.fromisoformat(source)
     if when.tzinfo is None:
         when = when.replace(tzinfo=datetime.timezone.utc)

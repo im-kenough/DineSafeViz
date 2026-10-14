@@ -14,8 +14,6 @@
 # .env, so docker compose commands keep working after a secret refresh.
 set -euo pipefail
 
-IMDS_URL="http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fvault.azure.net"
-
 # .env variable=Key Vault secret name
 SECRETS=(
   DSV_DB_PASSWORD=dsv-db-password
@@ -29,11 +27,7 @@ die() {
   exit 1
 }
 
-# Prints the value of $2 in env file $1. Last assignment wins, as it does when
-# compose reads .env.
-setting() {
-  sed -n "s/^$2=//p" "$1" | tail -n 1
-}
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 env_name=${1:-}
 if [[ $env_name != stg && $env_name != prod && $env_name != dev ]]; then
@@ -43,8 +37,7 @@ fi
 
 repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 settings="$repo_dir/deploy/$env_name.env"
-[[ -f $settings ]] \
-  || die "$settings is missing. Copy deploy/$env_name.env-example to deploy/$env_name.env first."
+require_settings "$settings" "$env_name"
 # read_secret VAR NAME prints the secret that .env calls VAR and Key Vault
 # calls NAME; secret_label VAR NAME names it in errors.
 if [[ $env_name == dev ]]; then
@@ -59,9 +52,7 @@ else
   compose_file=docker-compose.yml:docker-compose.vm.yml
   # Only the VM runs the tunnel (docker-compose.vm.yml).
   SECRETS+=(DSV_TUNNEL_TOKEN=dsv-tunnel-token)
-  token=$(curl -sS --fail-with-body --max-time 5 -H Metadata:true "$IMDS_URL" \
-    | jq -r .access_token) \
-    || die "can't get a token from IMDS. Run this on the Azure VM, with its managed identity attached."
+  token=$(imds_token https%3A%2F%2Fvault.azure.net)
   read_secret() {
     local body reason
     if body=$(curl -sS --fail-with-body --max-time 10 \

@@ -20,8 +20,6 @@
 # Exit codes: 0 ok, 1 error, 2 usage.
 set -euo pipefail
 
-IMDS_URL="http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fstorage.azure.com%2F"
-
 usage() {
   echo "usage: pipeline.sh stg|prod run|ingest|load [--force] [--historical] | pipeline.sh dev load [--force]" >&2
   exit 2
@@ -31,6 +29,8 @@ die() {
   echo "pipeline: $*" >&2
   exit 1
 }
+
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 env_name=${1:-}
 command=${2:-}
@@ -52,10 +52,8 @@ repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$repo_dir"
 
 settings=deploy/$env_name.env
-[[ -f $settings ]] \
-  || die "$settings is missing. Copy deploy/$env_name.env-example to deploy/$env_name.env first."
-# Last assignment wins, as it does when compose reads the copied .env.
-account=$(sed -n 's/^DSV_STORAGE_ACCOUNT=//p' "$settings" | tail -n 1)
+require_settings "$settings" "$env_name"
+account=$(setting "$settings" DSV_STORAGE_ACCOUNT)
 [[ -n $account ]] || die "DSV_STORAGE_ACCOUNT is missing from $settings"
 [[ $account =~ ^[a-z0-9]{3,24}$ ]] \
   || die "DSV_STORAGE_ACCOUNT in $settings isn't a valid storage account name: '$account'"
@@ -65,9 +63,7 @@ if [[ $env_name == dev ]]; then
     --query accessToken -o tsv) \
     || die "can't get a storage token. Run az login as dsv-ops01 first."
 else
-  token=$(curl -sS --fail-with-body --max-time 5 -H Metadata:true "$IMDS_URL" \
-    | jq -r .access_token) \
-    || die "can't get a token from IMDS. Run this on the Azure VM, with its managed identity attached."
+  token=$(imds_token https%3A%2F%2Fstorage.azure.com%2F)
 fi
 [[ -n $token && $token != null ]] || die "got an empty storage token"
 
@@ -83,11 +79,9 @@ if [[ $env_name == dev ]]; then
 fi
 
 # Runs as you: the container drops every capability, so root couldn't read
-# the mode-600 token file you own.
-status=0
+# the mode-600 token file you own. Not exec: the EXIT trap deletes the token.
 docker compose --profile pipeline run --rm "${build[@]}" \
   --user "$(id -u):$(id -g)" \
   -v "$token_dir/token:/run/secrets/storage-token:ro" \
   -e "DSV_STORAGE_ACCOUNT=$account" \
-  dsv-pipeline "$command" "${flags[@]}" || status=1
-exit "$status"
+  dsv-pipeline "$command" "${flags[@]}" || exit 1

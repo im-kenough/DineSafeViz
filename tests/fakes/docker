@@ -16,12 +16,6 @@ case "$1 $2" in
     fi
     exit "${FAKE_UP_EXIT:-0}"
     ;;
-  "compose wait")
-    code=0
-    [[ $3 == dsv-init-db ]] && code=${FAKE_INIT_DB_EXIT:-0}
-    echo "container \"fake\" exited with status code $code"
-    exit "$code"
-    ;;
   "compose ps")
     if [[ " $* " == *" --format json "* ]]; then
       printf '%s\n' "${FAKE_PS_JSON:-}"
@@ -59,9 +53,6 @@ case "$1 $2" in
     if [[ $4 == run ]]; then
       exit "${FAKE_PIPELINE_EXIT:-0}"
     fi
-    ;;
-  "compose run")
-    exit "${FAKE_LOAD_EXIT:-0}"
     ;;
   "compose pull" | "image prune")
     ;;

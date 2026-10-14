@@ -165,7 +165,7 @@ class TestBlobStore:
     def test_upload_sends_block_blob_md5_and_metadata(self, tmp_path):
         p = tmp_path / "f.csv"
         p.write_bytes(b"data")
-        store, opener = self.store({("PUT", "/recent/t/Dinesafe.csv"): FakeResponse(status=201)})
+        store, opener = self.store({("PUT", "/recent/t/Dinesafe.csv"): FakeResponse()})
         store.upload("recent/t/Dinesafe.csv", str(p), b64md5(b"data"),
                      metadata={"source_last_modified": "2026-10-11T08:18:39"})
         req = opener.requests[0]
@@ -173,7 +173,8 @@ class TestBlobStore:
         assert req.get_header("X-ms-blob-type") == "BlockBlob"
         assert req.get_header("Content-md5") == b64md5(b"data")
         assert req.get_header("X-ms-meta-source_last_modified") == "2026-10-11T08:18:39"
-        assert req.data == b"data"
+        assert req.get_header("Content-length") == "4"
+        assert req.body == b"data"
 
     def test_download_to_writes_file(self, tmp_path):
         store, _ = self.store({("GET", "/recent/t/Dinesafe.csv"): FakeResponse(b"csv")})
@@ -186,7 +187,7 @@ class TestBlobStore:
             store.download_to("recent/t/Dinesafe.csv", str(tmp_path / "out"))
 
     def test_delete_sends_delete(self):
-        store, opener = self.store({("DELETE", "/recent/t/Dinesafe.csv"): FakeResponse(status=202)})
+        store, opener = self.store({("DELETE", "/recent/t/Dinesafe.csv"): FakeResponse()})
         store.delete("recent/t/Dinesafe.csv")
         assert opener.requests[0].get_method() == "DELETE"
 

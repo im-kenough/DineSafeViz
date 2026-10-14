@@ -33,7 +33,7 @@ CREATE INDEX inspections_inspection_date_idx ON inspections (inspection_date);
 
 GRANT CONNECT ON DATABASE dinesafe TO dinesafe_app;
 GRANT USAGE   ON SCHEMA public       TO dinesafe_app;
-GRANT SELECT ON TABLE inspections TO dinesafe_app; -- SELECT only: Flask app is read-only; dsv-init-db handles writes
+GRANT SELECT ON TABLE inspections TO dinesafe_app; -- SELECT only: Flask app is read-only; dsv-pipeline writes as dinesafe_migrator
 
 -- Caps every app and Grafana query, including anonymous Grafana API queries.
 ALTER ROLE dinesafe_app SET statement_timeout = '10s';

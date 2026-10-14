@@ -27,6 +27,8 @@ die() {
   exit 1
 }
 
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
 # Prints the stack's state, then the logs of every failed service plus any
 # services named as arguments, and exits 1.
 fail() {
@@ -97,8 +99,7 @@ main() {
   local repo_dir
   repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
   cd "$repo_dir"
-  [[ -f deploy/$env_name.env ]] \
-    || die "deploy/$env_name.env is missing. Copy deploy/$env_name.env-example to deploy/$env_name.env first."
+  require_settings "deploy/$env_name.env" "$env_name"
   if [[ $env_name == dev ]]; then
     deploy_dev
     return
