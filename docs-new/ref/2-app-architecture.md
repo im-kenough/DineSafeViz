@@ -1,121 +1,141 @@
 # App architecture
 
-This document describes how the DineSafeViz application works and its tech stack.
+How DineSafeViz works and what it runs on.
 
 ## Overview
 
-DineSafeViz is a Docker Compose application hosted on an Azure VM. A Flask
-app serves the web pages, and Grafana serves an analytics dashboard. Both read
-the same Postgres database, and nginx sits in front of both. A data pipeline
-loads the City of Toronto's DineSafe inspections into the database.
+DineSafeViz shows the City of Toronto's DineSafe restaurant inspections.
 
-Visitors never connect to the VM directly. No port is published, and the tunnel only makes outbound connections.
-
-nginx sends `/analytics/` to Grafana and everything else to the app. It
-re-resolves the container names every 5 seconds, so a recreated container
-with a new IP address doesn't cause 502 errors.
-
-`dsv-app` and `dsv-analytics` connect as the read-only `dinesafe_app` role,
-which caps every query at 10 seconds. Visitors see Grafana as anonymous
-viewers. On the VMs, nginx returns 404 for `/analytics/login`, so Grafana
-admins sign in through an SSH tunnel to `172.30.10.30:3000` instead. For the
-admin path over SSH and the network rules, see
+- Runs as a Docker Compose stack on an Azure VM.
+- Cloudflare Tunnel brings visitors in. The VM publishes no ports.
+- nginx routes `/analytics/` to Grafana and everything else to the Flask app.
+- The Flask app and Grafana read the same Postgres database.
+- An on-demand data pipeline loads the data: Toronto Open Data → Azure Blob
+  raw zone → Postgres.
 
 ```mermaid
 flowchart LR
     visitor([Visitor]) --> cf[Cloudflare]
-    cf --> nginx[nginx]
-    nginx --> app[Flask app]
-    nginx --> grafana[Dashboard\nGrafana]
+    cf --> nginx[nginx<br/>reverse proxy]
+    nginx -- "/" --> app[Flask app<br/>web pages]
+    nginx -- "/analytics/" --> grafana[Grafana<br/>dashboard]
     app --> db[(Postgres)]
     grafana --> db
     tod[Toronto Open Data] --> pipeline[Data pipeline]
+    pipeline <--> blob[(Azure Blob<br/>raw zone)]
     pipeline --> db
 ```
 
-The Flask app (`src/dsv-app/app.py`) serves these routes:
+## Flask app
 
-| Route                 | Page                                                                                       |
-| --------------------- | ------------------------------------------------------------------------------------------ |
-| `/`                   | Home page with the total number of inspections and the years of data.                     |
-| `/inspections`        | Inspections for one quarter (`?year=&q=`), grouped by day and establishment.              |
-| `/inspections/month`  | One month's inspections as an HTML fragment, loaded when you expand an older month.       |
-| `/dashboard`          | The Grafana dashboard in an iframe (`/analytics/d/dinesafe/dinesafe-inspections?kiosk`). |
-| `/info`               | What the severities and results mean.                                                      |
-| `/healthz`, `/readyz` | Liveness, and readiness, which checks the database connection.                             |
+The Flask app is `src/dsv-app/app.py`. Gunicorn runs it with 1 worker and 4
+threads on port 8000.
 
-Gunicorn runs the app with one worker and four threads.
+| Route                | Returns                                                                                  |
+| -------------------- | ---------------------------------------------------------------------------------------- |
+| `/`                  | Home page with total inspections and years of data.                                      |
+| `/inspections`       | One quarter (`?year=&q=`), grouped by day and establishment.                             |
+| `/inspections/month` | One month as an HTML fragment, loaded when you expand an older month.                    |
+| `/dashboard`         | The Grafana dashboard in an iframe (`/analytics/d/dinesafe/dinesafe-inspections?kiosk`). |
+| `/info`              | What the severities and results mean.                                                    |
+| `/healthz`           | Liveness.                                                                                |
+| `/readyz`            | Readiness. Checks the database connection.                                               |
 
-## Services
+## Access
 
-Every component runs as a Docker Compose service. `docker-compose.yml`
-defines the local stack, and `docker-compose.vm.yml` adds the VM settings:
-published images, networks, hardening, and memory limits.
+Each service connects to Postgres with its own role. Grafana has separate
+paths for visitors and admins.
 
-| Service         | Image                                 | Networks (VM)       | Memory (VM) | Role                                                       |
-| --------------- | ------------------------------------- | ------------------- | ----------- | ---------------------------------------------------------- |
-| `dsv-tunnel`    | `cloudflare/cloudflared:2026.10.0`    | `edge`              | 64 MiB      | Outbound tunnel to Cloudflare. VM only.                    |
-| `dsv-nginx`     | `nginx:1.31.0-alpine-slim`            | `edge`, `backend`   | 64 MiB      | Reverse proxy for the app and `/analytics/`.               |
-| `dsv-app`       | `ghcr.io/im-kenough/dsv-app`          | `backend`           | 192 MiB     | Flask app. Read-only database role.                        |
-| `dsv-db`        | `postgres:18.6-alpine3.24`            | `backend`           | 320 MiB     | Postgres with the `inspections` and `load_log` tables.     |
-| `dsv-analytics` | `grafana/grafana:13.2.3`              | `backend`           | 320 MiB     | Dashboard. Read-only database role.                        |
-| `dsv-pipeline`  | `ghcr.io/im-kenough/dsv-init-db`      | `egress`, `backend` | 768 MiB     | On demand: `ingest`, `load`, or `run`. Profile `pipeline`. |
+| Who                          | Connects to | As                  | Access                                                     |
+| ---------------------------- | ----------- | ------------------- | ---------------------------------------------------------- |
+| `dsv-app`, `dsv-analytics`   | Postgres    | `dinesafe_app`      | `SELECT` only. 10-second `statement_timeout`.              |
+| `dsv-pipeline`               | Postgres    | `dinesafe_migrator` | Writes `inspections` and `load_log`.                       |
+| Visitors                     | Grafana     | Anonymous viewer    | Through nginx. On the VMs, `/analytics/login` returns 404. |
+| Admins                       | Grafana     | Grafana admin       | SSH tunnel to `172.30.10.30:3000`.                         |
 
-Locally, Compose builds `dsv-app` and `dsv-pipeline` from `src/dsv-app` and
-`src/dsv-db`, and every service shares the default network. On the VMs, the
-two app images come from GHCR, pinned to the deployed version's tag (set by
-`scripts/deploy.sh` as `DSV_VERSION`). Every service sets `no-new-privileges`
-and rotates its logs. Every service except `dsv-analytics` drops all Linux
-capabilities and adds back only the ones it needs. `dsv-tunnel`, `dsv-app`,
-and `dsv-pipeline` also run with a read-only root filesystem.
+## Compose services
 
-`dsv-pipeline` has the `pipeline` profile, so `docker compose up` never
-starts it. Only `scripts/pipeline.sh` runs it.
-
-## Networks on the VM
-
-On the VMs, each container joins one or more of three Docker networks.
-Nothing publishes a port on the VM, so visitors reach the site only through
-the Cloudflare Tunnel.
+The diagram shows the stack on the VM: `docker-compose.yml` merged with
+`docker-compose.vm.yml`. The labels on the arrows are the target ports.
 
 ```mermaid
 flowchart LR
-    cf[Cloudflare] --> tunnel
+    cf([Cloudflare]) <-. "outbound tunnel" .-> tunnel
 
-    subgraph vm[Azure VM]
-        subgraph edge[edge]
-            tunnel[dsv-tunnel]
-        end
-
-        nginx[dsv-nginx]
-
-        subgraph backend[backend - internal]
-            app[dsv-app]
-            analytics[dsv-analytics]
-            db[(dsv-db)]
-        end
-
-        pipeline[dsv-pipeline]
-
-        subgraph egress[egress]
-            out((internet))
-        end
+    subgraph edge["edge network"]
+        tunnel["dsv-tunnel<br/>cloudflare/cloudflared:2026.10.0<br/>metrics :2000"]
     end
 
-    tunnel --> nginx
-    nginx --> app
-    nginx --> analytics
-    app --> db
-    analytics --> db
-    pipeline --> db
-    pipeline --> out
+    nginx["dsv-nginx<br/>nginx:1.31.0-alpine-slim<br/>:80"]
+
+    subgraph backend["backend network: internal, 172.30.10.0/24"]
+        app["dsv-app<br/>ghcr.io/im-kenough/dsv-app<br/>:8000"]
+        analytics["dsv-analytics<br/>grafana/grafana:13.2.3<br/>172.30.10.30:3000"]
+        db[("dsv-db<br/>postgres:18.6-alpine3.24<br/>:5432")]
+    end
+
+    pipeline["dsv-pipeline<br/>ghcr.io/im-kenough/dsv-init-db<br/>profile: pipeline"]
+
+    subgraph egress["egress network"]
+        internet((Internet))
+    end
+
+    dbvol[/"volume<br/>dsv-db-data"/]
+    gvol[/"volume<br/>dsv-analytics-data"/]
+
+    tunnel -- ":80" --> nginx
+    nginx -- ":8000" --> app
+    nginx -- ":3000" --> analytics
+    app -- ":5432" --> db
+    analytics -- ":5432" --> db
+    pipeline -- ":5432" --> db
+    pipeline --> internet
+    db --- dbvol
+    analytics --- gvol
 ```
 
-- `edge` connects `dsv-tunnel` to Cloudflare and to `dsv-nginx`.
-- `backend` is internal: its containers can't reach the internet or the Azure
-  instance metadata service.
-- `egress` gives `dsv-pipeline` internet access to download from Toronto Open
-  Data and the storage account.
+| Service         | Networks (VM)       | Memory (VM) | Notes                                         |
+| --------------- | ------------------- | ----------- | --------------------------------------------- |
+| `dsv-tunnel`    | `edge`              | 64 MiB      | VM only. Token from `TUNNEL_TOKEN`.           |
+| `dsv-nginx`     | `edge`, `backend`   | 64 MiB      | Re-resolves container names every 5 seconds.  |
+| `dsv-app`       | `backend`           | 192 MiB     | Runs as `nonroot`.                            |
+| `dsv-db`        | `backend`           | 320 MiB     | Data in the `dsv-db-data` volume.             |
+| `dsv-analytics` | `backend`           | 320 MiB     | Fixed IP for the admin SSH tunnel.            |
+| `dsv-pipeline`  | `egress`, `backend` | 768 MiB     | `ingest`, `load`, or `run`. One-shot.         |
 
-`dsv-nginx` and `dsv-pipeline` are the only containers on two networks, so
-they're the only paths between `backend` and the outside.
+- Locally:
+  - Compose builds `dsv-app` and `dsv-pipeline` from `src/dsv-app` and
+    `src/dsv-db`.
+  - All services share the default network.
+  - nginx is published on `8080` and Grafana on `3000`.
+- On the VMs:
+  - Both app images come from GHCR, tagged with `DSV_VERSION` from
+    `scripts/deploy.sh`.
+  - `ports: !reset []` removes every published port.
+- Startup order:
+  - `dsv-db` → `dsv-app` and `dsv-analytics` → `dsv-nginx` → `dsv-tunnel`.
+  - Each step waits for the previous health check, except `dsv-tunnel`.
+- `dsv-pipeline`:
+  - Its `pipeline` profile keeps `docker compose up` from starting it.
+  - Only `scripts/pipeline.sh` runs it.
+
+## Networks and hardening
+
+The VM override splits the services across three networks and hardens every
+container.
+
+- `edge`: cloudflared's outbound connection, and its link to nginx.
+- `backend`: internal. No route to the internet or the Azure instance metadata
+  service.
+- `egress`: lets `dsv-pipeline` reach Toronto Open Data and the storage
+  account.
+- `dsv-nginx` and `dsv-pipeline` are the only paths between `backend` and the
+  outside.
+- Every service:
+  - sets `no-new-privileges`
+  - rotates its logs (3 files of 10 MB each)
+  - has a memory limit
+- Every service except `dsv-analytics` drops all Linux capabilities and adds
+  back only the ones it needs.
+- `dsv-tunnel`, `dsv-app`, and `dsv-pipeline` run with a read-only root
+  filesystem and a `/tmp` tmpfs.
