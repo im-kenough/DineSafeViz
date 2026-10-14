@@ -6,6 +6,7 @@ seed() or refresh(). Neither commits: pipeline.py records the load in
 load_log and commits once, so the data and its log row land together.
 """
 
+import codecs
 import csv
 import io
 import os
@@ -239,28 +240,33 @@ def bulk_insert(conn, rows):
 # ---------------------------------------------------------------------------
 
 
-def decode_csv(raw):
-    """Decode DineSafe CSV bytes, tolerating either UTF-8 or Windows-1252.
+def csv_encoding(csv_path):
+    """Return the encoding of a DineSafe CSV file: utf-8-sig, else cp1252.
 
     DineSafe exports mix encodings across files (older years are UTF-8 with a BOM,
-    newer files are Windows-1252), so decode UTF-8 first and fall back to cp1252.
+    newer files are Windows-1252), so try UTF-8 first and fall back to cp1252.
+    Checks the file in chunks, so it never holds the whole file in memory.
     """
-    try:
-        return raw.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        return raw.decode("cp1252")
-
-
-def read_csv_text(csv_path):
-    """Read a DineSafe CSV file as text, in whichever encoding it uses."""
+    decoder = codecs.getincrementaldecoder("utf-8-sig")()
     with open(csv_path, "rb") as f:
-        return decode_csv(f.read())
+        try:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                decoder.decode(chunk)
+            decoder.decode(b"", final=True)
+        except UnicodeDecodeError:
+            return "cp1252"
+    return "utf-8-sig"
+
+
+def open_csv(csv_path):
+    """Open a DineSafe CSV file as text for the csv module, in its encoding."""
+    return open(csv_path, encoding=csv_encoding(csv_path), newline="")
 
 
 def _read_csv_rows(csv_path, column_map):
     """Read a DineSafe CSV file into mapped rows."""
-    reader = csv.DictReader(io.StringIO(read_csv_text(csv_path)))
-    return [map_row(r, column_map) for r in reader]
+    with open_csv(csv_path) as f:
+        return [map_row(r, column_map) for r in csv.DictReader(f)]
 
 
 def _insert_historical_csv(conn, csv_path, name, cutoff):

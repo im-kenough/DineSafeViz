@@ -12,7 +12,6 @@ import csv
 import datetime
 import hashlib
 import base64
-import io
 import json
 import os
 import shutil
@@ -23,7 +22,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
-from refresh import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP, RECENT_NAME, read_csv_text
+from refresh import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP, RECENT_NAME, open_csv
 
 CKAN_PACKAGE_URL = (
     "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/package_show?id=dinesafe"
@@ -74,15 +73,15 @@ def validate_csv(path, column_map, min_rows):
     """Check headers and row count; return the row count or raise DataError."""
     name = os.path.basename(path)
     try:
-        text = read_csv_text(path)
+        with open_csv(path) as f:
+            reader = csv.reader(f)
+            header = next(reader, [])
+            missing = [c for c in column_map if c not in header]
+            if missing:
+                raise DataError(f"{name}: missing columns {', '.join(missing)}")
+            rows = sum(1 for _ in reader)
     except UnicodeDecodeError as e:
         raise DataError(f"{name}: not UTF-8 or cp1252 ({e})") from e
-    reader = csv.reader(io.StringIO(text))
-    header = next(reader, [])
-    missing = [c for c in column_map if c not in header]
-    if missing:
-        raise DataError(f"{name}: missing columns {', '.join(missing)}")
-    rows = sum(1 for _ in reader)
     if rows < min_rows:
         raise DataError(f"{name}: {rows} rows, expected at least {min_rows}")
     return rows

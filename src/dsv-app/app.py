@@ -52,6 +52,11 @@ def get_data_range() -> Tuple[date, date]:
     return stats["min_date"], stats["max_date"]
 
 
+def _month_end(year: int, month: int) -> date:
+    """Return the last day of the given month."""
+    return date(year, month, calendar.monthrange(year, month)[1])
+
+
 def get_quarter_bounds(year: int, q: int, first: date) -> Tuple[date, date]:
     """Get the start and end dates for a given year and quarter.
 
@@ -67,7 +72,7 @@ def get_quarter_bounds(year: int, q: int, first: date) -> Tuple[date, date]:
     """
     month_start, month_end = _QUARTER_MONTHS[q]
     start = date(year, month_start, 1)
-    end = date(year, month_end, calendar.monthrange(year, month_end)[1])
+    end = _month_end(year, month_end)
     return max(start, first), min(end, date.today())
 
 
@@ -79,8 +84,7 @@ def get_quarter_months(year: int, q: int, first: date) -> List[Tuple[date, date]
     start, end = get_quarter_bounds(year, q, first)
     months = []
     for m in range(end.month, start.month - 1, -1):
-        month_end = date(year, m, calendar.monthrange(year, m)[1])
-        months.append((max(date(year, m, 1), start), min(month_end, end)))
+        months.append((max(date(year, m, 1), start), min(_month_end(year, m), end)))
     return months
 
 

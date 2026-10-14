@@ -45,4 +45,3 @@ redeploy. For the full list, see
 | --- | --- |
 | `can't get a storage token` | Run `az login` as `dsv-ops01`. |
 | `GET https://stdsvstg01... HTTP 403` | Your home IP changed. See [Troubleshoot: your home IP address changed](../azure-vm/troubleshoot-home-ip-change.md). |
-| Site returns `502` but the app is healthy | Run `docker compose restart dsv-nginx`. nginx kept the app's old IP address. |

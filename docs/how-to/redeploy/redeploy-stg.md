@@ -134,4 +134,3 @@ redeploy. For the full list, see
 | `a container reached IMDS` | Run `sudo systemctl restart dsv-imds-block`, then rerun the deploy. |
 | `the checkout has local changes` | On the VM, run `git status`, then discard the changes. |
 | SSH times out | Your home IP changed. See [Troubleshoot: your home IP address changed](../azure-vm/troubleshoot-home-ip-change.md). |
-| Site returns `502` but the app is healthy | Run `docker compose restart dsv-nginx`. nginx kept the app's old IP address. |

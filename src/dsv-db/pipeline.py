@@ -45,7 +45,7 @@ def load(store, conn, force=False):
     """
     newest = data.newest_recent(store)
     if newest is None:
-        raise DataError("recent/ is empty. Run ingest first: scripts/pipeline.sh <env> ingest")
+        raise DataError(f"{data.RECENT_PREFIX} is empty. Run ingest first: scripts/pipeline.sh <env> ingest")
     recent_path = newest[0]
     with conn.cursor() as cur:
         cur.execute("SELECT pg_advisory_xact_lock(%s)", (LOAD_LOCK,))
@@ -62,7 +62,8 @@ def load(store, conn, force=False):
             historical = data.newest_historical(store)
             if historical is None:
                 raise DataError(
-                    "historical/ has no complete folder. Run: scripts/pipeline.sh <env> ingest --historical"
+                    f"{data.HISTORICAL_PREFIX} has no complete folder. "
+                    "Run: scripts/pipeline.sh <env> ingest --historical"
                 )
             historical_path, names = historical
             hist_dir = os.path.join(tmp, refresh.HISTORICAL_DIR)
