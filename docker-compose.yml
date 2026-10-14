@@ -83,7 +83,7 @@ services:
     # grafana/grafana:13.2.3 linux/amd64. Bundles the PostgreSQL plugin
     # (13.0.3); the -slim variant doesn't. See
     # docs/explanation/grafana-postgres-plugin.md.
-    image: grafana/grafana:13.2.3@sha256:d84563330dc9d2fd2bc096d0fb96021b5319c75bf6ed555566709998e823dec4
+    image: grafana/grafana:13.2.3@sha256:b28bae15e219c998fb0e0424ed724930cc61b1f61fb404d47c862f9a23f9e572
     ports:
       - "3000:3000"
     environment:
