@@ -51,6 +51,9 @@ services:
       # (/var/lib/postgresql/18/docker), so mount the parent directory.
       - dsv-db-data:/var/lib/postgresql
       - ./src/dsv-db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      # Runs between init.sql and set-passwords.sh (name order). deploy.sh
+      # also runs it on existing volumes.
+      - ./src/dsv-db/migrations/001_load_log.sql:/docker-entrypoint-initdb.d/migrations-001_load_log.sql:ro
       - ./src/dsv-db/set-passwords.sh:/docker-entrypoint-initdb.d/set-passwords.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DSV_DB_USER}"]
@@ -58,34 +61,22 @@ services:
       timeout: 5s
       retries: 5
 
-  dsv-init-db:
+  # Data pipeline: Toronto Open Data -> Blob raw zone -> Postgres. One-shot,
+  # run only by scripts/pipeline.sh, which mounts the storage token and
+  # passes the subcommand (ingest, load, or run). The profile keeps
+  # `docker compose up` from ever starting it, so restarts never touch data.
+  dsv-pipeline:
     build: ./src/dsv-db
+    profiles: [pipeline]
     environment:
       DSV_DB_HOST: dsv-db
       DSV_DB_PORT: ${DSV_DB_PORT}
       DSV_DB_NAME: ${DSV_DB_NAME}
-      DSV_DB_USER: ${DSV_DB_USER}
-      DSV_DB_PASSWORD: ${DSV_DB_PASSWORD}
-      DSV_DATA_DIR: /data
-    # Mirror of the Blob container. scripts/data.sh fills it.
-    volumes:
-      - ./data:/data:ro
+      DSV_DB_USER: dinesafe_migrator
+      DSV_DB_PASSWORD: ${DSV_DB_MIGRATOR_PASSWORD:-dinesafe_migrator}
     depends_on:
       dsv-db:
         condition: service_healthy
-    restart: "no"
-
-  # Toronto Open Data -> Blob -> ./data. Same image as dsv-init-db, but no
-  # DB credentials. Runs only through scripts/data.sh, which mounts the
-  # storage token and passes the command (fetch or sync).
-  dsv-data:
-    build: ./src/dsv-db
-    profiles: [data]
-    entrypoint: ["python3", "data.py"]
-    environment:
-      DSV_DATA_DIR: /data
-    volumes:
-      - ./data:/data
     restart: "no"
 
   dsv-analytics:

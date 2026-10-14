@@ -9,7 +9,7 @@
 | Formal SLA | **None** | AKS Free control plane has no uptime SLA |
 | Expected load | Near-zero real traffic; shown to employers on demand | No user-growth forecast |
 | Concurrent connections target | **~10** | Sizes Postgres `max_connections`, Flask workers (PE:01) |
-| Dataset scale | ~100k rows, grows slowly | Toronto Open Data DineSafe feed |
+| Dataset scale | about 516,000 rows, grows slowly | Toronto Open Data DineSafe feed |
 
 ## Critical user flows
 
@@ -17,7 +17,7 @@
 |---|---|---|---|
 | A | Visitor browses inspection data (Flask pages) | **Critical** | Holding page via manual DNS flip |
 | B | Visitor views embedded Grafana dashboard | **Critical** | Holding page via manual DNS flip |
-| C | Nightly ETL refresh from Toronto Open Data | **Best-effort** | A missed refresh is acceptable |
+| C | Business-day ETL refresh from Toronto Open Data | **Best-effort** | A missed refresh is acceptable |
 
 ## Recovery targets
 

@@ -11,8 +11,6 @@
 **/stg.env
 **/prod.env
 
-# CSV mirror of the Blob container, written by scripts/data.sh
-/data/
 
 *.csv#
 

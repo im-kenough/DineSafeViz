@@ -1,8 +1,9 @@
 # Installed by docs/how-to/azure-vm/vm-first-time-setup.md, which fills in
-# @ADMIN_USER@, @REPO_DIR@, and @ENV@. Exit 3 (fetch failed, existing Blob
-# data loaded) shows as failed on purpose, so you notice it.
+# @ADMIN_USER@, @REPO_DIR@, and @ENV@. A failed run (Toronto Open Data down,
+# validation failed, or data over 10 days old) shows as failed, and the site
+# keeps serving the data it already has.
 [Unit]
-Description=DineSafeViz data refresh (Toronto Open Data -> Blob -> Postgres)
+Description=DineSafeViz data pipeline (Toronto Open Data -> Blob -> Postgres)
 Requires=docker.service
 After=docker.service network-online.target dsv-imds-block.service
 Wants=network-online.target
@@ -11,6 +12,6 @@ Wants=network-online.target
 Type=oneshot
 User=@ADMIN_USER@
 WorkingDirectory=@REPO_DIR@
-ExecStart=@REPO_DIR@/scripts/data.sh @ENV@ --load
+ExecStart=@REPO_DIR@/scripts/pipeline.sh @ENV@ run
 # A stalled run must end, or the timer can't start the next one.
 TimeoutStartSec=30min

@@ -24,13 +24,12 @@ published images, networks, hardening, and memory limits.
 | `dsv-app`            | `ghcr.io/im-kenough/dsv-app`         | `backend`           | Flask app. Read-only database role.                         |
 | `dsv-db`             | `postgres`                           | `backend`           | Postgres with the `inspections` table.                      |
 | `dsv-analytics`      | `grafana/grafana`                    | `backend`           | Dashboards. Read-only database role.                        |
-| `dsv-init-db`        | `ghcr.io/im-kenough/dsv-init-db`     | `backend`           | One-shot: loads `./data` into Postgres with `refresh.py`.   |
-| `dsv-data`           | `ghcr.io/im-kenough/dsv-init-db`     | `egress`            | On demand: `data.py fetch` and `sync`. Profile `data`.      |
+| `dsv-pipeline`       | `ghcr.io/im-kenough/dsv-init-db`     | `egress`, `backend` | On demand: `ingest`, `load`, or `run`. Profile `pipeline`.  |
 
 The `backend` network is internal, so nothing on it reaches the internet or
-the instance metadata service. `dsv-data` is the only service on `egress`,
-and it has no database credentials. A plain `docker compose up` never starts
-it; only `scripts/data.sh` runs it.
+the instance metadata service. `dsv-pipeline` is the only service on
+`egress` and the only one on two networks. Its profile keeps
+`docker compose up` from starting it; only `scripts/pipeline.sh` runs it.
 
 ## Request path
 
@@ -48,47 +47,42 @@ For the admin path over SSH and the network rules, see
 
 ## Data path
 
-The data flows one way, from Toronto Open Data to Postgres, through two
-containers that share one image but have different network access.
+The data flows one way: from Toronto Open Data, into the Blob raw zone, and
+then into Postgres. One one-shot container, `dsv-pipeline`, does both steps.
 
 ```
- Toronto Open Data
-        │  (egress network)
-        ▼
- dsv-data  ◄── storage-scoped token file, minted on the host
-   fetch → validate → upload changed blobs → manifest.json last
-   sync  → mirror blobs to ./data, verify MD5
-        │                            ▲
-        ▼                            │ service endpoint; firewall allows
- stdsv<env>01 / dinesafe ────────────┘ the VM subnet and HOME_IP
-        │
- ./data (read-only mount) ──► dsv-init-db (backend only) ──► dsv-db
+           07:30 timer, deploy, or your command
+                        │
+                        ▼
+ ┌──────────── dsv-pipeline (one-shot container) ────────────┐
+ │ ingest: CKAN package_show → last_modified newer than       │
+ │         newest recent/ folder? → download → validate →     │
+ │         upload dinesafe/recent/<timestamp>/Dinesafe.csv    │
+ │                                                            │
+ │ load:   newest recent/ path already in load_log? → skip    │
+ │         else download blob → Python transform →            │
+ │         DELETE window + COPY into inspections +            │
+ │         insert load_log row (1 transaction)                │
+ └────────────────────────────────────────────────────────────┘
 ```
 
-1.  **Schedule.** `dsv-data.timer` runs `scripts/data.sh <env> --load` at
-    07:30 Toronto time on business days. `scripts/deploy.sh` also runs
-    `data.sh` before it starts the stack.
-2.  **Token.** `data.sh` asks the instance metadata service for a token for
-    `https://storage.azure.com/` only, and mounts it into `dsv-data` as a
-    mode-600 file. The token never appears in an argument or environment
-    variable.
-3.  **Fetch.** `data.py fetch` downloads `Dinesafe.csv`, and the historical
-    ZIP when the container has no historical files or you pass
-    `--historical`. Every file must have the expected columns, decode as
-    UTF-8 or cp1252, and have more than a minimum number of rows before
-    anything is uploaded. Only files whose MD5 changed are uploaded, and
-    `manifest.json` is uploaded last. Each manifest entry records the blob
-    version ID it describes.
-4.  **Sync.** `data.py sync` downloads the exact blob version of each file
-    in the manifest whose MD5 differs from the local copy, checks the MD5, and only then replaces the
-    file in `./data`. It removes CSVs that aren't in the manifest.
-5.  **Load.** `dsv-init-db` runs `refresh.py`. If the table is empty, it
-    seeds the historical and recent files. Otherwise it replaces every row
-    on or after the earliest date in the recent CSV, in one transaction.
+1.  **Schedule.** `dsv-pipeline.timer` runs `scripts/pipeline.sh <env> run`
+    at 07:30 Toronto time on business days. `scripts/deploy.sh` runs only
+    `load`.
+2.  **Token.** `pipeline.sh` asks the instance metadata service for a token
+    for `https://storage.azure.com/` only, and mounts it into `dsv-pipeline`
+    as a mode-600 file. The token never appears in an argument or
+    environment variable.
+3.  **Ingest.** Downloads and validates the files from Toronto Open Data,
+    then uploads them to new timestamped folders. See
+    [Blob layout](../explanation/data-landing-zone.md#blob-layout).
+4.  **Load.** Seeds an empty table, or refreshes the recent window, in one
+    transaction with a `load_log` row. See
+    [The ETL logic](../explanation/data-landing-zone.md#the-etl-logic) and
+    [The `load_log` table](../explanation/data-landing-zone.md#the-load_log-table).
 
-If Toronto Open Data is down or a file fails validation, `fetch` uploads
-nothing, `data.sh` exits 3, and the sync and load run on the last good data
-in Blob Storage. For column mapping and the seed and refresh logic, see
+A failed ingest leaves the database on its last good load. Deploys never
+ingest, so Toronto Open Data can't break a deploy. For column mapping, see
 [Data mapping](data-mapping.md).
 
 ## Identities and access
@@ -122,14 +116,14 @@ For the full list of accounts and roles, see
 ## Local development
 
 Local runs, the dev environment, use the same data as stg. Your account
-syncs it from the stg container with Reader access, from your home IP
+loads it from the stg container with Reader access, from your home IP
 address. Dev settings and throwaway passwords live in `deploy/dev.env`, like
 `deploy/stg.env` and `deploy/prod.env` on the VMs:
 
 ```bash
 cp deploy/dev.env-example deploy/dev.env   # once
 az login                                   # as dsv-ops01
-scripts/deploy.sh dev                      # .env, ./data, build, start
+scripts/deploy.sh dev                      # .env, build, start, load
 ```
 
 For the full steps, see [Deploy DineSafeViz locally](../how-to/deploy-locally.md).

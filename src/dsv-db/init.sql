@@ -33,7 +33,7 @@ CREATE INDEX inspections_inspection_date_idx ON inspections (inspection_date);
 
 GRANT CONNECT ON DATABASE dinesafe TO dinesafe_app;
 GRANT USAGE   ON SCHEMA public       TO dinesafe_app;
-GRANT SELECT ON TABLE inspections TO dinesafe_app; -- SELECT only: Flask app is read-only; dsv-init-db handles writes
+GRANT SELECT ON TABLE inspections TO dinesafe_app; -- SELECT only: Flask app is read-only; dsv-pipeline writes as dinesafe_migrator
 
 -- Caps every app and Grafana query, including anonymous Grafana API queries.
 ALTER ROLE dinesafe_app SET statement_timeout = '10s';
@@ -43,9 +43,9 @@ GRANT USAGE, CREATE ON SCHEMA public TO dinesafe_migrator;
 GRANT ALL PRIVILEGES ON TABLE inspections TO dinesafe_migrator;
 GRANT ALL PRIVILEGES ON SEQUENCE inspections_id_seq TO dinesafe_migrator;
 
--- Default privs must cover every role that actually creates tables. The
--- migrator role exists for the intended split; refresh.py currently still
--- connects as the bootstrap superuser, so list it explicitly too.
+-- Default privs must cover every role that actually creates tables: the
+-- bootstrap superuser runs init.sql and the migrations. migrations/001
+-- narrows dinesafe_migrator's grants above to what the data pipeline needs.
 ALTER DEFAULT PRIVILEGES FOR ROLE CURRENT_USER, dinesafe_migrator
     IN SCHEMA public
     GRANT SELECT ON TABLES TO dinesafe_app;

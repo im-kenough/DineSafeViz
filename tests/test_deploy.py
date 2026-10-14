@@ -43,11 +43,11 @@ def test_stg_deploys_main_by_its_commit_tag(vm_repo):
     assert "docker manifest inspect ghcr.io/im-kenough/dsv-app:sha-abc1234" in lines
     assert "docker manifest inspect ghcr.io/im-kenough/dsv-init-db:sha-abc1234" in lines
     assert f"git checkout --quiet --detach {SHA}" in lines
-    assert "docker compose pull --quiet" in lines
+    assert "docker compose --profile pipeline pull --quiet" in lines
     assert "docker compose up -d --no-build --remove-orphans" in lines
     assert ("docker compose up -d --no-build --wait --wait-timeout 600 "
             "dsv-tunnel dsv-nginx dsv-app dsv-db dsv-analytics") in lines
-    assert "docker compose wait dsv-init-db" in lines
+    assert not ran(lines, "docker compose wait")
     assert ran(lines, "docker image prune")
     assert "DSV_VERSION=sha-abc1234\n" in (repo / ".env").read_text()
     assert "kv-dsv-stg01" in log.read_text()
@@ -69,15 +69,6 @@ def test_images_are_checked_before_checkout_secrets_and_start(vm_repo):
 # `up --wait` over the whole project fails when a one-shot job that depends on
 # another service exits before the wait starts. Jobs are waited on first, and
 # --wait only covers the long-running services.
-def test_jobs_are_waited_on_before_health_and_wait_skips_them(vm_repo):
-    repo, env, log = vm_repo
-    assert deploy(repo, env, "stg", "main").returncode == 0
-    lines = calls(log)
-    up_wait = first(lines, "docker compose up -d --no-build --wait")
-    assert first(lines, "docker compose wait dsv-init-db") < up_wait
-    assert "dsv-init" not in lines[up_wait]
-
-
 def test_missing_settings_file_stops_before_checkout(vm_repo):
     repo, env, log = vm_repo
     (repo / "deploy" / "stg.env").unlink()
@@ -133,19 +124,6 @@ def test_failed_checkout_stops_before_containers_change(vm_repo):
 
 
 # Review focus 5: the data load fails after --wait returns.
-def test_failed_data_load_fails_the_deploy_with_its_logs(vm_repo):
-    repo, env, log = vm_repo
-    result = deploy(repo, env | {
-        "FAKE_INIT_DB_EXIT": "1",
-        "FAKE_PS_JSON": '{"Service":"dsv-init-db","State":"exited","ExitCode":1,"Health":""}',
-    }, "stg", "main")
-    assert result.returncode == 1
-    assert "FAILED" in result.stderr
-    assert "fake logs for dsv-init-db" in result.stderr
-    assert result.stderr.rstrip().endswith("fake logs for dsv-init-db")
-    assert not ran(calls(log), "docker image prune")
-
-
 def test_unhealthy_service_fails_the_deploy_with_its_logs(vm_repo):
     repo, env, log = vm_repo
     result = deploy(repo, env | {
@@ -157,12 +135,12 @@ def test_unhealthy_service_fails_the_deploy_with_its_logs(vm_repo):
     assert not ran(calls(log), "docker image prune")
 
 
-def test_start_failure_skips_the_job_waits(vm_repo):
+def test_start_failure_skips_the_data_load(vm_repo):
     repo, env, log = vm_repo
     result = deploy(repo, env | {"FAKE_UP_EXIT": "1"}, "stg", "main")
     assert result.returncode == 1
     assert "FAILED" in result.stderr
-    assert not ran(calls(log), "docker compose wait")
+    assert not ran(calls(log), "docker compose --profile pipeline run")
 
 
 # Review focus 4: repeated deploys keep .env self-contained.
@@ -209,29 +187,6 @@ def test_dirty_tree_stops_before_anything_changes(vm_repo):
     assert not ran(lines, "curl")
 
 
-def test_data_is_synced_after_pull_and_before_start(vm_repo):
-    repo, env, log = vm_repo
-    assert deploy(repo, env, "stg", "main").returncode == 0
-    lines = calls(log)
-    sync = first(lines, "docker compose --profile data run")
-    assert first(lines, "docker compose pull") < sync < first(lines, "docker compose up")
-
-
-def test_data_sync_failure_stops_before_start(vm_repo):
-    repo, env, log = vm_repo
-    result = deploy(repo, {**env, "FAKE_SYNC_EXIT": "1"}, "stg", "main")
-    assert result.returncode != 0
-    assert not ran(calls(log), "docker compose up")
-
-
-def test_data_fetch_failure_warns_and_continues(vm_repo):
-    repo, env, log = vm_repo
-    result = deploy(repo, {**env, "FAKE_FETCH_EXIT": "1"}, "stg", "main")
-    assert result.returncode == 0, result.stderr
-    assert "fetch failed" in result.stderr
-    assert ran(calls(log), "docker compose up")
-
-
 def test_smoke_check_confirms_containers_cannot_reach_imds(vm_repo):
     repo, env, log = vm_repo
     assert deploy(repo, env, "stg", "main").returncode == 0
@@ -261,11 +216,11 @@ def test_dev_builds_and_starts_the_working_tree(vm_repo):
     assert not ran(lines, "docker compose pull")
     assert not ran(lines, "docker image prune")  # not on a workstation
     assert (
-        first(lines, "az account get-access-token")
-        < first(lines, "docker compose --profile data run")
-        < first(lines, "docker compose up -d --build --remove-orphans")
-        < first(lines, "docker compose wait dsv-init-db")
+        first(lines, "docker compose up -d --build --remove-orphans")
         < first(lines, "docker compose up -d --no-build --wait")
+        < first(lines, "docker compose exec -T dsv-db sh -c psql -q -v ON_ERROR_STOP=1")
+        < first(lines, "az account get-access-token")
+        < first(lines, "docker compose --profile pipeline run")
     )
     up_wait = lines[first(lines, "docker compose up -d --no-build --wait")]
     assert up_wait.endswith("dsv-nginx dsv-app dsv-db dsv-analytics")
@@ -275,19 +230,74 @@ def test_dev_builds_and_starts_the_working_tree(vm_repo):
     assert "http://localhost:8080" in result.stdout
 
 
-def test_dev_without_az_login_starts_nothing(vm_repo):
+MIGRATE = "docker compose exec -T dsv-db sh -c psql -q -v ON_ERROR_STOP=1"
+LOAD = "docker compose --profile pipeline run"
+
+
+def test_data_loads_after_the_stack_is_healthy_and_migrated(vm_repo):
     repo, env, log = vm_repo
-    result = deploy(repo, env | {"FAKE_AZ_LOGGED_OUT": "1"}, "dev")
+    assert deploy(repo, env, "stg", "main").returncode == 0
+    lines = calls(log)
+    assert (
+        first(lines, "docker compose --profile pipeline pull")
+        < first(lines, "docker compose up -d --no-build --wait")
+        < first(lines, MIGRATE)
+        < first(lines, LOAD)
+        < first(lines, "docker image prune")
+    )
+    assert lines[first(lines, LOAD)].endswith("dsv-pipeline load")
+
+
+def test_deploys_never_contact_toronto(vm_repo):
+    repo, env, log = vm_repo
+    assert deploy(repo, env, "stg", "main").returncode == 0
+    for line in calls(log):
+        if line.startswith(LOAD):
+            assert line.endswith(" load")
+
+
+def test_failed_migration_fails_the_deploy_before_loading(vm_repo):
+    repo, env, log = vm_repo
+    result = deploy(repo, env | {"FAKE_MIGRATE_EXIT": "1"}, "stg", "main")
+    assert result.returncode == 1
+    assert "fake logs for dsv-db" in result.stderr
+    assert not ran(calls(log), LOAD)
+
+
+def test_failed_load_with_data_warns_and_keeps_serving(vm_repo):
+    repo, env, log = vm_repo
+    result = deploy(repo, env | {"FAKE_PIPELINE_EXIT": "1", "FAKE_DB_HAS_ROWS": "t"}, "stg", "main")
+    assert result.returncode == 0, result.stderr
+    assert "serving the data already in the database" in result.stderr
+
+
+def test_failed_load_into_an_empty_database_fails_the_deploy(vm_repo):
+    repo, env, log = vm_repo
+    result = deploy(repo, env | {"FAKE_PIPELINE_EXIT": "1", "FAKE_DB_HAS_ROWS": "f"}, "stg", "main")
+    assert result.returncode == 1
+    assert "empty database" in result.stderr
+    assert not ran(calls(log), "docker image prune")
+
+
+# Review focus 5: compose run --rm leaves no container using the pipeline
+# image, so prune -a deletes it.
+def test_pipeline_image_is_pulled_again_after_prune(vm_repo):
+    repo, env, log = vm_repo
+    assert deploy(repo, env, "stg", "main").returncode == 0
+    lines = calls(log)
+    prune = first(lines, "docker image prune")
+    assert "docker compose --profile pipeline pull --quiet dsv-pipeline" in lines[prune + 1:]
+
+
+def test_dev_without_az_login_and_an_empty_database_fails(vm_repo):
+    repo, env, log = vm_repo
+    result = deploy(repo, env | {"FAKE_AZ_LOGGED_OUT": "1", "FAKE_DB_HAS_ROWS": "f"}, "dev")
     assert result.returncode == 1
     assert "az login" in result.stderr
-    assert not ran(calls(log), "docker compose up")
 
 
-def test_dev_failed_data_load_shows_its_logs(vm_repo):
+def test_dev_without_az_login_keeps_existing_data(vm_repo):
     repo, env, log = vm_repo
-    result = deploy(repo, env | {
-        "FAKE_INIT_DB_EXIT": "1",
-        "FAKE_PS_JSON": '{"Service":"dsv-init-db","State":"exited","ExitCode":1,"Health":""}',
-    }, "dev")
-    assert result.returncode == 1
-    assert result.stderr.rstrip().endswith("fake logs for dsv-init-db")
+    result = deploy(repo, env | {"FAKE_AZ_LOGGED_OUT": "1"}, "dev")
+    assert result.returncode == 0, result.stderr
+    assert "serving the data already in the database" in result.stderr

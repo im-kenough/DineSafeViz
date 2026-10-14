@@ -1,9 +1,6 @@
-import sys
-import os
-
 import pytest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from fakes import historical_csv, historical_row, recent_csv, recent_row
 
 from refresh import (
     normalize,
@@ -16,7 +13,6 @@ from refresh import (
     drop_old_id_duplicates,
     _read_csv_rows,
     decode_csv,
-    require_manifest,
     HISTORICAL_COLUMN_MAP,
     RECENT_COLUMN_MAP,
     INSPECTIONS_COLUMNS,
@@ -333,13 +329,90 @@ class TestDecodeCsv:
         assert decode_csv("caf\xe9\n".encode("cp1252")) == "caf\xe9\n"
 
 
-class TestRequireManifest:
-    def test_missing_manifest_exits_with_a_message(self, tmp_path):
-        with pytest.raises(SystemExit) as exc:
-            require_manifest(str(tmp_path))
-        assert "manifest.json" in str(exc.value)
-        assert "scripts/data.sh" in str(exc.value)
 
-    def test_present_manifest_passes(self, tmp_path):
-        (tmp_path / "manifest.json").write_text("{}")
-        require_manifest(str(tmp_path))
+from refresh import (
+    HISTORICAL_DIR, RECENT_NAME, last_loaded_path, record_load, refresh, seed,
+)
+
+
+class FakeCursor:
+    def __init__(self, conn):
+        self.conn = conn
+        self.rowcount = 0
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def execute(self, sql, params=None):
+        self.conn.executed.append((" ".join(sql.split()), params))
+        self.rowcount = self.conn.delete_rowcount if sql.lstrip().startswith("DELETE") else 0
+
+    def copy_from(self, buf, table, columns):
+        self.conn.copied += sum(1 for _ in buf)
+
+    def fetchone(self):
+        return self.conn.fetch
+
+
+class FakeConn:
+    def __init__(self, delete_rowcount=0, fetch=None):
+        self.delete_rowcount = delete_rowcount
+        self.fetch = fetch
+        self.executed = []
+        self.copied = 0
+        self.commits = 0
+
+    def cursor(self):
+        return FakeCursor(self)
+
+    def commit(self):
+        self.commits += 1
+
+
+def data_dir(tmp_path):
+    recent_csv(tmp_path / RECENT_NAME, [recent_row("1", "2023-05-01"), recent_row("2", "2024-01-02")])
+    (tmp_path / HISTORICAL_DIR).mkdir()
+    historical_csv(tmp_path / HISTORICAL_DIR / "dinesafe_hist_2022.csv",
+                   [historical_row("9", "2022-03-01")])
+    historical_csv(tmp_path / HISTORICAL_DIR / "dinesafe_hist_2023.csv",
+                   [historical_row("8", "2023-04-30"), historical_row("7", "2023-05-01")])
+    return str(tmp_path)
+
+
+class TestSeedAndRefresh:
+    def test_seed_skips_historical_rows_in_the_recent_window(self, tmp_path):
+        conn = FakeConn()
+        assert seed(conn, data_dir(tmp_path)) == (0, 4)  # 2 historical before 2023-05-01, 2 recent
+        assert conn.copied == 4
+
+    def test_refresh_deletes_from_the_cutoff_and_inserts(self, tmp_path):
+        conn = FakeConn(delete_rowcount=5)
+        assert refresh(conn, data_dir(tmp_path)) == (5, 2)
+        assert ("DELETE FROM inspections WHERE inspection_date >= %s", ("2023-05-01",)) in conn.executed
+
+    def test_neither_commits(self, tmp_path):
+        conn = FakeConn()
+        seed(conn, data_dir(tmp_path))
+        refresh(conn, str(tmp_path))
+        assert conn.commits == 0
+
+
+class TestLoadLog:
+    def test_last_loaded_path_of_empty_log_is_none(self):
+        assert last_loaded_path(FakeConn(fetch=None)) is None
+
+    def test_last_loaded_path_returns_the_newest(self):
+        conn = FakeConn(fetch=("recent/20261012T113012Z/Dinesafe.csv",))
+        assert last_loaded_path(conn) == "recent/20261012T113012Z/Dinesafe.csv"
+        assert "ORDER BY id DESC LIMIT 1" in conn.executed[0][0]
+
+    def test_record_load_inserts_one_row(self):
+        conn = FakeConn()
+        record_load(conn, "seed", "recent/t/Dinesafe.csv", "historical/t/", 0, 10)
+        sql, params = conn.executed[0]
+        assert sql.startswith("INSERT INTO load_log")
+        assert params == ("seed", "recent/t/Dinesafe.csv", "historical/t/", 0, 10)
+        assert conn.commits == 0

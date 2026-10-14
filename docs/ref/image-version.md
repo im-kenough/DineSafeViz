@@ -2,6 +2,11 @@
 
 DineSafeViz uses the following images. Use the latest LTS or stable release when possible.
 
+## Cloudflare tunnel
+
+- https://github.com/cloudflare/cloudflared/releases
+- https://hub.docker.com/r/cloudflare/cloudflared/tags
+
 ## Nginx
 - https://nginx.org/en/download.html
 - https://hub.docker.com/_/nginx/tags
@@ -17,8 +22,6 @@ DineSafeViz uses the following images. Use the latest LTS or stable release when
 - https://hub.docker.com/r/grafana/grafana/tags
   
 
-- [curlimages/curl:8.21.0](https://hub.docker.com/r/curlimages/curl/tags)
-  - https://curl.se/download.html
 
 ## Python
 - https://hub.docker.com/_/python/tags
@@ -27,3 +30,5 @@ DineSafeViz uses the following images. Use the latest LTS or stable release when
 - https://www.debian.org/releases/
 
 
+- [curlimages/curl:8.21.0](https://hub.docker.com/r/curlimages/curl/tags)
+  - https://curl.se/download.html

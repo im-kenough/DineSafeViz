@@ -17,6 +17,7 @@ def vm_repo(tmp_path):
     repo = tmp_path / "repo"
     shutil.copytree(ROOT / "scripts", repo / "scripts")
     shutil.copytree(ROOT / "deploy", repo / "deploy")
+    shutil.copytree(ROOT / "src" / "dsv-db" / "migrations", repo / "src" / "dsv-db" / "migrations")
     # The real settings files are gitignored; the operator copies them from
     # the committed examples, as the VM setup guide says.
     for example in (repo / "deploy").glob("*.env-example"):

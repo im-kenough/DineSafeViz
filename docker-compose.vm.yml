@@ -23,7 +23,7 @@ x-hardening: &hardening
 services:
   dsv-tunnel:
     <<: *hardening
-    image: cloudflare/cloudflared:2026.10.0
+    image: cloudflare/cloudflared:2026.10.0@sha256:1a50cc8893b3f0dd283805d2efcd3336210aced60a83d967fb2bbc8ab69b5f35
     # The image's entrypoint is `cloudflared --no-autoupdate`. The token comes
     # from TUNNEL_TOKEN, so it doesn't appear in the process list.
     command: ["tunnel", "run"]
@@ -75,28 +75,21 @@ services:
     mem_limit: 320m
     restart: unless-stopped
 
-  dsv-init-db:
+  dsv-pipeline:
     <<: *hardening
     image: ghcr.io/im-kenough/dsv-init-db:${DSV_VERSION:?}
     environment:
-      DSV_DB_PASSWORD: ${DSV_DB_PASSWORD:?}
-    # backend only: reads the CSVs from ./data, which dsv-data fills.
-    networks: [backend]
-    # Measured peak about 430 MiB on the full data load (October 5, 2026);
-    # refresh.py reads each CSV into memory. One-shot, so swap absorbs it.
-    mem_limit: 640m
-
-  dsv-data:
-    <<: *hardening
-    image: ghcr.io/im-kenough/dsv-init-db:${DSV_VERSION:?}
-    # egress: Toronto Open Data and the storage account. No backend, so it
-    # can't reach the database.
-    networks: [egress]
+      DSV_DB_PASSWORD: ${DSV_DB_MIGRATOR_PASSWORD:?}
+    # The only service on both: egress for Toronto Open Data and the storage
+    # account, backend for the database.
+    networks: [egress, backend]
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
-    # Holds one decoded CSV (about 40 MB raw) while validating it.
-    mem_limit: 384m
+    # refresh.py peaked at about 430 MiB on the full seed (October 5, 2026),
+    # and the downloaded CSVs (about 125 MB on a seed) sit in the /tmp tmpfs,
+    # which counts against this limit. One-shot, so swap absorbs it.
+    mem_limit: 768m
 
   dsv-analytics:
     <<: *hardening
@@ -112,7 +105,7 @@ services:
       GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
       DSV_DB_PASSWORD: ${DSV_DB_APP_PASSWORD:?}
     # The first start on a new VM runs Grafana's schema migrations while
-    # dsv-init-db loads the CSVs, and took over 100s on stg (October 6, 2026).
+    # the data pipeline seeds the database, and took over 100s on stg (October 6, 2026).
     # Later starts are healthy within seconds. Merges with the base healthcheck.
     healthcheck:
       start_period: 300s
@@ -134,5 +127,5 @@ networks:
     ipam:
       config:
         - subnet: 172.30.10.0/24
-  # Only dsv-data: Toronto Open Data and the storage account.
+  # Only dsv-pipeline: Toronto Open Data and the storage account.
   egress: {}

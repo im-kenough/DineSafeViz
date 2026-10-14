@@ -16,12 +16,6 @@ case "$1 $2" in
     fi
     exit "${FAKE_UP_EXIT:-0}"
     ;;
-  "compose wait")
-    code=0
-    [[ $3 == dsv-init-db ]] && code=${FAKE_INIT_DB_EXIT:-0}
-    echo "container \"fake\" exited with status code $code"
-    exit "$code"
-    ;;
   "compose ps")
     if [[ " $* " == *" --format json "* ]]; then
       printf '%s\n' "${FAKE_PS_JSON:-}"
@@ -33,6 +27,16 @@ case "$1 $2" in
     echo "fake logs for ${*: -1}"
     ;;
   "compose exec")
+    # deploy.sh: does inspections have rows?
+    if [[ $* == *"FROM inspections"* ]]; then
+      echo "${FAKE_DB_HAS_ROWS:-t}"
+      exit 0
+    fi
+    # deploy.sh: a migration piped into psql
+    if [[ $* == *"ON_ERROR_STOP"* ]]; then
+      cat >/dev/null
+      exit "${FAKE_MIGRATE_EXIT:-0}"
+    fi
     if [[ $* == *"dsv-tunnel:2000/ready"* && -n ${FAKE_TUNNEL_NOT_READY:-} ]]; then
       echo "wget: server returned error: HTTP/1.1 503 Service Unavailable" >&2
       exit 1
@@ -44,14 +48,11 @@ case "$1 $2" in
     fi
     ;;
   "compose --profile")
-    # data.sh: docker compose --profile data run --rm ... dsv-data fetch|sync
-    if [[ " $* " == *" fetch"* ]]; then
-      exit "${FAKE_FETCH_EXIT:-0}"
+    # pipeline.sh: docker compose --profile pipeline run --rm ... dsv-pipeline <command>
+    # deploy.sh:   docker compose --profile pipeline pull --quiet [dsv-pipeline]
+    if [[ $4 == run ]]; then
+      exit "${FAKE_PIPELINE_EXIT:-0}"
     fi
-    exit "${FAKE_SYNC_EXIT:-0}"
-    ;;
-  "compose run")
-    exit "${FAKE_LOAD_EXIT:-0}"
     ;;
   "compose pull" | "image prune")
     ;;

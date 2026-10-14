@@ -32,10 +32,10 @@ def load(env_file, *files, profiles=()):
     return json.loads(result.stdout)
 
 
-# Profile services (dsv-data) are left out of `config` unless their profile is on.
+# Profile services (dsv-pipeline) are left out of `config` unless their profile is on.
 @pytest.fixture(scope="module")
 def local():
-    return load(COMPOSE_DIR / "local.env-test", "docker-compose.yml", profiles=("data",))
+    return load(COMPOSE_DIR / "local.env-test", "docker-compose.yml", profiles=("pipeline",))
 
 
 def test_local_db_role_passwords_default_to_todays_values(local):
@@ -53,18 +53,19 @@ def test_local_db_runs_set_passwords_after_init_sql(local):
     # The image runs these in name order: init.sql creates the roles first.
     assert targets == [
         "/docker-entrypoint-initdb.d/init.sql",
+        "/docker-entrypoint-initdb.d/migrations-001_load_log.sql",
         "/docker-entrypoint-initdb.d/set-passwords.sh",
     ]
 
 
 LONG_RUNNING = ["dsv-tunnel", "dsv-nginx", "dsv-app", "dsv-db", "dsv-analytics"]
-ONE_SHOT = ["dsv-init-db", "dsv-data"]
+ONE_SHOT = ["dsv-pipeline"]
 VM_FILES = ("docker-compose.yml", "docker-compose.vm.yml")
 
 
 @pytest.fixture(scope="module")
 def vm():
-    return load(COMPOSE_DIR / "vm.env-test", *VM_FILES, profiles=("data",))
+    return load(COMPOSE_DIR / "vm.env-test", *VM_FILES, profiles=("pipeline",))
 
 
 def test_local_stack_is_unaffected_by_the_vm_file(local):
@@ -73,15 +74,14 @@ def test_local_stack_is_unaffected_by_the_vm_file(local):
     assert [p["published"] for p in services["dsv-nginx"]["ports"]] == ["8080"]
     assert [p["published"] for p in services["dsv-analytics"]["ports"]] == ["3000"]
     assert "build" in services["dsv-app"]
-    assert "build" in services["dsv-init-db"]
+    assert "build" in services["dsv-pipeline"]
 
 
 def test_vm_uses_published_images(vm):
     services = vm["services"]
     assert services["dsv-app"]["image"] == "ghcr.io/im-kenough/dsv-app:test-version"
-    assert services["dsv-init-db"]["image"] == "ghcr.io/im-kenough/dsv-init-db:test-version"
-    assert services["dsv-data"]["image"] == "ghcr.io/im-kenough/dsv-init-db:test-version"
-    assert services["dsv-tunnel"]["image"] == "cloudflare/cloudflared:2026.10.0"
+    assert services["dsv-pipeline"]["image"] == "ghcr.io/im-kenough/dsv-init-db:test-version"
+    assert services["dsv-tunnel"]["image"].startswith("cloudflare/cloudflared:2026.10.0@sha256:")
 
 
 @pytest.mark.parametrize("name", LONG_RUNNING)
@@ -120,8 +120,7 @@ def test_vm_networks(vm):
         "dsv-app": {"backend"},
         "dsv-db": {"backend"},
         "dsv-analytics": {"backend"},
-        "dsv-init-db": {"backend"},
-        "dsv-data": {"egress"},
+        "dsv-pipeline": {"egress", "backend"},
     }
 
 
@@ -155,6 +154,7 @@ def test_vm_secrets_come_from_env_not_local_defaults(vm):
     assert services["dsv-db"]["environment"]["DSV_DB_APP_PASSWORD"] == "test-app-pw"
     assert services["dsv-db"]["environment"]["DSV_DB_MIGRATOR_PASSWORD"] == "test-migrator-pw"
     assert services["dsv-tunnel"]["environment"]["TUNNEL_TOKEN"] == "test-tunnel-token"
+    assert services["dsv-pipeline"]["environment"]["DSV_DB_PASSWORD"] == "test-migrator-pw"
 
 
 def test_vm_grafana_settings(vm):
@@ -189,10 +189,10 @@ def test_vm_refuses_to_start_without_required_values(tmp_path, var):
     assert var in result.stderr
 
 
-def test_vm_init_db_memory_covers_the_measured_peak(vm):
-    # refresh.py peaked at about 430 MiB on the full data load (October 5,
-    # 2026). Below that, the kernel kills it with exit 137.
-    assert int(vm["services"]["dsv-init-db"]["mem_limit"]) >= 512 * 1024 * 1024
+def test_vm_pipeline_memory_covers_the_seed(vm):
+    # refresh.py peaked at about 430 MiB on the full seed (October 5, 2026),
+    # and the downloaded CSVs sit in the /tmp tmpfs, which counts too.
+    assert int(vm["services"]["dsv-pipeline"]["mem_limit"]) >= 768 * 1024 * 1024
 
 
 def test_vm_tunnel_serves_readiness_for_deploy_sh(vm):
@@ -200,26 +200,25 @@ def test_vm_tunnel_serves_readiness_for_deploy_sh(vm):
     assert vm["services"]["dsv-tunnel"]["environment"]["TUNNEL_METRICS"] == "0.0.0.0:2000"
 
 
-def test_data_runs_only_when_asked():
+def test_pipeline_runs_only_when_asked():
     plain = load(COMPOSE_DIR / "local.env-test", "docker-compose.yml")
+    assert "dsv-pipeline" not in plain["services"]
+    assert "dsv-init-db" not in plain["services"]
     assert "dsv-data" not in plain["services"]
 
 
-def test_data_service_runs_data_py_and_owns_the_mirror(local):
-    svc = local["services"]["dsv-data"]
-    assert svc["entrypoint"] == ["python3", "data.py"]
-    mounts = {v["target"]: v for v in svc["volumes"]}
-    assert mounts["/data"]["source"] == str(ROOT / "data")
-    assert not mounts["/data"].get("read_only")
-    assert "DSV_DB_PASSWORD" not in svc.get("environment", {})
+def test_pipeline_loads_as_the_migrator_with_no_mounts(local):
+    svc = local["services"]["dsv-pipeline"]
+    assert svc["environment"]["DSV_DB_USER"] == "dinesafe_migrator"
+    assert svc["environment"]["DSV_DB_PASSWORD"] == "dinesafe_migrator"
+    assert not svc.get("volumes")  # the token is mounted per run by pipeline.sh
 
 
-def test_init_db_reads_the_mirror_read_only(local):
-    svc = local["services"]["dsv-init-db"]
-    mounts = {v["target"]: v for v in svc["volumes"]}
-    assert mounts["/data"]["source"] == str(ROOT / "data")
-    assert mounts["/data"]["read_only"] is True
-    assert svc["environment"]["DSV_DATA_DIR"] == "/data"
+def test_vm_pipeline_is_hardened(vm):
+    svc = vm["services"]["dsv-pipeline"]
+    assert svc["read_only"] is True
+    assert svc["cap_drop"] == ["ALL"]
+    assert "/tmp" in svc["tmpfs"]
 
 
 def test_nothing_mounts_the_old_csv_folder(local, vm):
@@ -227,14 +226,6 @@ def test_nothing_mounts_the_old_csv_folder(local, vm):
         for name, svc in config["services"].items():
             for v in svc.get("volumes", []):
                 assert "local-data" not in v.get("source", ""), name
-
-
-def test_vm_data_service_is_hardened(vm):
-    svc = vm["services"]["dsv-data"]
-    assert svc["read_only"] is True
-    assert svc["cap_drop"] == ["ALL"]
-    assert "/tmp" in svc["tmpfs"]
-    assert int(svc["mem_limit"]) <= 384 * 1024 * 1024
 
 
 # The .env that `fetch-secrets.sh dev` writes drives the local stack, so the
@@ -250,9 +241,11 @@ def test_dev_env_reaches_every_service(vm_repo):
     assert db["POSTGRES_PASSWORD"] == "dev-db-password"
     assert db["DSV_DB_APP_PASSWORD"] == "dev-db-app-password"
     assert db["DSV_DB_MIGRATOR_PASSWORD"] == "dev-db-migrator-password"
-    assert services["dsv-init-db"]["environment"]["DSV_DB_PASSWORD"] == "dev-db-password"
+    assert services.get("dsv-pipeline") is None  # profile off by default
     for name in ("dsv-app", "dsv-analytics"):
         assert services[name]["environment"]["DSV_DB_PASSWORD"] == "dev-db-app-password"
     grafana = services["dsv-analytics"]["environment"]
     assert grafana["GF_SECURITY_ADMIN_PASSWORD"] == "dev-analytics-admin-password"
     assert grafana["GF_SERVER_ROOT_URL"] == "http://localhost:8080/analytics/"
+    piped = load(repo / ".env", "docker-compose.yml", profiles=("pipeline",))["services"]
+    assert piped["dsv-pipeline"]["environment"]["DSV_DB_PASSWORD"] == "dev-db-migrator-password"

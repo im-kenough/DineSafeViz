@@ -1,76 +1,34 @@
-import base64
-import hashlib
 import io
 import json
-import os
-import shutil
-import sys
-import zipfile as _zipfile
 from email.message import Message
 from urllib.error import HTTPError, URLError
 
 import pytest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
+from fakes import (
+    HIST_HEADER, RECENT_HEADER, FakeOpener, FakeResponse, FakeStore, b64md5, write_csv,
+)
 from data import (
-    MIN_HISTORICAL_ROWS,
-    MIN_RECENT_ROWS,
-    BlobStore,
-    DataError,
-    fetch,
-    http_download,
-    main,
-    md5_b64,
-    sync,
-    validate_csv,
+    BlobStore, DataError, folders, http_download, md5_b64, newest_historical,
+    newest_recent, resolve_resources, validate_csv,
 )
 from refresh import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP
 
-RECENT_HEADER = ",".join(["_id", "phone", "observation", *RECENT_COLUMN_MAP])
-HIST_HEADER = ",".join(['"Rec #"', *(f'"{c}"' for c in HISTORICAL_COLUMN_MAP)])
+LIST = "?restype=container&comp=list&prefix=recent%2F&include=metadata"
 
 
-def write_csv(path, header, rows, encoding="utf-8"):
-    width = header.count(",") + 1
-    lines = [header] + [",".join(["x"] * width) for _ in range(rows)]
-    path.write_bytes(("\n".join(lines) + "\n").encode(encoding))
-    return path
-
-
-def b64md5(data):
-    return base64.b64encode(hashlib.md5(data).digest()).decode()
-
-
-class FakeResponse(io.BytesIO):
-    def __init__(self, body=b"", headers=None, status=200):
-        super().__init__(body)
-        self.status = status
-        self.headers = Message()
-        for k, v in (headers or {}).items():
-            self.headers[k] = v
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        return False
-
-
-class FakeOpener:
-    """Records requests; answers from a dict of {(method, blob): FakeResponse | int}."""
-
-    def __init__(self, answers):
-        self.answers = answers
-        self.requests = []
-
-    def __call__(self, req, timeout=None):
-        self.requests.append(req)
-        blob = req.full_url.split("/dinesafe/", 1)[1]
-        answer = self.answers.get((req.get_method(), blob), 404)
-        if isinstance(answer, int):
-            raise HTTPError(req.full_url, answer, "error", Message(), io.BytesIO(b""))
-        return answer
+def listing(blobs, next_marker=""):
+    """Blob service List Blobs XML for {name: (md5, {metadata})}."""
+    items = "".join(
+        f"<Blob><Name>{n}</Name><Properties><Content-MD5>{md5}</Content-MD5></Properties>"
+        f"<Metadata>{''.join(f'<{k}>{v}</{k}>' for k, v in meta.items())}</Metadata></Blob>"
+        for n, (md5, meta) in blobs.items()
+    )
+    return FakeResponse((
+        '<?xml version="1.0" encoding="utf-8"?>'
+        f'<EnumerationResults ContainerName="dinesafe"><Blobs>{items}</Blobs>'
+        f"<NextMarker>{next_marker}</NextMarker></EnumerationResults>"
+    ).encode())
 
 
 class TestMd5:
@@ -90,8 +48,7 @@ class TestValidateCsv:
         assert validate_csv(str(p), HISTORICAL_COLUMN_MAP, min_rows=1) == 2
 
     def test_missing_column_names_it(self, tmp_path):
-        header = RECENT_HEADER.replace("severity", "sev")
-        p = write_csv(tmp_path / "r.csv", header, 3)
+        p = write_csv(tmp_path / "r.csv", RECENT_HEADER.replace("severity", "sev"), 3)
         with pytest.raises(DataError, match="severity"):
             validate_csv(str(p), RECENT_COLUMN_MAP, min_rows=1)
 
@@ -99,270 +56,6 @@ class TestValidateCsv:
         p = write_csv(tmp_path / "r.csv", RECENT_HEADER, 2)
         with pytest.raises(DataError, match="2 rows"):
             validate_csv(str(p), RECENT_COLUMN_MAP, min_rows=3)
-
-
-class TestBlobStore:
-    def test_requests_carry_bearer_token_and_version(self):
-        opener = FakeOpener({("HEAD", "Dinesafe.csv"): FakeResponse(
-            headers={"Content-MD5": "abc=", "x-ms-version-id": "2026-10-06T00:00:00.0000000Z"})})
-        store = BlobStore("stdsvstg01", "dinesafe", "tok", opener=opener)
-        assert store.stat("Dinesafe.csv") == ("abc=", "2026-10-06T00:00:00.0000000Z")
-        req = opener.requests[0]
-        assert req.full_url == "https://stdsvstg01.blob.core.windows.net/dinesafe/Dinesafe.csv"
-        assert req.get_header("Authorization") == "Bearer tok"
-        assert req.get_header("X-ms-version") == "2023-11-03"
-
-    def test_stat_of_missing_blob_is_none(self):
-        store = BlobStore("a", "dinesafe", "t", opener=FakeOpener({}))
-        assert store.stat("nope.csv") is None
-
-    def test_other_http_errors_raise_data_error(self):
-        opener = FakeOpener({("HEAD", "x.csv"): 403})
-        store = BlobStore("a", "dinesafe", "t", opener=opener)
-        with pytest.raises(DataError, match="403"):
-            store.stat("x.csv")
-
-    def test_upload_sends_block_blob_with_md5(self, tmp_path):
-        p = tmp_path / "f.csv"
-        p.write_bytes(b"data")
-        opener = FakeOpener({("PUT", "dinesafe-historical/f.csv"): FakeResponse(
-            status=201, headers={"x-ms-version-id": "v1"})})
-        store = BlobStore("a", "dinesafe", "t", opener=opener)
-        assert store.upload("dinesafe-historical/f.csv", str(p), b64md5(b"data")) == "v1"
-        req = opener.requests[0]
-        assert req.get_method() == "PUT"
-        assert req.get_header("X-ms-blob-type") == "BlockBlob"
-        assert req.get_header("Content-md5") == b64md5(b"data")
-        assert req.data == b"data"
-
-    def test_download_to_writes_file(self, tmp_path):
-        opener = FakeOpener({("GET", "Dinesafe.csv"): FakeResponse(b"csv")})
-        store = BlobStore("a", "dinesafe", "t", opener=opener)
-        store.download_to("Dinesafe.csv", str(tmp_path / "out"))
-        assert (tmp_path / "out").read_bytes() == b"csv"
-
-    def test_download_to_a_pinned_version(self, tmp_path):
-        opener = FakeOpener({("GET", "Dinesafe.csv?versionid=2026-10-06T00%3A00%3A00Z"): FakeResponse(b"old")})
-        store = BlobStore("a", "dinesafe", "t", opener=opener)
-        store.download_to("Dinesafe.csv", str(tmp_path / "out"), "2026-10-06T00:00:00Z")
-        assert (tmp_path / "out").read_bytes() == b"old"
-
-    def test_read_manifest_missing_is_none(self):
-        assert BlobStore("a", "dinesafe", "t", opener=FakeOpener({})).read_manifest() is None
-
-    def test_read_manifest_parses_json(self):
-        body = json.dumps({"files": []}).encode()
-        opener = FakeOpener({("GET", "manifest.json"): FakeResponse(body)})
-        assert BlobStore("a", "dinesafe", "t", opener=opener).read_manifest() == {"files": []}
-
-
-class FakeStore:
-    """In-memory container. blobs: {name: bytes}. Records upload order."""
-
-    def __init__(self, blobs=None):
-        self.blobs = dict(blobs or {})
-        self.uploads = []
-        self.versions = {}  # {(name, version id): bytes}, like Blob versioning
-        self.current = {}   # {name: current version id}
-
-    def stat(self, name):
-        if name not in self.blobs:
-            return None
-        return b64md5(self.blobs[name]), self.current.get(name)
-
-    def download_to(self, name, path, version_id=None):
-        data = self.versions.get((name, version_id)) if version_id else self.blobs.get(name)
-        if data is None:
-            raise DataError(f"{name} isn't in the container")
-        with open(path, "wb") as f:
-            f.write(data)
-
-    def upload(self, name, path, md5):
-        with open(path, "rb") as f:
-            self.blobs[name] = f.read()
-        version_id = f"v{len(self.versions) + 1}"
-        self.versions[(name, version_id)] = self.blobs[name]
-        self.current[name] = version_id
-        self.uploads.append(name)
-        return version_id
-
-    def read_manifest(self):
-        raw = self.blobs.get("manifest.json")
-        return json.loads(raw) if raw else None
-
-    def write_manifest(self, manifest, staging_dir):
-        path = os.path.join(staging_dir, "manifest.json")
-        with open(path, "w") as f:
-            json.dump(manifest, f)
-        self.upload("manifest.json", path, md5_b64(path))
-
-
-def fake_download(tmp_path, recent_rows=MIN_RECENT_ROWS, recent_header=RECENT_HEADER):
-    """A urlretrieve stand-in serving a recent CSV and a 2-file historical ZIP."""
-    src = tmp_path / "src"
-    src.mkdir(exist_ok=True)
-    recent = write_csv(src / "dinesafe.csv", recent_header, recent_rows)
-    zpath = src / "hist.zip"
-    with _zipfile.ZipFile(zpath, "w") as zf:
-        for year in (2001, 2002):
-            h = write_csv(src / f"dinesafe_hist_{year}.csv", HIST_HEADER, MIN_HISTORICAL_ROWS)
-            zf.write(h, f"some folder/dinesafe_hist_{year}.csv")
-        zf.writestr("readme.txt", "not a csv")
-
-    def download(url, path):
-        shutil.copy(recent if url.endswith("dinesafe.csv") else zpath, path)
-
-    return download
-
-
-class TestFetch:
-    def test_first_fetch_uploads_everything_and_manifest_last(self, tmp_path):
-        store = FakeStore()
-        manifest = fetch(store, str(tmp_path / "data"), historical=False,
-                         download=fake_download(tmp_path))
-        names = {f["name"] for f in manifest["files"]}
-        assert names == {"Dinesafe.csv", "dinesafe-historical/dinesafe_hist_2001.csv",
-                         "dinesafe-historical/dinesafe_hist_2002.csv"}
-        assert store.uploads[-1] == "manifest.json"
-        assert len(store.uploads) == 4
-        recent = next(f for f in manifest["files"] if f["name"] == "Dinesafe.csv")
-        assert recent["rows"] == MIN_RECENT_ROWS
-        assert recent["md5"] == b64md5(store.blobs["Dinesafe.csv"])
-
-    def test_unchanged_files_are_not_reuploaded(self, tmp_path):
-        store = FakeStore()
-        dl = fake_download(tmp_path)
-        fetch(store, str(tmp_path / "data"), historical=False, download=dl)
-        store.uploads.clear()
-        fetch(store, str(tmp_path / "data"), historical=False, download=dl)
-        assert store.uploads == ["manifest.json"]
-
-    def test_historical_is_carried_over_unless_requested(self, tmp_path):
-        store = FakeStore()
-        dl = fake_download(tmp_path)
-        fetch(store, str(tmp_path / "data"), historical=False, download=dl)
-        calls = []
-
-        def counting(url, path):
-            calls.append(url)
-            dl(url, path)
-
-        manifest = fetch(store, str(tmp_path / "data"), historical=False, download=counting)
-        assert len(calls) == 1  # recent only
-        assert len(manifest["files"]) == 3
-        fetch(store, str(tmp_path / "data"), historical=True, download=counting)
-        assert len(calls) == 3  # recent + ZIP
-
-    def test_fetch_rejects_missing_column_and_uploads_nothing(self, tmp_path):
-        store = FakeStore()
-        bad = RECENT_HEADER.replace("estId", "establishmentId")
-        with pytest.raises(DataError, match="estId"):
-            fetch(store, str(tmp_path / "data"), historical=False,
-                  download=fake_download(tmp_path, recent_header=bad))
-        assert store.uploads == []
-
-    def test_manifest_pins_each_file_version(self, tmp_path):
-        store = FakeStore()
-        manifest = fetch(store, str(tmp_path / "data"), historical=False,
-                         download=fake_download(tmp_path))
-        for entry in manifest["files"]:
-            assert entry["version_id"] == store.current[entry["name"]]
-
-    def test_bad_zip_is_a_data_error(self, tmp_path):
-        good = fake_download(tmp_path)
-
-        def download(url, path):
-            good(url, path)
-            if not url.endswith("dinesafe.csv"):
-                with open(path, "wb") as f:
-                    f.write(b"<html>maintenance</html>")
-
-        with pytest.raises(DataError, match="ZIP"):
-            fetch(FakeStore(), str(tmp_path / "data"), historical=False, download=download)
-
-    def test_staging_is_cleaned_up(self, tmp_path):
-        fetch(FakeStore(), str(tmp_path / "data"), historical=False,
-              download=fake_download(tmp_path))
-        assert not (tmp_path / "data" / ".staging").exists()
-
-
-class TestSync:
-    def seeded_store(self, tmp_path):
-        store = FakeStore()
-        fetch(store, str(tmp_path / "seed"), historical=False, download=fake_download(tmp_path))
-        return store
-
-    def test_sync_mirrors_manifest_files(self, tmp_path):
-        store = self.seeded_store(tmp_path)
-        data = tmp_path / "data"
-        sync(store, str(data))
-        assert (data / "manifest.json").exists()
-        assert (data / "Dinesafe.csv").read_bytes() == store.blobs["Dinesafe.csv"]
-        assert (data / "dinesafe-historical" / "dinesafe_hist_2001.csv").exists()
-
-    def test_sync_skips_files_that_already_match(self, tmp_path):
-        store = self.seeded_store(tmp_path)
-        data = tmp_path / "data"
-        sync(store, str(data))
-        before = (data / "Dinesafe.csv").stat().st_mtime_ns
-        sync(store, str(data))
-        assert (data / "Dinesafe.csv").stat().st_mtime_ns == before
-
-    def test_sync_md5_mismatch_keeps_old_file(self, tmp_path):
-        store = self.seeded_store(tmp_path)
-        data = tmp_path / "data"
-        sync(store, str(data))
-        old = (data / "Dinesafe.csv").read_bytes()
-        manifest = json.loads(store.blobs["manifest.json"])
-        for f in manifest["files"]:
-            if f["name"] == "Dinesafe.csv":
-                f["md5"] = b64md5(b"something else")
-        store.blobs["manifest.json"] = json.dumps(manifest).encode()
-        store.blobs["Dinesafe.csv"] = b"corrupted"
-        with pytest.raises(DataError, match="Dinesafe.csv"):
-            sync(store, str(data))
-        assert (data / "Dinesafe.csv").read_bytes() == old
-        assert not list(data.rglob("*.part"))
-
-    def test_sync_removes_csvs_not_in_manifest(self, tmp_path):
-        store = self.seeded_store(tmp_path)
-        data = tmp_path / "data"
-        sync(store, str(data))
-        stale = data / "dinesafe-historical" / "dinesafe_hist_1999.csv"
-        stale.write_text("old")
-        sync(store, str(data))
-        assert not stale.exists()
-
-    def test_sync_after_partial_upload_gets_the_manifest_versions(self, tmp_path):
-        store = self.seeded_store(tmp_path)
-        old = store.blobs["Dinesafe.csv"]
-        # A later fetch uploaded a new Dinesafe.csv, then failed before the manifest.
-        p = tmp_path / "new.csv"
-        p.write_bytes(old + b"x,y\n")
-        store.upload("Dinesafe.csv", str(p), b64md5(p.read_bytes()))
-        data = tmp_path / "fresh"
-        sync(store, str(data))
-        assert (data / "Dinesafe.csv").read_bytes() == old
-
-    def test_sync_without_manifest_fails(self, tmp_path):
-        with pytest.raises(DataError, match="manifest.json"):
-            sync(FakeStore(), str(tmp_path / "data"))
-
-
-class TestMain:
-    def test_missing_account_is_a_clear_error(self, tmp_path, monkeypatch, capsys):
-        token = tmp_path / "token"
-        token.write_text("t")
-        monkeypatch.delenv("DSV_STORAGE_ACCOUNT", raising=False)
-        monkeypatch.setenv("DSV_TOKEN_FILE", str(token))
-        assert main(["sync"]) == 1
-        assert "DSV_STORAGE_ACCOUNT" in capsys.readouterr().err
-
-    def test_missing_token_file_is_a_clear_error(self, tmp_path, monkeypatch, capsys):
-        monkeypatch.setenv("DSV_STORAGE_ACCOUNT", "stdsvstg01")
-        monkeypatch.setenv("DSV_TOKEN_FILE", str(tmp_path / "nope"))
-        assert main(["sync"]) == 1
-        assert "token" in capsys.readouterr().err
 
 
 class TestHttpDownload:
@@ -379,7 +72,7 @@ class TestHttpDownload:
 
     @pytest.mark.parametrize("error", [
         URLError("timed out"),
-        HTTPError("https://example.test/f.csv", 503, "Service Unavailable", Message(), io.BytesIO(b"")),
+        HTTPError("https://example.test/f.csv", 503, "Unavailable", Message(), io.BytesIO(b"")),
         TimeoutError("timed out"),
     ])
     def test_network_errors_are_data_errors(self, tmp_path, error):
@@ -388,3 +81,327 @@ class TestHttpDownload:
 
         with pytest.raises(DataError, match="example.test"):
             http_download("https://example.test/f.csv", str(tmp_path / "f"), opener=opener)
+
+
+def package(*resources):
+    return FakeResponse(json.dumps({"success": True, "result": {"resources": list(resources)}}).encode())
+
+
+RECENT_RES = {"name": "Dinesafe.csv", "format": "CSV", "url": "https://t.test/recent.csv",
+              "last_modified": "2026-10-11T08:18:39.697474"}
+HIST_RES = {"name": "Dinesafe Historical Data", "format": "ZIP", "url": "https://t.test/hist.zip",
+            "last_modified": "2026-07-06T13:07:17.168414"}
+TM_RES = {"name": "Dinesafe™.csv", "format": "CSV", "url": "https://t.test/old.csv",
+          "last_modified": "2026-07-08T21:00:32.773986"}
+
+
+class TestResolveResources:
+    def test_picks_recent_and_historical_by_name(self):
+        found = resolve_resources(opener=lambda url, timeout=None: package(RECENT_RES, HIST_RES))
+        assert found == {
+            "recent": {"url": "https://t.test/recent.csv", "last_modified": "2026-10-11T08:18:39.697474"},
+            "historical": {"url": "https://t.test/hist.zip", "last_modified": "2026-07-06T13:07:17.168414"},
+        }
+
+    # Review focus 2: the package still lists the old-schema Dinesafe™.csv.
+    def test_ignores_the_trademark_variant(self):
+        found = resolve_resources(opener=lambda url, timeout=None: package(TM_RES, RECENT_RES, HIST_RES))
+        assert found["recent"]["url"] == "https://t.test/recent.csv"
+
+    def test_missing_resource_names_it(self):
+        with pytest.raises(DataError, match="Dinesafe Historical Data"):
+            resolve_resources(opener=lambda url, timeout=None: package(RECENT_RES))
+
+    def test_network_error_is_a_data_error(self):
+        def opener(url, timeout=None):
+            raise URLError("down")
+
+        with pytest.raises(DataError, match="package_show"):
+            resolve_resources(opener=opener)
+
+    def test_non_json_is_a_data_error(self):
+        with pytest.raises(DataError, match="JSON"):
+            resolve_resources(opener=lambda url, timeout=None: FakeResponse(b"<html>"))
+
+
+class TestBlobStore:
+    def store(self, answers):
+        opener = FakeOpener(answers)
+        return BlobStore("a", "dinesafe", "tok", opener=opener), opener
+
+    def test_requests_carry_bearer_token_and_version(self):
+        store, opener = self.store({("GET", LIST): listing({})})
+        store.list("recent/")
+        req = opener.requests[0]
+        assert req.get_header("Authorization") == "Bearer tok"
+        assert req.get_header("X-ms-version") == "2023-11-03"
+
+    def test_list_returns_metadata_and_md5(self):
+        store, _ = self.store({("GET", LIST): listing({
+            "recent/20261009T113005Z/Dinesafe.csv": ("abc=", {"source_last_modified": "2026-10-09T08:00:00"}),
+        })})
+        blobs = store.list("recent/")
+        info = blobs["recent/20261009T113005Z/Dinesafe.csv"]
+        assert info.md5 == "abc="
+        assert info.metadata == {"source_last_modified": "2026-10-09T08:00:00"}
+
+    def test_list_follows_next_marker(self):
+        store, _ = self.store({
+            ("GET", LIST): listing({"recent/a/Dinesafe.csv": ("1=", {})}, next_marker="m2"),
+            ("GET", LIST + "&marker=m2"): listing({"recent/b/Dinesafe.csv": ("2=", {})}),
+        })
+        assert set(store.list("recent/")) == {"recent/a/Dinesafe.csv", "recent/b/Dinesafe.csv"}
+
+    def test_list_of_missing_container_is_an_error(self):
+        store, _ = self.store({})
+        with pytest.raises(DataError, match="container"):
+            store.list("recent/")
+
+    def test_other_http_errors_raise_data_error(self):
+        store, _ = self.store({("GET", LIST): 403})
+        with pytest.raises(DataError, match="403"):
+            store.list("recent/")
+
+    def test_upload_sends_block_blob_md5_and_metadata(self, tmp_path):
+        p = tmp_path / "f.csv"
+        p.write_bytes(b"data")
+        store, opener = self.store({("PUT", "/recent/t/Dinesafe.csv"): FakeResponse()})
+        store.upload("recent/t/Dinesafe.csv", str(p), b64md5(b"data"),
+                     metadata={"source_last_modified": "2026-10-11T08:18:39"})
+        req = opener.requests[0]
+        assert req.get_method() == "PUT"
+        assert req.get_header("X-ms-blob-type") == "BlockBlob"
+        assert req.get_header("Content-md5") == b64md5(b"data")
+        assert req.get_header("X-ms-meta-source_last_modified") == "2026-10-11T08:18:39"
+        assert req.get_header("Content-length") == "4"
+        assert req.body == b"data"
+
+    def test_download_to_writes_file(self, tmp_path):
+        store, _ = self.store({("GET", "/recent/t/Dinesafe.csv"): FakeResponse(b"csv")})
+        store.download_to("recent/t/Dinesafe.csv", str(tmp_path / "out"))
+        assert (tmp_path / "out").read_bytes() == b"csv"
+
+    def test_download_of_missing_blob_is_an_error(self, tmp_path):
+        store, _ = self.store({})
+        with pytest.raises(DataError, match="isn't in the container"):
+            store.download_to("recent/t/Dinesafe.csv", str(tmp_path / "out"))
+
+    def test_delete_sends_delete(self):
+        store, opener = self.store({("DELETE", "/recent/t/Dinesafe.csv"): FakeResponse()})
+        store.delete("recent/t/Dinesafe.csv")
+        assert opener.requests[0].get_method() == "DELETE"
+
+
+class TestNewest:
+    def test_folders_are_sorted_and_unique(self):
+        names = ["recent/b/Dinesafe.csv", "recent/a/Dinesafe.csv", "recent/a/other", "recent/loose"]
+        assert folders(names, "recent/") == ["a", "b"]
+
+    def test_newest_recent_is_the_last_folder(self):
+        store = FakeStore()
+        store.put("recent/20261009T113005Z/Dinesafe.csv", b"old", source_last_modified="2026-10-09")
+        store.put("recent/20261012T113012Z/Dinesafe.csv", b"new", source_last_modified="2026-10-12")
+        path, info = newest_recent(store)
+        assert path == "recent/20261012T113012Z/Dinesafe.csv"
+        assert info.metadata["source_last_modified"] == "2026-10-12"
+
+    def test_newest_recent_of_empty_zone_is_none(self):
+        assert newest_recent(FakeStore()) is None
+
+    def test_newest_historical_lists_its_csvs(self):
+        store = FakeStore()
+        for name in ("a.csv", "b.csv", "_SUCCESS"):
+            store.put(f"historical/20261012T113012Z/{name}", b"x")
+        folder, names = newest_historical(store)
+        assert folder == "historical/20261012T113012Z/"
+        assert names == ["historical/20261012T113012Z/a.csv", "historical/20261012T113012Z/b.csv"]
+
+    # Review focus 1: an ingest that died partway leaves a folder without _SUCCESS.
+    def test_newest_historical_ignores_folders_without_success(self):
+        store = FakeStore()
+        for name in ("a.csv", "_SUCCESS"):
+            store.put(f"historical/20260601T113002Z/{name}", b"x")
+        store.put("historical/20261012T113012Z/a.csv", b"partial")
+        folder, _ = newest_historical(store)
+        assert folder == "historical/20260601T113002Z/"
+
+    def test_newest_historical_of_empty_zone_is_none(self):
+        assert newest_historical(FakeStore()) is None
+import datetime
+import shutil
+import zipfile as _zipfile
+
+from data import (
+    KEEP_RECENT, MIN_HISTORICAL_ROWS, MIN_RECENT_ROWS, check_fresh, ingest, prune_recent,
+)
+
+NOW = datetime.datetime(2026, 10, 12, 11, 30, 12, tzinfo=datetime.timezone.utc)
+STAMP = "20261012T113012Z"
+
+
+def resolver(recent_modified="2026-10-12T09:14:00"):
+    def resolve():
+        return {"recent": {"url": "https://t.test/dinesafe.csv", "last_modified": recent_modified},
+                "historical": {"url": "https://t.test/hist.zip", "last_modified": "2026-07-06T13:07:17"}}
+    return resolve
+
+
+def downloader(tmp_path, recent_header=RECENT_HEADER, recent_extra=b""):
+    """Serves a valid recent CSV and a 2-file historical ZIP. Records URLs."""
+    src = tmp_path / "src"
+    src.mkdir(exist_ok=True)
+    recent = write_csv(src / "dinesafe.csv", recent_header, MIN_RECENT_ROWS)
+    if recent_extra:
+        recent.write_bytes(recent.read_bytes() + recent_extra)
+    zpath = src / "hist.zip"
+    with _zipfile.ZipFile(zpath, "w") as zf:
+        for year in (2001, 2002):
+            h = write_csv(src / f"dinesafe_hist_{year}.csv", HIST_HEADER, MIN_HISTORICAL_ROWS)
+            zf.write(h, f"some folder/dinesafe_hist_{year}.csv")
+        zf.writestr("readme.txt", "not a csv")
+    calls = []
+
+    def download(url, path):
+        calls.append(url)
+        shutil.copy(recent if url.endswith("dinesafe.csv") else zpath, path)
+
+    download.calls = calls
+    return download
+
+
+def seeded(tmp_path):
+    """A raw zone after one ingest on October 9."""
+    store = FakeStore()
+    ingest(store, resolve=resolver("2026-10-09T08:00:00"), download=downloader(tmp_path),
+           now=datetime.datetime(2026, 10, 9, 11, 30, 5, tzinfo=datetime.timezone.utc))
+    store.uploads.clear()
+    return store
+
+
+class TestIngest:
+    def test_first_ingest_uploads_historical_then_success_then_recent(self, tmp_path):
+        store = FakeStore()
+        path = ingest(store, resolve=resolver(), download=downloader(tmp_path), now=NOW)
+        assert path == f"recent/{STAMP}/Dinesafe.csv"
+        assert store.uploads == [
+            f"historical/{STAMP}/dinesafe_hist_2001.csv",
+            f"historical/{STAMP}/dinesafe_hist_2002.csv",
+            f"historical/{STAMP}/_SUCCESS",
+            f"recent/{STAMP}/Dinesafe.csv",
+        ]
+        assert store.blobs[path][1] == {"source_last_modified": "2026-10-12T09:14:00"}
+
+    def test_not_newer_downloads_nothing(self, tmp_path):
+        store = seeded(tmp_path)
+        dl = downloader(tmp_path)
+        assert ingest(store, resolve=resolver("2026-10-09T08:00:00"), download=dl, now=NOW) is None
+        assert dl.calls == []
+        assert store.uploads == []
+
+    def test_newer_uploads_a_new_recent_folder_only(self, tmp_path):
+        store = seeded(tmp_path)
+        dl = downloader(tmp_path, recent_extra=b"x\n")
+        assert ingest(store, resolve=resolver(), download=dl, now=NOW) == f"recent/{STAMP}/Dinesafe.csv"
+        assert dl.calls == ["https://t.test/dinesafe.csv"]
+        assert store.uploads == [f"recent/{STAMP}/Dinesafe.csv"]
+
+    def test_force_with_same_content_uploads_nothing(self, tmp_path):
+        store = seeded(tmp_path)
+        dl = downloader(tmp_path)
+        assert ingest(store, force=True, resolve=resolver("2026-10-09T08:00:00"),
+                      download=dl, now=NOW) is None
+        assert dl.calls == ["https://t.test/dinesafe.csv"]
+        assert store.uploads == []
+
+    def test_force_with_new_content_uploads(self, tmp_path):
+        store = seeded(tmp_path)
+        dl = downloader(tmp_path, recent_extra=b"x\n")
+        path = ingest(store, force=True, resolve=resolver("2026-10-09T08:00:00"), download=dl, now=NOW)
+        assert path == f"recent/{STAMP}/Dinesafe.csv"
+
+    def test_historical_flag_redownloads_the_zip(self, tmp_path):
+        store = seeded(tmp_path)
+        dl = downloader(tmp_path)
+        ingest(store, historical=True, resolve=resolver("2026-10-09T08:00:00"), download=dl, now=NOW)
+        assert dl.calls == ["https://t.test/hist.zip"]
+        assert f"historical/{STAMP}/_SUCCESS" in store.uploads
+
+    def test_incomplete_historical_folder_is_downloaded_again(self, tmp_path):
+        store = FakeStore()
+        store.put("recent/20261009T113005Z/Dinesafe.csv", b"r", source_last_modified="2026-10-12T09:14:00")
+        store.put("historical/20261009T113005Z/dinesafe_hist_2001.csv", b"partial")
+        dl = downloader(tmp_path)
+        ingest(store, resolve=resolver(), download=dl, now=NOW)
+        assert dl.calls == ["https://t.test/hist.zip"]
+
+    def test_failed_validation_uploads_nothing(self, tmp_path):
+        store = FakeStore()
+        bad = RECENT_HEADER.replace("estId", "establishmentId")
+        with pytest.raises(DataError, match="estId"):
+            ingest(store, resolve=resolver(), download=downloader(tmp_path, recent_header=bad), now=NOW)
+        assert store.uploads == []
+
+    def test_bad_zip_is_a_data_error_and_uploads_nothing(self, tmp_path):
+        good = downloader(tmp_path)
+
+        def download(url, path):
+            good(url, path)
+            if url.endswith(".zip"):
+                with open(path, "wb") as f:
+                    f.write(b"<html>maintenance</html>")
+
+        store = FakeStore()
+        with pytest.raises(DataError, match="ZIP"):
+            ingest(store, resolve=resolver(), download=download, now=NOW)
+        assert store.uploads == []
+
+
+class TestPrune:
+    def fill(self, count):
+        store = FakeStore()
+        for day in range(count):
+            store.put(f"recent/202601{day + 1:02d}T000000Z/Dinesafe.csv", b"x")
+        return store
+
+    def test_keeps_the_newest(self):
+        store = self.fill(KEEP_RECENT + 2)
+        prune_recent(store)
+        assert store.deleted == ["recent/20260101T000000Z/Dinesafe.csv",
+                                 "recent/20260102T000000Z/Dinesafe.csv"]
+        assert len(store.list("recent/")) == KEEP_RECENT
+
+    def test_never_deletes_the_newest(self):
+        store = self.fill(3)
+        prune_recent(store, keep=1)
+        assert list(store.list("recent/")) == ["recent/20260103T000000Z/Dinesafe.csv"]
+
+    def test_ingest_prunes_after_upload(self, tmp_path):
+        store = self.fill(KEEP_RECENT)
+        for name in ("a.csv", "_SUCCESS"):
+            store.put(f"historical/20260101T000000Z/{name}", b"x")
+        ingest(store, resolve=resolver(), download=downloader(tmp_path), now=NOW)
+        assert store.deleted == ["recent/20260101T000000Z/Dinesafe.csv"]
+
+
+class TestCheckFresh:
+    def store(self, modified):
+        store = FakeStore()
+        store.put("recent/20261012T113012Z/Dinesafe.csv", b"x", source_last_modified=modified)
+        return store
+
+    def test_ten_days_is_fresh(self):
+        check_fresh(self.store("2026-10-02T11:30:12"), now=NOW)
+
+    def test_older_than_ten_days_is_stale(self):
+        with pytest.raises(DataError, match="10 days"):
+            check_fresh(self.store("2026-10-02T11:30:11"), now=NOW)
+
+    def test_missing_metadata_is_an_error(self):
+        store = FakeStore()
+        store.put("recent/20261012T113012Z/Dinesafe.csv", b"x")
+        with pytest.raises(DataError, match="source_last_modified"):
+            check_fresh(store, now=NOW)
+
+    def test_empty_zone_is_an_error(self):
+        with pytest.raises(DataError, match="recent/ is empty"):
+            check_fresh(FakeStore(), now=NOW)
