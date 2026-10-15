@@ -1,145 +1,145 @@
 # Data architecture
 
-How DineSafe data gets from Toronto Open Data into Postgres, how it's
-transformed, how it stays current, and how the app reads it.
+This page gives a high-level view of how DineSafe inspection data moves from
+Toronto Open Data into Postgres and stays current. Each section links to a
+sub-document with the implementation details.
 
-## Overview
+## Infrastructure
 
-Data flows one way through three zones. One one-shot service, `dsv-pipeline`,
-writes. Everything else reads.
+The data path has three zones: raw files in Azure Blob Storage, a temporary
+transform step, and the Postgres database the site reads. One service,
+`dsv-pipeline`, writes data. Everything else only reads.
 
 ```mermaid
 flowchart LR
-    tod["Toronto Open Data<br/>CKAN package: dinesafe"]
-    ingest["dsv-pipeline<br/>ingest"]
-    load["dsv-pipeline<br/>load"]
-    blob[("Raw zone<br/>Blob container: dinesafe")]
-    db[("Serving zone<br/>Postgres: inspections")]
-    app["dsv-app<br/>Flask"]
-    graf["dsv-analytics<br/>Grafana"]
+    tod["Toronto Open Data<br/>(public internet)"]
 
-    tod -- "CSV + ZIP" --> ingest -- "new folder,<br/>never overwrite" --> blob
-    blob --> load -- "transform in memory<br/>COPY in 1 transaction" --> db
-    db -- "SELECT as dinesafe_app" --> app
-    db -- "SELECT as dinesafe_app" --> graf
+    subgraph azure["Azure subscription"]
+        kv["Key Vault<br/>DB passwords"]
+        mi["VM managed identity<br/>id-dsv-stg01-vm / id-dsv-prod01-vm"]
+        blob[("Storage account<br/>stdsvstg01 / stdsvprod01<br/>Blob container: dinesafe<br/>RAW ZONE")]
+
+        subgraph vm["VM (Docker Compose)"]
+            timer["systemd timer<br/>weekdays 07:30"]
+            pipe["dsv-pipeline<br/>ingest + TRANSFORM"]
+            db[("dsv-db<br/>Postgres<br/>SERVING ZONE")]
+            app["dsv-app<br/>website"]
+            graf["dsv-analytics<br/>Grafana"]
+        end
+    end
+
+    timer -- starts --> pipe
+    mi -. "storage token" .-> pipe
+    kv -. ".env passwords" .-> vm
+    tod -- "1. download CSV + ZIP" --> pipe
+    pipe -- "2. upload raw files" --> blob
+    blob -- "3. read raw files" --> pipe
+    pipe -- "4. write rows" --> db
+    db -- "read only" --> app
+    db -- "read only" --> graf
 ```
 
-| Zone      | Where                                       | Holds                               | Writer                        | Readers                           |
-| --------- | ------------------------------------------- | ----------------------------------- | ----------------------------- | --------------------------------- |
-| Raw       | Blob container `dinesafe` in `stdsv<env>01` | Files as downloaded, never edited   | `ingest`                      | `load`                            |
-| Transform | `dsv-pipeline` memory and `/tmp`            | Decoded, mapped, de-duplicated rows | `load`                        | `load`                            |
-| Serving   | `dsv-db`, volume `dsv-db-data`              | `inspections`, `load_log`           | `load` as `dinesafe_migrator` | App and Grafana as `dinesafe_app` |
+| Component       | Pulls                    | Transforms          | Stores                          |
+| --------------- | ------------------------ | ------------------- | ------------------------------- |
+| `dsv-pipeline`  | Toronto Open Data, Blob  | Yes, in memory      | Nothing. One-shot container.    |
+| Blob `dinesafe` | —                        | No                  | Raw files, as downloaded        |
+| `dsv-db`        | —                        | No                  | `inspections` and `load_log`    |
+| `dsv-app`       | `dsv-db`                 | No                  | A small stats cache, in memory  |
+| `dsv-analytics` | `dsv-db`                 | No                  | Nothing                         |
 
-- Only `ingest` and `run` contact Toronto Open Data. Deploys run `load` only.
-- The raw zone can rebuild the database at any time, without Toronto.
-- `docker compose up`, `restart`, and rebuilds never change data:
-  `dsv-pipeline` is in the `pipeline` profile.
+- Same layout in stg and prod. Dev reads stg's storage, read-only.
+- Only `dsv-pipeline` can reach the internet. The app and Grafana can't.
+- The raw zone is the backup: it can rebuild the database without Toronto.
+- `docker compose up` and restarts never change data.
 
-### Components
+For details, see [App architecture](2-app-architecture.md),
+[Data operations](3-7-data-operations.md#access-and-credentials), and
+[Data readers](3-9-data-readers.md).
 
-Each component on the data path, and the code that defines it:
+## How raw data is ingested
 
-| Component                 | Code                                                | Role                                                    |
-| ------------------------- | --------------------------------------------------- | ------------------------------------------------------- |
-| `dsv-pipeline ingest`     | `src/dsv-db/data.py`                                | Toronto Open Data → raw zone. Never touches Postgres.   |
-| `dsv-pipeline load`       | `src/dsv-db/pipeline.py`, `src/dsv-db/refresh.py`   | Raw zone → transform → Postgres. Never contacts Toronto. |
-| `scripts/pipeline.sh`     | `scripts/pipeline.sh`, `scripts/lib.sh`             | Gets a storage token, then runs `dsv-pipeline`.          |
-| `dsv-pipeline.timer`      | `deploy/systemd/dsv-pipeline.{timer,service}`       | Runs `pipeline.sh <env> run` on weekday mornings (VMs).  |
-| `scripts/deploy.sh`       | `scripts/deploy.sh`                                 | Runs migrations, then `pipeline.sh <env> load`.          |
-| `dsv-db`                  | `src/dsv-db/init.sql`, `src/dsv-db/migrations/`     | Postgres 18.6. Schema, roles, and grants.                |
-| `dsv-app`                 | `src/dsv-app/app.py`                                | Web pages. Reads `inspections`.                          |
-| `dsv-analytics`           | `src/dsv-analytics/provisioning/`                   | Grafana dashboard. Reads `inspections`.                  |
-
-## How the app reads data
-
-Two services read Postgres, both as `dinesafe_app`: `SELECT` only, with a
-10-second `statement_timeout`. Neither writes.
-
-| Reader          | Code                              | Connection                                                       | Caching                                              |
-| --------------- | --------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------- |
-| `dsv-app`       | `src/dsv-app/app.py`              | New psycopg2 connection per query. No pool. 5 s connect timeout. | Inspection count and date range, in memory, 5-day TTL |
-| `dsv-analytics` | `src/dsv-analytics/provisioning/` | Provisioned data source `dinesafe-postgres`, `sslmode: disable`  | None. Panels query on every dashboard load.          |
-
-- `load_log` is readable, but nothing displays it yet.
-- Connections are plaintext, on the internal `backend` network only.
-
-### Grain: one row per infraction
-
-Both readers depend on how `inspections` stores an inspection.
-
-| `establishment_id`   | `inspection_date` | `establishment_status` | `severity`  | `infraction_details`                              |
-| -------------------- | ----------------- | ---------------------- | ----------- | ------------------------------------------------- |
-| `001Vo000013QjdPIAS` | 2026-04-21        | Pass                   | M - Minor   | FAIL TO ENSURE EQUIPMENT SURFACE SANITIZED …      |
-| `001Vo000013QjdPIAS` | 2026-04-21        | Pass                   | M - Minor   | FOOD PREMISE NOT MAINTAINED TO KEEP …             |
-| `10500438`           | 2017-12-05        | Pass                   | `NULL`      | `NULL`                                            |
-
-- Rows 1 and 2: one inspection with two infractions. Row 3: a clean
-  inspection, one row with `NULL` infraction fields.
-- An inspection is an `(establishment_id, inspection_date)` pair. Recent rows
-  have no `inspection_id`.
-- The app and Grafana both count `DISTINCT establishment_id, inspection_date`,
-  so their totals match: about 333,000 inspections in about 508,000 rows.
-
-
-
-## How data is ingested
-
-`dsv-pipeline ingest` (`src/dsv-db/data.py`) copies new files from Toronto
-Open Data to the raw zone. It never touches Postgres.
+Ingest copies new files from Toronto Open Data to Blob Storage. It never
+touches the database.
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    participant P as dsv-pipeline ingest
-    participant C as CKAN API
-    participant T as Toronto Open Data
-    participant B as Blob raw zone
-    P->>C: package_show?id=dinesafe
-    C-->>P: Resources with url and last_modified
-    P->>B: List recent/ and historical/ with metadata
-    B-->>P: Newest source_last_modified, complete historical folders
-    alt Nothing needed
-        P-->>P: Exit 0, "No new data"
-    else Recent or historical needed
-        P->>T: GET Dinesafe.csv, the historical ZIP, or both
-        T-->>P: Files into /tmp
-        P->>P: Validate every file, then hash it (MD5)
-        P->>B: PUT historical/{ts}/*.csv, then _SUCCESS
-        P->>B: PUT recent/{ts}/Dinesafe.csv with source_last_modified
-        P->>B: DELETE recent/ folders past the newest 30
-    end
+flowchart LR
+    start(["ingest"]) --> ask["Ask Toronto's catalog<br/>when files last changed"]
+    ask --> newer{"Newer than the<br/>newest blob?"}
+    newer -- no --> done(["Exit: no new data"])
+    newer -- yes --> dl["Download to /tmp"]
+    dl --> val{"Headers and<br/>row counts OK?"}
+    val -- no --> fail(["Exit 1:<br/>nothing uploaded"])
+    val -- yes --> up["Upload to a new<br/>timestamped folder"]
+    up --> prune["Keep the newest<br/>30 recent folders"]
 ```
 
-| Rule                | Detail                                                                                                                                                                                    |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Find files          | Exact name and format: `Dinesafe.csv` (CSV) and `Dinesafe Historical Data` (ZIP). Exactly one match each, or fail. Survives resource ID changes and skips the stale `Dinesafe™.csv`.     |
-| Download recent     | CKAN `last_modified` is newer than the newest blob's `source_last_modified`, `recent/` is empty, or `--force`.                                                                            |
-| Download historical | No `historical/` folder has `_SUCCESS`, or `--historical`.                                                                                                                                |
-| Unzip               | Every `.csv` in the ZIP, flattened to its base name. Other files are skipped.                                                                                                             |
-| Validate            | Every file, before any upload: mapped headers present, UTF-8 or cp1252, at least 50,000 recent rows and 1,000 rows per historical file. Values aren't checked.                            |
-| Skip duplicates     | Doesn't upload a recent file whose MD5 matches the newest blob.                                                                                                                           |
-| Upload order        | Historical CSVs, `_SUCCESS`, recent CSV, then prune.                                                                                                                                      |
-| Integrity           | `Content-MD5` on every upload, so Blob rejects a corrupted body.                                                                                                                          |
-| Timeouts            | 120 seconds without data, per request.                                                                                                                                                    |
-| Client              | Plain Blob REST API (`x-ms-version: 2023-11-03`) with a bearer token. No Azure SDK.                                                                                                       |
+- Two source files:
+  - **Recent:** `Dinesafe.csv`, November 2023 to today. Updated often.
+  - **Historical:** a ZIP of yearly CSVs, 2001 to 2023. Downloaded once.
+- Each ingest writes a new folder. Existing files are never overwritten.
+- A bad download is rejected before upload, so the raw zone only holds files
+  that passed validation.
+- Uses the VM's managed identity. No storage keys.
 
-### Raw zone layout
+For details, see [Data sources](3-2-data-sources.md) and
+[Data ingest](3-8-data-ingest.md).
 
-Each ingest writes to new folders. Nothing is overwritten.
+## How the database is created and populated
 
-```text
-stdsv<env>01 / dinesafe
-├── recent/
-│   ├── 20261009T113005Z/Dinesafe.csv   metadata: source_last_modified
-│   └── 20261012T113012Z/Dinesafe.csv   ← newest: last in sort order
-└── historical/
-    └── 20261005T140211Z/
-        ├── dinesafe_hist_2001.csv … dinesafe_hist_2023.csv
-        └── _SUCCESS                     ← written last; no marker, no load
+Postgres creates the empty schema on first start. The pipeline then fills it
+from the raw zone. This first fill is called a *seed*.
+
+```mermaid
+flowchart LR
+    vol(["Empty dsv-db-data<br/>volume"]) --> init["Postgres runs init.sql<br/>and migrations:<br/>tables, roles, grants"]
+    init --> deploy["deploy.sh reruns<br/>migrations"]
+    deploy --> load["pipeline load:<br/>table empty, so seed"]
+    load --> read["Read historical<br/>+ recent CSVs<br/>from Blob"]
+    read --> xform["Transform:<br/>rename, clean,<br/>de-duplicate"]
+    xform --> copy["Bulk COPY into<br/>inspections"]
+    copy --> log["Add load_log row,<br/>COMMIT"]
 ```
 
-- Folder name: the ingest's UTC start time, not Toronto's date. Names sort in
-  time order, so there's no manifest.
-- A forced download with new content gets its own folder.
-- A new `historical/` folder takes effect only on the next seed. Refreshes
-  never read `historical/`.
+- Two tables:
+  - `inspections`: one row per infraction, about 508,000 rows.
+  - `load_log`: one row per successful load.
+- Three database roles, each with least access:
+  - Superuser: creates the schema only.
+  - `dinesafe_migrator`: the pipeline. Read, insert, and delete.
+  - `dinesafe_app`: the app and Grafana. Read only.
+- The seed is one transaction. If it fails, the table stays empty and the
+  deploy fails.
+- Every deploy runs the load step. On an existing database it refreshes or
+  skips instead of seeding.
+
+For details, see [Database](3-5-database.md) and
+[Data mapping](3-6-data-mapping.md).
+
+## How the data is updated
+
+A systemd timer runs the pipeline on weekday mornings. Each run ingests new
+files, then replaces the recent rows in the database.
+
+```mermaid
+flowchart LR
+    timer(["Timer:<br/>Mon-Fri 07:30"]) --> ingest["Ingest<br/>new files"]
+    ingest --> lock["Lock, so only<br/>one load runs"]
+    lock --> cur{"Newest blob<br/>already loaded?"}
+    cur -- yes --> skip(["Skip"])
+    cur -- no --> swap["Delete recent rows,<br/>insert newest recent CSV"]
+    swap --> commit["Add load_log row,<br/>COMMIT"]
+    commit --> fresh{"Source data<br/>under 10 days old?"}
+    skip --> fresh
+    fresh -- yes --> ok(["Exit 0"])
+    fresh -- no --> stale(["Exit 1:<br/>stale warning"])
+```
+
+- Only the recent window is replaced. Historical rows are loaded once and
+  never touched again.
+- The swap is atomic: visitors see the old data until `COMMIT`, then the new
+  data. No downtime.
+- Any failure rolls back, and the site keeps serving the last good load.
+- If Toronto Open Data is down, the data only gets older. Nothing breaks.
+- Check the last run with `systemctl status dsv-pipeline.service`.
+
+For details, see [Data operations](3-7-data-operations.md).

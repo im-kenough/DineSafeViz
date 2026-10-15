@@ -38,7 +38,7 @@ sequenceDiagram
     S->>I: Token for https://storage.azure.com/
     I-->>S: Managed identity token
     S->>P: docker compose run --rm, token as a mode-600 file
-    P->>B: ingest (previous section)
+    P->>B: ingest (see Data ingest)
     P->>D: BEGIN, pg_advisory_xact_lock
     P->>D: Table empty? Newest load_log.recent_path?
     alt Already current
