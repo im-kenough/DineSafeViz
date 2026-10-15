@@ -116,15 +116,15 @@ The load's design gives readers these properties:
 
 Measured with the October 14, 2026 data, unless noted:
 
-| Measure                | Value                                                        |
-| ---------------------- | ------------------------------------------------------------ |
-| Seed                   | 508,445 rows: 390,835 historical, 117,610 recent             |
-| Refresh                | Deletes and inserts about 117,600 rows                       |
-| Recent CSV             | About 45 MB                                                  |
-| Seed download          | About 125 MB, held in `/tmp`                                 |
-| Seed memory peak       | About 430 MiB, under the 768 MiB container limit             |
-| `inspections` on disk  | About 136 MB: 120 MB table, 15 MB indexes (October 5, 2026)  |
-| `recent/`              | About 1.4 GB at 30 folders                                   |
+| Measure               | Value                                                       |
+| --------------------- | ----------------------------------------------------------- |
+| Seed                  | 508,445 rows: 390,835 historical, 117,610 recent            |
+| Refresh               | Deletes and inserts about 117,600 rows                      |
+| Recent CSV            | About 45 MB                                                 |
+| Seed download         | About 125 MB, held in `/tmp`                                |
+| Seed memory peak      | About 430 MiB, under the 768 MiB container limit            |
+| `inspections` on disk | About 136 MB: 120 MB table, 15 MB indexes (October 5, 2026) |
+| `recent/`             | About 1.4 GB at 30 folders                                  |
 
 - Each refresh leaves about 117,600 dead rows. Autovacuum, on by default,
   reclaims them.
@@ -142,12 +142,12 @@ Access, failures, recovery, and environments for the data path.
 Each hop on the data path uses its own identity, with the least access it
 needs.
 
-| Hop                         | Identity                                         | Credential                              | Permission                                            |
-| --------------------------- | ------------------------------------------------ | --------------------------------------- | ----------------------------------------------------- |
-| Pipeline → Blob (stg, prod) | VM managed identity `id-dsv-<env>01-vm`          | IMDS token for `storage.azure.com` only | Storage Blob Data Contributor on container `dinesafe` |
-| Pipeline → Blob (dev)       | `dsv-ops01`, through `sg-dsv-stg01-operators`    | `az account get-access-token`           | Storage Blob Data Reader on stg's container           |
-| Pipeline → Postgres         | `dinesafe_migrator`                              | Key Vault secret → `.env`               | `SELECT`, `INSERT`, `DELETE` on both tables           |
-| App, Grafana → Postgres     | `dinesafe_app`                                   | Key Vault secret → `.env`               | `SELECT` on both tables, 10 s timeout                 |
+| Hop                                             | Identity                                      | Credential                              | Permission                                            |
+| ----------------------------------------------- | --------------------------------------------- | --------------------------------------- | ----------------------------------------------------- |
+| Pipeline → Blob (stg, prod)                     | VM managed identity `id-dsv-<env>01-vm`       | IMDS token for `storage.azure.com` only | Storage Blob Data Contributor on container `dinesafe` |
+| Pipeline → Blob (dev)                           | `dsv-ops01`, through `sg-dsv-stg01-operators` | `az account get-access-token`           | Storage Blob Data Reader on stg's container           |
+| Pipeline → Postgres                             | `dinesafe_migrator`                           | Key Vault secret → `.env`               | `SELECT`, `INSERT`, `DELETE` on both tables           |
+| App, inspections dashboard (Grafana) → Postgres | `dinesafe_app`                                | Key Vault secret → `.env`               | `SELECT` on both tables, 10 s timeout                 |
 
 - **Token:** minted on the host for each run, mounted at
   `/run/secrets/storage-token` (mode 600), and deleted on exit. Never an
@@ -158,36 +158,37 @@ needs.
   1.2, default-deny firewall with `--bypass None`. Allows the VM subnet and
   the operator's home IP.
 - **Network:** `dsv-pipeline` is the only service on both `egress` and
-  `backend`. The app and Grafana can't reach the internet.
+  `backend`. The app and the inspections dashboard (Grafana) can't reach the
+  internet.
 
 ### Failure handling
 
 Every pipeline failure leaves the site serving its last good load, unless the
 database is empty.
 
-| Failure                                                   | Result                                                   | Site serves    |
-| --------------------------------------------------------- | -------------------------------------------------------- | -------------- |
-| Toronto Open Data down, CKAN changed, or validation fails | Nothing uploaded. `run` exits 1.                         | Last good load |
-| Blob unreachable: firewall, token, or role                | `load` or `run` exits 1                                  | Last good load |
-| Load fails partway, including out of memory               | Rollback. No `load_log` row.                             | Last good load |
-| Bad value in a typed column (date, coordinate)            | `COPY` fails, rollback. Repeats until Toronto fixes it.  | Last good load |
-| Newest source data over 10 days old                       | `run` loads what it has, then exits 1                    | Newest load    |
-| Deploy's load fails, table has rows                       | Deploy warns and continues                               | Last good load |
-| Deploy's load fails, table is empty                       | Deploy fails                                             | Nothing        |
-| Run takes over 30 minutes                                 | systemd stops it                                         | Last good load |
-| Postgres down                                             | `/inspections` returns 500. `/` works only while stats are cached. `/info` renders, with totals only if cached. `/readyz` returns 503. | Partial |
+| Failure                                                   | Result                                                                                                                                 | Site serves    |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| Toronto Open Data down, CKAN changed, or validation fails | Nothing uploaded. `run` exits 1.                                                                                                       | Last good load |
+| Blob unreachable: firewall, token, or role                | `load` or `run` exits 1                                                                                                                | Last good load |
+| Load fails partway, including out of memory               | Rollback. No `load_log` row.                                                                                                           | Last good load |
+| Bad value in a typed column (date, coordinate)            | `COPY` fails, rollback. Repeats until Toronto fixes it.                                                                                | Last good load |
+| Newest source data over 10 days old                       | `run` loads what it has, then exits 1                                                                                                  | Newest load    |
+| Deploy's load fails, table has rows                       | Deploy warns and continues                                                                                                             | Last good load |
+| Deploy's load fails, table is empty                       | Deploy fails                                                                                                                           | Nothing        |
+| Run takes over 30 minutes                                 | systemd stops it                                                                                                                       | Last good load |
+| Postgres down                                             | `/inspections` returns 500. `/` works only while stats are cached. `/info` renders, with totals only if cached. `/readyz` returns 503. | Partial        |
 
 ### Retention and recovery
 
 The raw zone is the only backup of the data. Postgres has no backup of its
 own.
 
-| Data                   | Kept                        | How                                                          |
-| ---------------------- | --------------------------- | ------------------------------------------------------------ |
-| `recent/` folders      | Newest 30                   | `prune_recent()` after each recent upload. Never the newest. |
-| `historical/` folders  | All                         | Never pruned                                                 |
-| Deleted blobs          | 7 days                      | Soft delete                                                  |
-| Previous blob versions | 30 days                     | Versioning, plus lifecycle rule `delete-old-versions`        |
+| Data                   | Kept                        | How                                                                          |
+| ---------------------- | --------------------------- | ---------------------------------------------------------------------------- |
+| `recent/` folders      | Newest 30                   | `prune_recent()` after each recent upload. Never the newest.                 |
+| `historical/` folders  | All                         | Never pruned                                                                 |
+| Deleted blobs          | 7 days                      | Soft delete                                                                  |
+| Previous blob versions | 30 days                     | Versioning, plus lifecycle rule `delete-old-versions`                        |
 | Postgres               | Until the volume is removed | Rebuilt from the raw zone. Prod: manual OS disk snapshot before each deploy. |
 
 | Situation                        | Fix                                                                  |
@@ -202,14 +203,14 @@ own.
 The pipeline runs the same code everywhere, with different storage and
 identity.
 
-|                   | dev                         | stg                             | prod                       |
-| ----------------- | --------------------------- | ------------------------------- | -------------------------- |
-| Raw zone          | `stdsvstg01`, read-only     | `stdsvstg01`                    | `stdsvprod01`              |
-| Commands          | `load`                      | `ingest`, `load`, `run`         | `ingest`, `load`, `run`    |
-| Timer             | No                          | Yes                             | Yes                        |
-| Storage token     | Your `az login`             | VM managed identity             | VM managed identity        |
+|                   | dev                         | stg                                | prod                       |
+| ----------------- | --------------------------- | ---------------------------------- | -------------------------- |
+| Raw zone          | `stdsvstg01`, read-only     | `stdsvstg01`                       | `stdsvprod01`              |
+| Commands          | `load`                      | `ingest`, `load`, `run`            | `ingest`, `load`, `run`    |
+| Timer             | No                          | Yes                                | Yes                        |
+| Storage token     | Your `az login`             | VM managed identity                | VM managed identity        |
 | Pipeline image    | Built from the working tree | GHCR `dsv-init-db:sha-<short SHA>` | GHCR `dsv-init-db:<X.Y.Z>` |
-| Network isolation | None (default network)      | `egress` and `backend`          | `egress` and `backend`     |
+| Network isolation | None (default network)      | `egress` and `backend`             | `egress` and `backend`     |
 
 - stg and prod each ingest on their own, so they can briefly serve different
   data.
@@ -244,7 +245,7 @@ These limits exist in the current code:
   `unique_id` is recent only and isn't unique-constrained.
 - **Unused columns:** `latitude`, `longitude`, `unique_id`, `inspection_id`,
   and `min_inspections_per_year` are stored but nothing reads them.
-- **Dashboard note is wrong:** the Grafana text panel says establishment type
-  runs to 2023-12-31. The data ends on 2023-11-09.
+- **Dashboard note is wrong:** the inspections dashboard (Grafana) text panel
+  says establishment type runs to 2023-12-31. The data ends on 2023-11-09.
 - **No reseed script:** fixing historical rows needs a manual empty and
   reload.

@@ -15,11 +15,11 @@ Each section links to a sub-document with the implementation details.
 DineSafeViz adapts the
 [medallion architecture](https://learn.microsoft.com/azure/databricks/lakehouse/medallion), sorting data into layers, with each layer more refined.
 
-| Medallion layer | Function                                   | DineSafeViz                                       |
-| --------------- | ----------------------------------------- | ------------------------------------------------- |
-| Bronze          | Raw data, exactly as the source sent it   | Blob container `dinesafe`, the *raw zone*         |
-| Silver          | Cleaned, validated, de-duplicated rows    | Postgres `inspections` table, the *serving zone*  |
-| Gold            | Aggregated, ready for a specific consumer | Not stored. The app and Grafana aggregate on read |
+| Medallion layer | Function                                  | DineSafeViz                                                                   |
+| --------------- | ----------------------------------------- | ----------------------------------------------------------------------------- |
+| Bronze          | Raw data, exactly as the source sent it   | Blob container `dinesafe`, the *raw zone*                                     |
+| Silver          | Cleaned, validated, de-duplicated rows    | Postgres `inspections` table, the *serving zone*                              |
+| Gold            | Aggregated, ready for a specific consumer | Not stored. The app and the inspections dashboard (Grafana) aggregate on read |
 
 Modifications:
 
@@ -33,49 +33,92 @@ Modifications:
 
 ## Infrastructure
 
-Both zones live in one Azure subscription per environment. One service,
-`dsv-pipeline`, writes data. Everything else only reads.
+Each environment has its own Azure subscription and resource group. The
+diagram groups every Azure resource and app component that handles data by
+medallion layer. The ETL group sits between the layers, because it moves data
+from one to the next. Identity and secrets serve every layer.
+
+The diagram uses stg names. prod uses the same names with `prod01` in place of
+`stg01`.
 
 ```mermaid
 flowchart LR
-    tod["Toronto Open Data<br/>(public internet)"]
+    tod["Toronto Open Data<br/>CKAN catalog API<br/>Dinesafe.csv + historical ZIP"]
+    visitors(["Visitors"])
 
-    subgraph azure["Azure subscription"]
-        kv["Key Vault<br/>DB passwords"]
-        mi["VM managed identity<br/>id-dsv-stg01-vm / id-dsv-prod01-vm"]
-        blob[("Storage account<br/>stdsvstg01 / stdsvprod01<br/>Blob container: dinesafe<br/>BRONZE: raw zone")]
+    subgraph azure["Azure: sub-dsv-stg01, rg-dsv-stg01, canadacentral"]
+        subgraph sec["Identity and secrets: all layers"]
+            mi["Managed identity<br/>id-dsv-stg01-vm"]
+            kv["Key Vault kv-dsv-stg01<br/>DB role passwords"]
+        end
 
-        subgraph vm["VM (Docker Compose)"]
-            timer["systemd timer<br/>weekdays 07:30"]
-            pipe["dsv-pipeline<br/>extract + transform"]
-            db[("dsv-db<br/>Postgres<br/>SILVER: serving zone")]
-            app["dsv-app<br/>website"]
-            graf["dsv-analytics<br/>Grafana"]
+        subgraph bronze["BRONZE: raw zone"]
+            st["Storage account stdsvstg01<br/>Entra ID only, no shared keys<br/>Firewall: deny by default,<br/>allow VM subnet + operator IP"]
+            subgraph cont["Blob container: dinesafe"]
+                recent["recent/ timestamped folders<br/>Dinesafe.csv<br/>newest 30 kept"]
+                hist["historical/ timestamped folders<br/>yearly CSVs + _SUCCESS marker"]
+            end
+            prot["Blob versioning<br/>7-day soft delete<br/>Lifecycle: delete versions<br/>after 30 days"]
+        end
+
+        subgraph vm["VM vm-dsv-stg01, subnet snet-dsv-stg01-app, Docker Compose"]
+            subgraph etl["ETL: between layers"]
+                timer["systemd<br/>dsv-pipeline.timer<br/>Mon-Fri 07:30"]
+                deploy["scripts/deploy.sh<br/>load only"]
+                sh["scripts/pipeline.sh<br/>storage token from IMDS"]
+                pipe["dsv-pipeline container<br/>pipeline.py: ingest, load<br/>data.py: extract, validate<br/>refresh.py: transform"]
+            end
+
+            subgraph silver["SILVER: serving zone"]
+                db[("dsv-db Postgres<br/>inspections<br/>load_log")]
+                vol[/"Docker volume<br/>dsv-db-data"/]
+            end
+
+            subgraph gold["GOLD: aggregated on read"]
+                app["dsv-app Flask website<br/>home stats cache in memory"]
+                graf["Inspections dashboard<br/>(Grafana)<br/>dsv-analytics"]
+                edge["dsv-nginx<br/>dsv-tunnel"]
+            end
         end
     end
 
-    timer -- starts --> pipe
-    mi -. "storage token" .-> pipe
-    kv -. ".env passwords" .-> vm
-    tod -- "1. download CSV + ZIP" --> pipe
-    pipe -- "2. upload raw files" --> blob
-    blob -- "3. read raw files" --> pipe
-    pipe -- "4. write rows" --> db
-    db -- "read only,<br/>GOLD on read" --> app
-    db -- "read only,<br/>GOLD on read" --> graf
+    timer -- "pipeline.sh run" --> sh
+    deploy -- "pipeline.sh load" --> sh
+    sh -- "compose run" --> pipe
+    mi -. "Storage Blob Data<br/>Contributor token" .-> sh
+    kv -. "Key Vault Secrets User:<br/>passwords to .env" .-> vm
+    tod -- "1. extract" --> pipe
+    pipe -- "2. upload raw files" --> cont
+    st --- cont
+    st --- prot
+    cont -- "3. read raw files" --> pipe
+    pipe -- "4. COPY rows as<br/>dinesafe_migrator" --> db
+    db --- vol
+    db -- "SELECT as<br/>dinesafe_app" --> app
+    db -- "SELECT as<br/>dinesafe_app" --> graf
+    app --> edge
+    graf --> edge
+    edge -- "Cloudflare Tunnel" --> visitors
 ```
 
-| Component       | Pulls                   | Transforms              | Stores                         |
-| --------------- | ----------------------- | ----------------------- | ------------------------------ |
-| `dsv-pipeline`  | Toronto Open Data, Blob | Yes, in memory          | Nothing. One-shot container.   |
-| Blob `dinesafe` | —                       | No                      | Raw files, as downloaded       |
-| `dsv-db`        | —                       | No                      | `inspections` and `load_log`   |
-| `dsv-app`       | `dsv-db`                | Aggregates per request  | A small stats cache, in memory |
-| `dsv-analytics` | `dsv-db`                | Aggregates per request  | Nothing                        |
+| Component                             | Layer  | Pulls                   | Transforms             | Stores                         |
+| ------------------------------------- | ------ | ----------------------- | ---------------------- | ------------------------------ |
+| Storage account, container `dinesafe` | Bronze | —                       | No                     | Raw files, as downloaded       |
+| `dsv-pipeline`                        | ETL    | Toronto Open Data, Blob | Yes, in memory         | Nothing. One-shot container.   |
+| `dsv-db`, volume `dsv-db-data`        | Silver | —                       | No                     | `inspections` and `load_log`   |
+| `dsv-app`                             | Gold   | `dsv-db`                | Aggregates per request | A small stats cache, in memory |
+| Inspections dashboard (Grafana)       | Gold   | `dsv-db`                | Aggregates per request | Nothing                        |
+| Managed identity, Key Vault           | All    | —                       | No                     | DB passwords (Key Vault)       |
 
-- Same layout in stg and prod. Dev reads stg's storage, read-only.
-- Only `dsv-pipeline` can reach the internet. The app and Grafana can't.
+- Same layout in stg and prod. Dev has no Azure resources of its own: it reads
+  stg's raw zone, read-only, and runs the rest on your workstation.
+- Only `dsv-pipeline` can reach the internet. The app and the inspections
+  dashboard (Grafana) can't.
 - Only the VM's managed identity can write to Blob. There are no storage keys.
+- Containers can't reach IMDS. `scripts/pipeline.sh` gets the storage token on
+  the host and mounts it into the container.
+- The inspections dashboard (Grafana) shows statistics about the dataset. It
+  isn't used to monitor the app or the VM.
 
 For details, see [App architecture](2-app-architecture.md),
 [Data operations](3-7-data-operations.md#access-and-credentials), and
@@ -117,21 +160,22 @@ writes it, and nothing else does.
 - Three database roles, each with least access:
   - Superuser: creates the schema only.
   - `dinesafe_migrator`: the pipeline. Read, insert, and delete.
-  - `dinesafe_app`: the app and Grafana. Read only, with a 10-second query
-    timeout.
+  - `dinesafe_app`: the app and the inspections dashboard (Grafana). Read
+    only, with a 10-second query timeout.
 
 For details, see [Database](3-5-database.md) and
 [Data mapping](3-6-data-mapping.md).
 
 ### Gold: aggregated on read
 
-Gold data isn't stored. The app and Grafana build it from silver on each
-request.
+Gold data isn't stored. The app and the inspections dashboard (Grafana) build
+it from silver on each request.
 
 - The app groups inspections by day and establishment, and works out year and
   quarter ranges.
 - The home page stats are cached in the app's memory for a short time.
-- Grafana dashboards run their own aggregate queries.
+- The inspections dashboard (Grafana) runs its own aggregate queries on every
+  load.
 - Every query filters on `inspection_date`, which is the table's only index.
 
 For details, see [Data readers](3-9-data-readers.md).
@@ -142,16 +186,35 @@ Three pipelines move data between the layers. `ingest` fills bronze. `seed` and
 `refresh` fill silver from bronze. They're separate steps, and only the
 scheduled run does both.
 
-| Pipeline  | From → to         | Contacts Toronto? | Runs when                      |
-| --------- | ----------------- | ----------------- | ------------------------------ |
-| `ingest`  | Toronto → bronze  | Yes               | Scheduled run, or by hand      |
-| `seed`    | Bronze → silver   | No                | Load step, table is empty      |
-| `refresh` | Bronze → silver   | No                | Load step, newer file in Blob  |
+Every pipeline runs through one entry point:
+`scripts/pipeline.sh <env> <command>`. It gets a storage token on the host, then starts the one-shot
+`dsv-pipeline` container, which runs `pipeline.py <command>`. The command
+decides which pipelines run:
+
+| Command  | Runs                                         | Started by                                    |
+| -------- | -------------------------------------------- | --------------------------------------------- |
+| `run`    | `ingest`, then the load step, then freshness | `dsv-pipeline.timer` → `dsv-pipeline.service` |
+| `load`   | The load step: `seed`, `refresh`, or skip    | `scripts/deploy.sh`, on every deploy          |
+| `ingest` | `ingest` only                                | An operator, by hand                          |
+
+The load step picks `seed` or `refresh` on its own, from the state of the
+database:
+
+| Pipeline  | From → to        | Contacts Toronto? | Runs when                     | Code                                        |
+| --------- | ---------------- | ----------------- | ----------------------------- | ------------------------------------------- |
+| `ingest`  | Toronto → bronze | Yes               | `run` or `ingest`             | `data.py: ingest`                           |
+| `seed`    | Bronze → silver  | No                | Load step, table is empty     | `pipeline.py: load` → `refresh.py: seed`    |
+| `refresh` | Bronze → silver  | No                | Load step, newer file in Blob | `pipeline.py: load` → `refresh.py: refresh` |
+
+All code paths are under `src/dsv-db/`.
 
 ### Ingest: Toronto Open Data to bronze
 
 Ingest copies new files from Toronto Open Data to Blob Storage. It never
 touches the database.
+
+- **Run by:** `dsv-pipeline.timer` (`pipeline.sh <env> run`), or by hand with
+  `scripts/pipeline.sh <env> ingest`. Deploys never ingest.
 
 ```mermaid
 flowchart LR
@@ -175,6 +238,9 @@ For details, see [Data ingest](3-8-data-ingest.md).
 A seed fills an empty `inspections` table from the raw zone. It runs as part
 of the load step whenever the table is empty.
 
+- **Run by:** `scripts/deploy.sh` (`pipeline.sh <env> load`) on the first
+  deploy. The timer's `run` also seeds if it finds the table empty.
+
 ```mermaid
 flowchart LR
     load(["load:<br/>table empty"]) --> read["Extract: read historical<br/>+ newest recent CSV<br/>from Blob"]
@@ -191,6 +257,12 @@ For details, see [Data mapping](3-6-data-mapping.md).
 
 A refresh replaces the recent rows with the newest recent file. The systemd
 timer runs it on weekday mornings, right after ingest.
+
+- **Run by:** `dsv-pipeline.timer` (`pipeline.sh <env> run`), Monday to Friday
+  at 07:30 Toronto time, plus a random delay of up to 10 minutes. Every
+  redeploy also runs it through `scripts/deploy.sh`
+  (`pipeline.sh <env> load`), and `scripts/pipeline.sh <env> load --force` reloads the newest file
+  by hand.
 
 ```mermaid
 flowchart LR
@@ -227,14 +299,14 @@ only load from the raw zone.
 > In a new environment, you must ingest before the first deploy. Run
 > `scripts/pipeline.sh <env> ingest`, then `scripts/deploy.sh`.
 
-| Event                          | Bronze (Blob)                | Silver (Postgres)                                                                      |
-| ------------------------------ | ---------------------------- | -------------------------------------------------------------------------------------- |
-| First deploy, empty raw zone   | Untouched                    | Schema created. The load fails, and the deploy fails with an empty database.           |
-| First deploy, raw zone filled  | Read only                    | Schema created, then **seed**.                                                         |
-| Redeploy                       | Read only                    | Migrations rerun. Then **refresh** if Blob has a newer file, otherwise skip.           |
-| Restart or `docker compose up` | Untouched                    | Untouched. The pipeline isn't started by `up`.                                         |
-| Scheduled run                  | New folder if Toronto changed | **Refresh** or skip, then the staleness check.                                        |
-| Database volume destroyed      | Untouched                    | Lost. The next deploy is a first deploy, so it seeds from the raw zone.                |
+| Event                          | Bronze (Blob)                 | Silver (Postgres)                                                            |
+| ------------------------------ | ----------------------------- | ---------------------------------------------------------------------------- |
+| First deploy, empty raw zone   | Untouched                     | Schema created. The load fails, and the deploy fails with an empty database. |
+| First deploy, raw zone filled  | Read only                     | Schema created, then **seed**.                                               |
+| Redeploy                       | Read only                     | Migrations rerun. Then **refresh** if Blob has a newer file, otherwise skip. |
+| Restart or `docker compose up` | Untouched                     | Untouched. The pipeline isn't started by `up`.                               |
+| Scheduled run                  | New folder if Toronto changed | **Refresh** or skip, then the staleness check.                               |
+| Database volume destroyed      | Untouched                     | Lost. The next deploy is a first deploy, so it seeds from the raw zone.      |
 
 - On every deploy, `deploy.sh` reruns the migrations, then runs the load step.
   Migrations are idempotent.

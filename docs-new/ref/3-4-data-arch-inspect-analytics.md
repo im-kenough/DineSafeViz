@@ -1,8 +1,11 @@
 # Inspection Analytics
 
-### Grafana dashboard
+### Inspections dashboard (Grafana)
 
-`/dashboard` embeds the Grafana dashboard
+The inspections dashboard (Grafana) shows statistics and metrics about the
+DineSafe dataset. It isn't used to monitor the app or its infrastructure.
+
+`/dashboard` embeds the inspections dashboard (Grafana)
 `/analytics/d/dinesafe/dinesafe-inspections?kiosk` in an iframe. Visitors see
 it as anonymous Viewers.
 
