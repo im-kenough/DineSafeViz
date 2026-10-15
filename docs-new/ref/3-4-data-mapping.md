@@ -4,25 +4,9 @@ Two source schemas map into one table. The recent and historical CSVs use
 different column names, and each has columns the other lacks. For the source
 files themselves, see [Data sources](3-2-data-sources.md).
 
-### Load path
-
 Seed and refresh run the same row transforms from `src/dsv-db/refresh.py`.
-They differ in what they delete and which files they read.
-
-```mermaid
-flowchart LR
-    rc["Recent CSV"] --> rmap["Decode, map_row()<br/>RECENT_COLUMN_MAP"]
-    rmap --> dd["drop_old_id_<br/>duplicates()"]
-    dd --> cut{{"cutoff = earliest<br/>inspection_date"}}
-    cut -- seed --> hist["Each historical CSV:<br/>decode, map_row()<br/>HISTORICAL_COLUMN_MAP,<br/>drop rows on or after cutoff"]
-    hist --> hcopy["COPY historical rows"] --> rcopy["COPY recent rows"]
-    cut -- refresh --> del["DELETE rows on<br/>or after cutoff"] --> rcopy
-    rcopy --> log["INSERT load_log<br/>COMMIT"]
-```
-
-- Historical files load one at a time, in file name order, to cap memory.
-- `seed()` and `refresh()` never commit. `pipeline.py` adds the `load_log`
-  row and commits once.
+For the load path and the order of the transform steps, see
+[Transformations](datapipe-seed.md#transformations).
 
 ### Column mapping
 
@@ -58,28 +42,12 @@ Source columns that aren't stored:
 - **Recent:** `_id`, `phone`, and `observation`. `oldEstId` is read for
   de-duplication, then dropped.
 
-### Transformations
+### De-duplication
 
-Every row goes through these steps, in order.
-
-| #   | Step      | Code                       | Columns                                        | Before → after                                                     |
-| --- | --------- | -------------------------- | ---------------------------------------------- | ------------------------------------------------------------------ |
-| 1   | Decode    | `csv_encoding()`           | Whole file                                     | UTF-8 (BOM-tolerant), else cp1252. Only the 2023 historical file is cp1252. |
-| 2   | Rename    | `map_row()`                | All mapped                                     | `estId` → `establishment_id`                                       |
-| 3   | Fill gaps | `map_row()`                | The other era's columns                        | Missing → `NULL`                                                   |
-| 4   | Nulls     | `normalize()`              | All mapped                                     | `"None"` or `""` → `NULL`                                          |
-| 5   | Dates     | `normalize_date()`         | `inspection_date`                              | `10/24/2023` → `2023-10-24` (2023 historical file only)            |
-| 6   | Address   | `split_address()`          | `establishment_address` → `street`, `unit`, `postal_code` | `3155 Markham Rd Unit-D1 M1X 0B5` → `3155 Markham Rd`, `Unit-D1`, `M1X 0B5` |
-| 7   | De-dupe   | `drop_old_id_duplicates()` | Recent `estId`, `oldEstId`, `inspectionDate`   | Drops the numeric-ID copy of an inspection: 3,996 rows             |
-| 8   | Overlap   | `exclude_on_or_after()`    | Historical `inspection_date`                   | Drops rows on or after the cutoff (2023-11-10): 4,791 rows         |
-| 9   | Escape    | `bulk_insert()`            | All                                            | Tab, CR, LF in values → space. `NULL` → `\N`.                      |
-| 10  | Cast      | Postgres `COPY`            | `inspection_date`, `latitude`, `longitude`     | Text → `DATE` or `DOUBLE PRECISION`. One bad value fails the load. |
-
-- Row counts are from the October 14, 2026 data.
-- De-dupe rule: drop a row when another row has `oldEstId` equal to its
-  `estId`, on the same date, under a different `estId`.
-- Overlap rule: the cutoff is computed after de-dupe. Rows with no date are
-  kept.
+`drop_old_id_duplicates()` drops a recent row when another row has `oldEstId`
+equal to its `estId`, on the same date, under a different `estId`. That
+removes the numeric-ID copy of an inspection: 3,996 rows in the October 14,
+2026 data.
 
 ### Address split
 

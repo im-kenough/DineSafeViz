@@ -22,7 +22,7 @@ DineSafeViz combines two datasets from the package:
   historical data still uses the old one.
 - **Overlap:** November 10 to December 29, 2023 is in both datasets.
   DineSafeViz keeps the recent rows for that window and drops the historical
-  ones. See [Load path](3-6-data-mapping.md#load-path).
+  ones. See [Seed pipeline](datapipe-seed.md#transformations).
 
 ### Files in the package
 
@@ -97,14 +97,14 @@ These quirks affect anyone who reads or loads the recent data.
     inspection.
   - October 2, 2026: new rows were appended at the end with the next `_id`
     values, sorted by name within each batch.
-  - Don't rely on `_id` or row order. The load uses neither: it replaces
-    every row on or after the file's earliest `inspectionDate`.
+  - Don't rely on `_id` or row order. See
+    [The recent window](datapipe-refresh.md#the-recent-window).
 - **Backfill:** a publish can add inspections dated as far back as November
   2023, not only the latest ones.
 - **Duplicate inspections:** 3,996 rows dated November 13, 2023 to November
   7, 2025 repeat an inspection under the old numeric `estId`. The new-ID copy
   has `oldEstId` pointing back to it. The load drops the numeric-ID copy. See
-  [Transformations](3-6-data-mapping.md#transformations).
+  [De-duplication](3-6-data-mapping.md#de-duplication).
 - **Numeric-ID rows:** every row with a numeric `estId` is dated on or
   before November 7, 2025, and has `phone` set to `None`.
 - **Status isn't the worst severity:** `inspectionStatus` comes from the
