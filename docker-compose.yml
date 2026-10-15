@@ -1,9 +1,11 @@
 name: dsv
 
 # Where the database is, shared by every service that connects to it.
+# Postgres's default port. dsv-db publishes no ports, so only containers on
+# the stack's network can reach it, and changing the port would gain nothing.
 x-db-env: &db-env
   DSV_DB_HOST: dsv-db
-  DSV_DB_PORT: ${DSV_DB_PORT}
+  DSV_DB_PORT: "5432"
   DSV_DB_NAME: ${DSV_DB_NAME}
 
 # Read-only app-role DB connection, shared by dsv-app and dsv-analytics.
@@ -56,7 +58,7 @@ services:
       # (/var/lib/postgresql/18/docker), so mount the parent directory.
       - dsv-db-data:/var/lib/postgresql
       # Run once, on an empty volume. Migrations aren't mounted: deploy.sh
-      # applies src/dsv-db/migrations/ on every deploy, before the load.
+      # and pipeline.sh apply src/dsv-db/migrations/ before every load.
       - ./src/dsv-db/init.sql:/docker-entrypoint-initdb.d/init.sql
       - ./src/dsv-db/set-passwords.sh:/docker-entrypoint-initdb.d/set-passwords.sh:ro
     healthcheck:

@@ -45,9 +45,11 @@ def decide(table_empty, loaded, newest, force):
     last seed didn't use. Otherwise refresh unless the newest recent file is
     already loaded.
     """
-    if table_empty or (newest[1] is not None and newest[1] != loaded[1]):
+    last_recent, last_historical = loaded
+    newest_recent, newest_historical = newest
+    if table_empty or (newest_historical is not None and newest_historical != last_historical):
         return "seed"
-    if force or loaded[0] != newest[0]:
+    if force or last_recent != newest_recent:
         return "refresh"
     return "skip"
 
@@ -69,9 +71,8 @@ def load(store, conn, force=False):
     load in load_log, and commits. On any error nothing is committed.
     Returns "seed", "refresh", or "skip".
     """
-    recent_path = data.require_newest_recent(store)[0]
-    historical = data.newest_historical(store)
-    historical_path = historical[0] if historical else None
+    recent_path, _ = data.require_newest_recent(store)
+    historical_path, historical_names = data.newest_historical(store) or (None, None)
     with conn.cursor() as cur:
         cur.execute("SELECT pg_advisory_xact_lock(%s)", (LOAD_LOCK,))
     action = decide(loader.is_empty(conn), loader.last_load(conn), (recent_path, historical_path), force)
@@ -79,7 +80,7 @@ def load(store, conn, force=False):
         print(f"Already current: {recent_path} is loaded.")
         conn.rollback()  # releases the lock
         return action
-    if action == "seed" and historical is None:
+    if action == "seed" and historical_path is None:
         raise DataError(
             f"{data.HISTORICAL_PREFIX} has no complete folder. "
             "Run: scripts/pipeline.sh <env> ingest --historical"
@@ -90,7 +91,7 @@ def load(store, conn, force=False):
         store.download_to(recent_path, recent_csv)
         if action == "seed":
             print(f"Seeding from {historical_path} and {recent_path} ...")
-            deleted, inserted = loader.seed(conn, recent_csv, _download_each(store, historical[1], tmp))
+            deleted, inserted = loader.seed(conn, recent_csv, _download_each(store, historical_names, tmp))
         else:
             deleted, inserted = loader.refresh(conn, recent_csv)
     # Only seeds record a historical folder.

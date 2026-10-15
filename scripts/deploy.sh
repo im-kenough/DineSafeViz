@@ -55,12 +55,10 @@ start_stack() {
 # raw-zone data (scripts/pipeline.sh <env> load). Migrations are idempotent.
 # A failed load keeps the site up on the data it has, unless there's none.
 load_data() {
-  local env_name=$1 migration has_rows
-  for migration in src/dsv-db/migrations/*.sql; do
-    docker compose exec -T dsv-db sh -c \
-      'psql -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <"$migration" \
-      || fail dsv-db
-  done
+  local env_name=$1 has_rows
+  # pipeline.sh applies them too; migrating here first makes a failed
+  # migration fail the deploy, not just the load.
+  apply_migrations || fail dsv-db
   if scripts/pipeline.sh "$env_name" load; then
     return
   fi

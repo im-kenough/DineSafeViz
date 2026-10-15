@@ -13,6 +13,7 @@ import io
 import itertools
 import os
 import re
+from typing import NamedTuple
 
 import psycopg2
 
@@ -119,11 +120,6 @@ _POSTAL_RE = re.compile(r"^(?P<rest>.*) (?:(?P<postal>[A-Z]\d[A-Z] \w+)|None)$")
 _UNIT_RE = re.compile(r"^(?P<street>[^,]*?),? (?P<unit>[A-Za-z]+-.*)$")
 
 
-def is_unparsed_address(address):
-    """True for a recent-feed address that doesn't end in a postal code or "None"."""
-    return bool(address) and not _POSTAL_RE.match(address)
-
-
 def split_address(address):
     """Split a DineSafe address into (street, unit, postal_code).
 
@@ -206,7 +202,13 @@ def is_empty(conn):
         return cur.fetchone() is None
 
 
-_COPY_ESCAPES = str.maketrans({"\\": "\\\\", "\t": " ", "\r": " ", "\n": " "})
+def _copy_escape(value):
+    """Escape a value for COPY's text format: double backslashes, which COPY
+    reads as escapes, and turn tabs, carriage returns, and newlines into
+    spaces. Chained replace() is several times faster here than
+    str.translate with a dict table, which runs once per field per row.
+    """
+    return value.replace("\\", "\\\\").replace("\t", " ").replace("\r", " ").replace("\n", " ")
 
 
 def bulk_insert(conn, rows):
@@ -214,9 +216,8 @@ def bulk_insert(conn, rows):
 
     Takes any iterable, so rows can stream from a CSV. Each batch is a
     tab-separated StringIO buffer in COPY's text format. None values become
-    \\N (the null marker), and _COPY_ESCAPES doubles backslashes, which COPY
-    reads as escapes, and turns tabs, carriage returns, and newlines into
-    spaces. Returns the row count.
+    \\N (the null marker), and the rest go through _copy_escape. Returns the
+    row count.
     """
     inserted = 0
     with conn.cursor() as cur:
@@ -224,7 +225,7 @@ def bulk_insert(conn, rows):
             buf = io.StringIO()
             for row in batch:
                 line = "\t".join(
-                    "\\N" if row[col] is None else str(row[col]).translate(_COPY_ESCAPES)
+                    "\\N" if row[col] is None else _copy_escape(str(row[col]))
                     for col in INSPECTIONS_COLUMNS
                 )
                 buf.write(line + "\n")
@@ -284,13 +285,19 @@ def _insert_historical_csv(conn, csv_path, cutoff):
     return inserted
 
 
-def scan_recent(csv_path, encoding=None):
-    """First pass over the recent CSV, so the insert pass can stream.
+class RecentScan(NamedTuple):
+    """What the insert pass over the recent CSV needs from the first pass."""
+    path: str
+    encoding: str
+    cutoff: str   # earliest inspection_date
+    keys: set     # (old ID, date) pairs that drop_old_id_duplicates drops
+    total: int    # row count
 
-    Returns (cutoff, keys, total): the earliest inspection_date, the
-    (old ID, date) pairs that drop_old_id_duplicates drops, and the row count.
-    """
+
+def scan_recent(csv_path):
+    """First pass over the recent CSV, so the insert pass can stream."""
     print(f"Reading recent data from {csv_path} ...")
+    encoding = csv_encoding(csv_path)
     cutoff, keys, total, unparsed = None, set(), 0, 0
     for r in _read_csv_rows(csv_path, RECENT_COLUMN_MAP, encoding):
         total += 1
@@ -300,19 +307,20 @@ def scan_recent(csv_path, encoding=None):
         old_id = r["old_establishment_id"]
         if old_id and old_id != r["establishment_id"]:
             keys.add((old_id, date))
-        unparsed += is_unparsed_address(r["establishment_address"])
+        address = r["establishment_address"]
+        unparsed += bool(address) and not _POSTAL_RE.match(address)
     if cutoff is None:
         raise ValueError(f"{csv_path} has no inspection dates")
     # Non-zero means the upstream address format changed; the raw address is kept in street.
     print(f"  Unparsed recent addresses: {unparsed}")
-    return cutoff, keys, total
+    return RecentScan(csv_path, encoding, cutoff, keys, total)
 
 
-def _insert_recent(conn, csv_path, encoding, keys, total):
+def _insert_recent(conn, scan):
     """Stream the recent CSV into inspections, without old-ID duplicates."""
-    rows = _read_csv_rows(csv_path, RECENT_COLUMN_MAP, encoding)
-    inserted = bulk_insert(conn, drop_old_id_duplicates(rows, keys))
-    print(f"  Dropped old-ID duplicate rows: {total - inserted}")
+    rows = _read_csv_rows(scan.path, RECENT_COLUMN_MAP, scan.encoding)
+    inserted = bulk_insert(conn, drop_old_id_duplicates(rows, scan.keys))
+    print(f"  Dropped old-ID duplicate rows: {scan.total - inserted}")
     print(f"  Loaded recent CSV: {inserted} rows")
     return inserted
 
@@ -324,13 +332,12 @@ def seed(conn, recent_csv, historical_csvs):
     at a time, so the caller can fetch each just before it's needed.
     Doesn't commit. Returns (rows deleted, rows inserted).
     """
-    encoding = csv_encoding(recent_csv)
-    cutoff, keys, total = scan_recent(recent_csv, encoding)
+    scan = scan_recent(recent_csv)
     with conn.cursor() as cur:
         cur.execute("DELETE FROM inspections")
         deleted = cur.rowcount
-    inserted = sum(_insert_historical_csv(conn, path, cutoff) for path in historical_csvs)
-    inserted += _insert_recent(conn, recent_csv, encoding, keys, total)
+    inserted = sum(_insert_historical_csv(conn, path, scan.cutoff) for path in historical_csvs)
+    inserted += _insert_recent(conn, scan)
     return deleted, inserted
 
 
@@ -341,12 +348,11 @@ def refresh(conn, recent_csv):
     single transaction covers the delete, the insert, and the log row.
     Returns (rows deleted, rows inserted).
     """
-    encoding = csv_encoding(recent_csv)
-    cutoff, keys, total = scan_recent(recent_csv, encoding)
+    scan = scan_recent(recent_csv)
     with conn.cursor() as cur:
-        cur.execute("DELETE FROM inspections WHERE inspection_date >= %s", (cutoff,))
+        cur.execute("DELETE FROM inspections WHERE inspection_date >= %s", (scan.cutoff,))
         deleted = cur.rowcount
-    return deleted, _insert_recent(conn, recent_csv, encoding, keys, total)
+    return deleted, _insert_recent(conn, scan)
 
 
 # ---------------------------------------------------------------------------

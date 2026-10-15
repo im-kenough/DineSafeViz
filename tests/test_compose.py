@@ -44,6 +44,13 @@ def test_local_db_role_passwords_default_to_todays_values(local):
     assert env["DSV_DB_MIGRATOR_PASSWORD"] == "dinesafe_migrator"
 
 
+# Postgres always listens on 5432 inside dsv-db, so clients can't be told otherwise.
+@pytest.mark.parametrize("name", ["dsv-app", "dsv-analytics", "dsv-pipeline"])
+def test_db_clients_use_postgres_default_port(local, name):
+    env = local["services"][name]["environment"]
+    assert (env["DSV_DB_HOST"], env["DSV_DB_PORT"]) == ("dsv-db", "5432")
+
+
 def test_local_db_runs_set_passwords_after_init_sql(local):
     targets = sorted(
         v["target"]
@@ -94,6 +101,11 @@ def test_vm_long_running_services_restart_and_are_hardened(vm, name):
         "options": {"max-size": "10m", "max-file": "3"},
     }
     assert "mem_limit" in svc
+
+
+@pytest.mark.parametrize("name", LONG_RUNNING + ONE_SHOT)
+def test_vm_services_drop_all_capabilities(vm, name):
+    assert vm["services"][name]["cap_drop"] == ["ALL"]
 
 
 @pytest.mark.parametrize("name", ONE_SHOT)

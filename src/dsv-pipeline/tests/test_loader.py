@@ -43,8 +43,8 @@ class TestScanRecent:
     def test_cutoff_is_the_earliest_date_skipping_blanks(self, tmp_path):
         p = recent_csv(tmp_path / "r.csv", [recent_row("1", "2024-03-06"), recent_row("2", ""),
                                             recent_row("3", "2023-11-10")])
-        cutoff, _, total = scan_recent(str(p))
-        assert (cutoff, total) == ("2023-11-10", 3)
+        scan = scan_recent(str(p))
+        assert (scan.cutoff, scan.total) == ("2023-11-10", 3)
 
     def test_collects_old_id_keys(self, tmp_path):
         p = recent_csv(tmp_path / "r.csv", [
@@ -52,8 +52,7 @@ class TestScanRecent:
             recent_row("10820991", "2025-08-18", oldEstId="10820991"),
             recent_row("001Vo000013QjdPIAS", "2026-04-21"),
         ])
-        _, keys, _ = scan_recent(str(p))
-        assert keys == {("10820991", "2025-08-18")}
+        assert scan_recent(str(p)).keys == {("10820991", "2025-08-18")}
 
     def test_reports_unparsed_addresses(self, tmp_path, capsys):
         # Recent addresses always end in a postal code or "None"; anything

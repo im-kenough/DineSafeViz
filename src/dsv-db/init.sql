@@ -41,7 +41,7 @@ GRANT SELECT ON TABLE inspections TO dinesafe_app; -- SELECT only: Flask app is 
 ALTER ROLE dinesafe_app SET statement_timeout = '10s';
 
 -- Table and sequence grants for dinesafe_migrator are in migrations/001,
--- which deploy.sh applies before the first load.
+-- which deploy.sh and pipeline.sh apply before every load.
 GRANT CONNECT ON DATABASE :"DBNAME" TO dinesafe_migrator;
 GRANT USAGE   ON SCHEMA public       TO dinesafe_migrator;
 

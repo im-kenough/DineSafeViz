@@ -1,4 +1,5 @@
 """Start the real Postgres image with this repo's init scripts, for tests."""
+import re
 import subprocess
 import time
 import uuid
@@ -13,6 +14,8 @@ INIT_FILES = {
     "set-passwords.sh": DB_DIR / "set-passwords.sh",
 }
 MIGRATIONS = sorted((DB_DIR / "migrations").glob("*.sql"))
+# Read from apply_migrations, so these tests run the real command line.
+MIGRATE_PSQL = re.search(r"'(psql [^']*)'", (ROOT / "scripts" / "lib.sh").read_text())[1]
 
 
 def docker(*args, check=True):
@@ -59,15 +62,19 @@ def wait_ready(name, timeout=90):
     raise TimeoutError(f"{name} didn't become ready in {timeout}s")
 
 
+def run_migration(name, sql):
+    """Run sql through apply_migrations' own psql command line."""
+    return subprocess.run(
+        ["docker", "exec", "-i", name, "sh", "-c", MIGRATE_PSQL],
+        input=sql, capture_output=True, text=True, timeout=60,
+    )
+
+
 def migrate(name):
-    """Apply every migration as the superuser, the way deploy.sh does."""
+    """Apply every migration as the superuser, the way apply_migrations in
+    scripts/lib.sh does."""
     for migration in MIGRATIONS:
-        with open(migration) as f:
-            result = subprocess.run(
-                ["docker", "exec", "-i", name, "sh", "-c",
-                 'psql -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'],
-                stdin=f, capture_output=True, text=True, timeout=60,
-            )
+        result = run_migration(name, migration.read_text())
         if result.returncode != 0:
             return result
     return result
