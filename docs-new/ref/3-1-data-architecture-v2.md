@@ -33,13 +33,10 @@ Modifications:
 
 ## Infrastructure
 
-Each environment has its own Azure subscription and resource group. The
-diagram groups every Azure resource and app component that handles data by
-medallion layer. The ETL group sits between the layers, because it moves data
-from one to the next. Identity and secrets serve every layer.
-
-The diagram uses stg names. prod uses the same names with `prod01` in place of
-`stg01`.
+This section shows the stg environment. The diagram groups every Azure resource
+and app component that handles data by medallion layer. The ETL group sits
+between the layers, because it moves data from one to the next. Identity and
+secrets serve every layer.
 
 ```mermaid
 flowchart LR
@@ -110,8 +107,8 @@ flowchart LR
 | Inspections dashboard (Grafana)       | Gold   | `dsv-db`                | Aggregates per request | Nothing                        |
 | Managed identity, Key Vault           | All    | —                       | No                     | DB passwords (Key Vault)       |
 
-- Same layout in stg and prod. Dev has no Azure resources of its own: it reads
-  stg's raw zone, read-only, and runs the rest on your workstation.
+- Dev has no Azure resources of its own: it reads stg's raw zone, read-only,
+  and runs the rest on your workstation.
 - Only `dsv-pipeline` can reach the internet. The app and the inspections
   dashboard (Grafana) can't.
 - Only the VM's managed identity can write to Blob. There are no storage keys.
@@ -134,6 +131,43 @@ silver feeds gold.
 The raw zone holds the source files exactly as Toronto Open Data published
 them. It's the source of truth for everything downstream.
 
+```mermaid
+flowchart LR
+    ingest["dsv-pipeline: ingest<br/>data.py"]
+
+    subgraph st["Storage account stdsvstg01"]
+        fw["Firewall and auth<br/>Entra ID only<br/>deny by default"]
+        subgraph cont["Container dinesafe"]
+            recent["recent/UTC-stamp/<br/>Dinesafe.csv<br/>metadata: source_last_modified"]
+            hist["historical/UTC-stamp/<br/>yearly CSVs<br/>_SUCCESS written last"]
+        end
+        prot["Versioning<br/>7-day soft delete<br/>lifecycle rule"]
+    end
+
+    load["dsv-pipeline: load<br/>seed or refresh"]
+    fresh["dsv-pipeline: check_fresh"]
+    dev["Dev workstation<br/>read-only, stg only"]
+
+    ingest -- "validated files,<br/>new folder each run" --> fw
+    fw --> cont
+    ingest -. "prune_recent:<br/>keep newest 30" .-> recent
+    prot -. "protects" .- cont
+    recent -- "newest folder" --> load
+    hist -- "newest complete<br/>folder, seed only" --> load
+    recent -- "source_last_modified" --> fresh
+    recent --> dev
+```
+
+| Component                       | What it does                                                                                                         |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `ingest` (`data.py`)            | The only writer. Downloads from Toronto Open Data, validates, and uploads to a new folder.                           |
+| Storage firewall and auth       | Accepts Entra ID tokens only, from the VM subnet and the operator's IP. The VM's managed identity can write.         |
+| `recent/` folders               | One folder per changed recent file. The blob's `source_last_modified` metadata records when Toronto last changed it. |
+| `historical/` folders           | The yearly CSVs from the historical ZIP. `_SUCCESS` marks a folder as complete, so a partial upload is never read.   |
+| `prune_recent`                  | Runs after each recent upload. Deletes all but the newest 30 recent folders, and never the newest.                   |
+| Versioning, soft delete, rule   | Keeps deleted blobs for 7 days and old versions for 30 days, so a bad delete or overwrite can be undone.             |
+| `load`, `check_fresh` (readers) | `load` reads the newest folders for silver. `check_fresh` reads the metadata to warn when data is over 10 days old.  |
+
 - Two source files:
   - **Recent:** `Dinesafe.csv`, November 2023 to today. Updated often.
   - **Historical:** a ZIP of yearly CSVs, 2001 to 2023. Downloaded once.
@@ -141,7 +175,6 @@ them. It's the source of truth for everything downstream.
   overwritten.
 - Files are validated before upload, so the raw zone only holds files that
   passed.
-- The newest 30 recent folders are kept.
 - The raw zone is the backup: it can rebuild the database without Toronto
   Open Data.
 
@@ -153,15 +186,45 @@ For details, see [Data sources](3-2-data-sources.md) and
 The serving zone holds cleaned rows in Postgres, ready to query. The pipeline
 writes it, and nothing else does.
 
-- Two tables:
-  - `inspections`: one row per infraction, about 508,000 rows.
-  - `load_log`: one row per successful load, recording which raw files it
-    loaded. This is the lineage from silver back to bronze.
-- Three database roles, each with least access:
-  - Superuser: creates the schema only.
-  - `dinesafe_migrator`: the pipeline. Read, insert, and delete.
-  - `dinesafe_app`: the app and the inspections dashboard (Grafana). Read
-    only, with a 10-second query timeout.
+```mermaid
+flowchart LR
+    xform["dsv-pipeline: load<br/>rows transformed<br/>in memory by refresh.py"]
+    schema["Schema setup<br/>new volume: init.sql,<br/>migrations, set-passwords.sh<br/>every deploy: migrations"]
+
+    subgraph db["dsv-db: Postgres container"]
+        lock["Advisory lock<br/>one load at a time"]
+        subgraph dinesafe["Database dinesafe"]
+            insp[("inspections<br/>one row per infraction<br/>index: inspection_date")]
+            log[("load_log<br/>one row per load<br/>which blobs were loaded")]
+        end
+        roles["Roles<br/>dinesafe_migrator: SELECT, INSERT, DELETE<br/>dinesafe_app: SELECT, 10 s timeout"]
+    end
+
+    vol[/"Docker volume<br/>dsv-db-data"/]
+    gold["Gold readers<br/>dsv-app, dashboard"]
+
+    schema --> dinesafe
+    xform -- "as dinesafe_migrator" --> lock
+    lock -- "DELETE window,<br/>COPY rows" --> insp
+    lock -- "INSERT, then COMMIT" --> log
+    roles -. "limits" .- dinesafe
+    dinesafe --- vol
+    insp -- "SELECT as<br/>dinesafe_app" --> gold
+```
+
+| Component            | What it does                                                                                                          |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Schema setup         | On a new volume, Postgres runs `init.sql`, the migrations, and `set-passwords.sh`. `deploy.sh` reruns the migrations. |
+| Advisory lock        | Makes a deploy's load and the timer's load take turns. The second one sees the first's `load_log` row and skips.      |
+| `inspections`        | The cleaned rows. One row per infraction. The index on `inspection_date` serves every reader.                         |
+| `load_log`           | One row per successful load: kind, blob paths, and row counts. This is the lineage from silver back to bronze.        |
+| Roles                | Least access per caller. The pipeline can't change the schema, and readers can't write.                               |
+| Volume `dsv-db-data` | Holds the database files. Survives restarts and redeploys. If it's removed, the next deploy seeds again from bronze.  |
+
+- `inspections` holds about 508,000 rows.
+- The superuser only creates and migrates the schema. The pipeline and the
+  readers never use it.
+- Postgres never transforms data. Rows arrive already cleaned.
 
 For details, see [Database](3-5-database.md) and
 [Data mapping](3-6-data-mapping.md).
@@ -171,12 +234,51 @@ For details, see [Database](3-5-database.md) and
 Gold data isn't stored. The app and the inspections dashboard (Grafana) build
 it from silver on each request.
 
-- The app groups inspections by day and establishment, and works out year and
-  quarter ranges.
-- The home page stats are cached in the app's memory for a short time.
-- The inspections dashboard (Grafana) runs its own aggregate queries on every
-  load.
-- Every query filters on `inspection_date`, which is the table's only index.
+```mermaid
+flowchart LR
+    db[("Silver: inspections<br/>SELECT as dinesafe_app")]
+
+    subgraph app["dsv-app: Flask website"]
+        stats["Home stats<br/>distinct inspections,<br/>first and last date<br/>cached 5 days"]
+        cal["Calendar view<br/>one month of rows,<br/>grouped by day<br/>and establishment"]
+        pages["Pages<br/>/, /info, /inspections,<br/>/dashboard iframe"]
+    end
+
+    subgraph graf["dsv-analytics: inspections dashboard (Grafana)"]
+        ds["Data source<br/>dinesafe-postgres"]
+        panels["Provisioned dashboard<br/>counts, pass rates, trends,<br/>by establishment type<br/>default: last 90 days"]
+    end
+
+    subgraph edge["Edge"]
+        nginx["dsv-nginx<br/>/ to dsv-app<br/>/analytics/ to dashboard"]
+        tunnel["dsv-tunnel<br/>cloudflared"]
+    end
+
+    visitors(["Visitors"])
+
+    db --> stats --> pages
+    db --> cal --> pages
+    db --> ds --> panels
+    pages --> nginx
+    panels --> nginx
+    nginx --> tunnel -- "Cloudflare Tunnel" --> visitors
+```
+
+| Component                       | What it does                                                                                                            |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Home stats (`dsv-app`)          | Counts distinct `(establishment_id, inspection_date)` pairs and the date range. Cached in memory for 5 days.            |
+| Calendar view (`dsv-app`)       | Fetches one month of rows by `inspection_date`, then groups them by day and establishment in Python.                    |
+| Pages (`dsv-app`)               | `/` and `/info` show the stats. `/inspections` shows the calendar. `/dashboard` embeds the dashboard in an iframe.      |
+| Data source `dinesafe-postgres` | Grafana's provisioned connection to `dsv-db`, as `dinesafe_app`.                                                        |
+| Provisioned dashboard           | SQL panels that aggregate on every load: totals, pass rates, trends, and breakdowns by establishment type and severity. |
+| `dsv-nginx`                     | Routes `/` to `dsv-app` and `/analytics/` to the dashboard.                                                             |
+| `dsv-tunnel`                    | Runs `cloudflared`, which carries traffic between Cloudflare and `dsv-nginx`. No inbound port is open for web traffic.  |
+
+- The calendar and dashboard queries filter on `inspection_date`, the table's
+  only index. The home stats query scans the whole table, which is why it's
+  cached.
+- The inspections dashboard (Grafana) shows statistics about the dataset. It
+  isn't used to monitor the app or the VM.
 
 For details, see [Data readers](3-9-data-readers.md).
 
