@@ -12,18 +12,16 @@ Each section links to a sub-document with the implementation details.
 
 ## Overview
 
-DineSafeViz uses the
-[medallion architecture](https://learn.microsoft.com/azure/databricks/lakehouse/medallion).
-The medallion pattern sorts data into layers. Each layer is cleaner and closer
-to what users need than the one before it:
+DineSafeViz adapts the
+[medallion architecture](https://learn.microsoft.com/azure/databricks/lakehouse/medallion), sorting data into layers, with each layer more refined.
 
-| Medallion layer | Meaning                                   | DineSafeViz                                       |
+| Medallion layer | Function                                   | DineSafeViz                                       |
 | --------------- | ----------------------------------------- | ------------------------------------------------- |
 | Bronze          | Raw data, exactly as the source sent it   | Blob container `dinesafe`, the *raw zone*         |
 | Silver          | Cleaned, validated, de-duplicated rows    | Postgres `inspections` table, the *serving zone*  |
 | Gold            | Aggregated, ready for a specific consumer | Not stored. The app and Grafana aggregate on read |
 
-The app adapts the pattern in two ways:
+Modifications:
 
 - **Two stored layers, not three.** Silver and gold share one Postgres
   database. At about 508,000 rows, query-time aggregation is fast enough, so a
@@ -32,8 +30,6 @@ The app adapts the pattern in two ways:
   stores it. DineSafeViz transforms data in the `dsv-pipeline` container, then
   loads finished rows into Postgres. Postgres never transforms data.
 
-For the reasons behind both choices, see
-[Design decisions](../explainations/99-design-decisions.md#etl-not-elt).
 
 ## Infrastructure
 
@@ -226,6 +222,11 @@ Deploys, redeploys, and restarts don't add layers. They're events that run
 some of the pipelines, or none. Deploys never contact Toronto Open Data: they
 only load from the raw zone.
 
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> In a new environment, you must ingest before the first deploy. Run
+> `scripts/pipeline.sh <env> ingest`, then `scripts/deploy.sh`.
+
 | Event                          | Bronze (Blob)                | Silver (Postgres)                                                                      |
 | ------------------------------ | ---------------------------- | -------------------------------------------------------------------------------------- |
 | First deploy, empty raw zone   | Untouched                    | Schema created. The load fails, and the deploy fails with an empty database.           |
@@ -234,11 +235,6 @@ only load from the raw zone.
 | Restart or `docker compose up` | Untouched                    | Untouched. The pipeline isn't started by `up`.                                         |
 | Scheduled run                  | New folder if Toronto changed | **Refresh** or skip, then the staleness check.                                        |
 | Database volume destroyed      | Untouched                    | Lost. The next deploy is a first deploy, so it seeds from the raw zone.                |
-
-<!-- prettier-ignore -->
-> [!IMPORTANT]
-> In a new environment, you must ingest before the first deploy. Run
-> `scripts/pipeline.sh <env> ingest`, then `scripts/deploy.sh`.
 
 - On every deploy, `deploy.sh` reruns the migrations, then runs the load step.
   Migrations are idempotent.

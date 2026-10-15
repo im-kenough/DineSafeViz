@@ -1,10 +1,6 @@
-# Design decisions
+# Design decisions - v0.5.0
 
-This page records design choices that aren't obvious from the code, and why
-DineSafeViz made them. Each entry gives the context, the decision, and what it
-costs.
-
-## v0.5.0
+This page documents design decisions make for `DineSafeViz` `v0.5.0`
 
 ## ETL, not ELT
 
