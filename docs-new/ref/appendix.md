@@ -19,8 +19,8 @@ leads to it.
 
 ### Where the colours are defined
 
-The colours live in two places, because the Grafana dashboard can't read CSS
-variables.
+The colours live in two places, because the inspections dashboard (Grafana)
+can't read CSS variables.
 
 - `src/dsv-app/static/style.css`: the `--dinesafe-*` tokens in `:root`.
 - `src/dsv-analytics/provisioning/dashboards/dinesafe.json`: hard-coded hex

@@ -10,10 +10,10 @@ grouped by primary actors.
 - The end user goes to the website.
 - The end user navigates to the inspection page.
 
-### UC-USR-02: View analytics dashboard
+### UC-USR-02: View inspections dashboard
 
 - The end user goes to the website.
-- The end user navigates to the dashboard page.
+- The end user navigates to the inspections dashboard (Grafana) page.
 
 ## Sysadmin use cases
 
