@@ -1,10 +1,16 @@
 name: dsv
 
+# Where the database is, shared by every service that connects to it.
+# Postgres's default port. dsv-db publishes no ports, so only containers on
+# the stack's network can reach it, and changing the port would gain nothing.
+x-db-env: &db-env
+  DSV_DB_HOST: dsv-db
+  DSV_DB_PORT: "5432"
+  DSV_DB_NAME: ${DSV_DB_NAME}
+
 # Read-only app-role DB connection, shared by dsv-app and dsv-analytics.
 x-db-app-env: &db-app-env
-  DSV_DB_HOST: dsv-db
-  DSV_DB_PORT: ${DSV_DB_PORT}
-  DSV_DB_NAME: ${DSV_DB_NAME}
+  <<: *db-env
   DSV_DB_USER: ${DSV_DB_APP_USER:-dinesafe_app}
   DSV_DB_PASSWORD: ${DSV_DB_APP_PASSWORD:-dinesafe_app}
 
@@ -26,7 +32,8 @@ services:
     build: ./src/dsv-app
     environment: *db-app-env
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      # busybox wget, not python -c: no interpreter cold start every 5s.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8000/healthz"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -50,10 +57,9 @@ services:
       # 18+ images keep PGDATA in a versioned subdirectory
       # (/var/lib/postgresql/18/docker), so mount the parent directory.
       - dsv-db-data:/var/lib/postgresql
+      # Run once, on an empty volume. Migrations aren't mounted: deploy.sh
+      # and pipeline.sh apply src/dsv-db/migrations/ before every load.
       - ./src/dsv-db/init.sql:/docker-entrypoint-initdb.d/init.sql
-      # Runs between init.sql and set-passwords.sh (name order). deploy.sh
-      # also runs it on existing volumes.
-      - ./src/dsv-db/migrations/001_load_log.sql:/docker-entrypoint-initdb.d/migrations-001_load_log.sql:ro
       - ./src/dsv-db/set-passwords.sh:/docker-entrypoint-initdb.d/set-passwords.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DSV_DB_USER}"]
@@ -66,12 +72,10 @@ services:
   # passes the subcommand (ingest, load, or run). The profile keeps
   # `docker compose up` from ever starting it, so restarts never touch data.
   dsv-pipeline:
-    build: ./src/dsv-db
+    build: ./src/dsv-pipeline
     profiles: [pipeline]
     environment:
-      DSV_DB_HOST: dsv-db
-      DSV_DB_PORT: ${DSV_DB_PORT}
-      DSV_DB_NAME: ${DSV_DB_NAME}
+      <<: *db-env
       DSV_DB_USER: dinesafe_migrator
       DSV_DB_PASSWORD: ${DSV_DB_MIGRATOR_PASSWORD:-dinesafe_migrator}
     depends_on:

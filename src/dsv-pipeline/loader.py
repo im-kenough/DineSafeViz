@@ -1,16 +1,19 @@
 """DineSafe data loader: transforms and the seed and refresh SQL.
 
-pipeline.py downloads the raw-zone files into a temp directory laid out as
-<data_dir>/Dinesafe.csv and <data_dir>/dinesafe-historical/*.csv, then calls
-seed() or refresh(). Neither commits: pipeline.py records the load in
-load_log and commits once, so the data and its log row land together.
+pipeline.py downloads the raw-zone files into a temp directory, then calls
+seed() or refresh() with their paths. Rows stream from each CSV into COPY,
+so memory holds one batch, not a file. Neither commits: pipeline.py records
+the load in load_log and commits once, so the data and its log row land
+together.
 """
 
 import codecs
 import csv
 import io
+import itertools
 import os
 import re
+from typing import NamedTuple
 
 import psycopg2
 
@@ -25,7 +28,9 @@ DSV_DB_USER = os.environ.get("DSV_DB_USER", "dinesafe")
 DSV_DB_PASSWORD = os.environ.get("DSV_DB_PASSWORD", "dinesafe")
 
 RECENT_NAME = "Dinesafe.csv"
-HISTORICAL_DIR = "dinesafe-historical"
+
+# Rows per COPY. Bounds memory; the whole load is still one transaction.
+COPY_BATCH = 10000
 
 # Column order for COPY into the inspections table (excludes serial `id`)
 INSPECTIONS_COLUMNS = [
@@ -74,8 +79,8 @@ HISTORICAL_COLUMN_MAP = {
 
 # Maps recent CSV headers → unified inspections column names.
 # "_id", "phone", and "observation" are intentionally absent (discarded on
-# import). "oldEstId" is read only by drop_old_id_duplicates and isn't stored,
-# because it isn't in INSPECTIONS_COLUMNS. The recent feed no longer carries an
+# import). "oldEstId" is read only by scan_recent and isn't stored: bulk_insert
+# writes only INSPECTIONS_COLUMNS. The recent feed no longer carries an
 # "actionDesc" column, so `action` stays NULL for recent rows.
 RECENT_COLUMN_MAP = {
     "estId": "establishment_id",
@@ -133,14 +138,6 @@ def split_address(address):
     return street, unit or None, postal
 
 
-def count_unparsed_addresses(rows):
-    """Count recent-feed rows whose address doesn't end in a postal code or "None"."""
-    return sum(
-        1 for r in rows
-        if r["establishment_address"] and not _POSTAL_RE.match(r["establishment_address"])
-    )
-
-
 def normalize_date(value):
     """Return an inspection_date string as ISO YYYY-MM-DD.
 
@@ -154,30 +151,22 @@ def normalize_date(value):
     return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
 
 
-def min_inspection_date(rows):
-    """Return the earliest inspection_date string from mapped rows."""
-    return min(r["inspection_date"] for r in rows if r["inspection_date"] is not None)
-
-
 def exclude_on_or_after(rows, cutoff):
-    """Return rows whose inspection_date is before cutoff (None dates are kept)."""
-    return [r for r in rows if r["inspection_date"] is None or r["inspection_date"] < cutoff]
+    """Yield rows whose inspection_date is before cutoff (None dates are kept)."""
+    return (r for r in rows if r["inspection_date"] is None or r["inspection_date"] < cutoff)
 
 
-def drop_old_id_duplicates(rows):
+def drop_old_id_duplicates(rows, keys):
     """Drop recent rows filed under an old establishment ID when the same
     inspection is also listed under the new ID.
 
     Between Nov 2023 and Nov 2025 the recent feed lists some inspections twice:
     once under the old numeric estId and once under the new estId, whose
     oldEstId points back to the old one. Keeping both double-counts them.
+    keys holds the (old ID, date) pairs listed under a new ID; scan_recent
+    collects them in a first pass, so this pass can stream.
     """
-    listed_under_new_id = {
-        (r["old_establishment_id"], r["inspection_date"])
-        for r in rows
-        if r["old_establishment_id"] and r["old_establishment_id"] != r["establishment_id"]
-    }
-    return [r for r in rows if (r["establishment_id"], r["inspection_date"]) not in listed_under_new_id]
+    return (r for r in rows if (r["establishment_id"], r["inspection_date"]) not in keys)
 
 
 def map_row(row, column_map):
@@ -213,26 +202,37 @@ def is_empty(conn):
         return cur.fetchone() is None
 
 
-def bulk_insert(conn, rows):
-    """Insert mapped row dicts into inspections via COPY for speed.
-
-    Uses a tab-separated StringIO buffer. None values become \\N
-    (Postgres COPY null marker). Tabs, carriage returns, and newlines
-    in data values are replaced with spaces to avoid COPY format errors.
+def _copy_escape(value):
+    """Escape a value for COPY's text format: double backslashes, which COPY
+    reads as escapes, and turn tabs, carriage returns, and newlines into
+    spaces. Chained replace() is several times faster here than
+    str.translate with a dict table, which runs once per field per row.
     """
-    if not rows:
-        return
-    buf = io.StringIO()
-    for row in rows:
-        line = "\t".join(
-            "\\N" if row[col] is None
-            else str(row[col]).replace("\t", " ").replace("\r", " ").replace("\n", " ")
-            for col in INSPECTIONS_COLUMNS
-        )
-        buf.write(line + "\n")
-    buf.seek(0)
+    return value.replace("\\", "\\\\").replace("\t", " ").replace("\r", " ").replace("\n", " ")
+
+
+def bulk_insert(conn, rows):
+    """Insert mapped row dicts into inspections via COPY, COPY_BATCH at a time.
+
+    Takes any iterable, so rows can stream from a CSV. Each batch is a
+    tab-separated StringIO buffer in COPY's text format. None values become
+    \\N (the null marker), and the rest go through _copy_escape. Returns the
+    row count.
+    """
+    inserted = 0
     with conn.cursor() as cur:
-        cur.copy_from(buf, "inspections", columns=INSPECTIONS_COLUMNS)
+        for batch in itertools.batched(rows, COPY_BATCH):
+            buf = io.StringIO()
+            for row in batch:
+                line = "\t".join(
+                    "\\N" if row[col] is None else _copy_escape(str(row[col]))
+                    for col in INSPECTIONS_COLUMNS
+                )
+                buf.write(line + "\n")
+            buf.seek(0)
+            cur.copy_from(buf, "inspections", columns=INSPECTIONS_COLUMNS)
+            inserted += len(batch)
+    return inserted
 
 
 # ---------------------------------------------------------------------------
@@ -259,101 +259,116 @@ def csv_encoding(csv_path):
     return "utf-8-sig"
 
 
-def open_csv(csv_path):
-    """Open a DineSafe CSV file as text for the csv module, in its encoding."""
-    return open(csv_path, encoding=csv_encoding(csv_path), newline="")
+def open_csv(csv_path, encoding=None):
+    """Open a DineSafe CSV file as text for the csv module, in its encoding.
+    Pass encoding when it's already known, to skip csv_encoding's full read."""
+    return open(csv_path, encoding=encoding or csv_encoding(csv_path), newline="")
 
 
-def _read_csv_rows(csv_path, column_map):
-    """Read a DineSafe CSV file into mapped rows."""
-    with open_csv(csv_path) as f:
-        return [map_row(r, column_map) for r in csv.DictReader(f)]
+def _read_csv_rows(csv_path, column_map, encoding=None):
+    """Yield mapped rows from a DineSafe CSV file, one at a time."""
+    with open_csv(csv_path, encoding) as f:
+        for r in csv.DictReader(f):
+            yield map_row(r, column_map)
 
 
-def _insert_historical_csv(conn, csv_path, name, cutoff):
-    """Parse one historical CSV file and bulk-insert its rows.
+def _insert_historical_csv(conn, csv_path, cutoff):
+    """Stream one historical CSV file into inspections.
 
     Drops rows on or after cutoff: newer historical archives now extend into
     the recent CSV's date window (for example a 2023 historical file
     alongside a recent feed that also starts in 2023), and inserting both
     would double-count the overlapping inspections.
     """
-    rows = _read_csv_rows(csv_path, HISTORICAL_COLUMN_MAP)
-    rows = exclude_on_or_after(rows, cutoff)
-    bulk_insert(conn, rows)
-    print(f"  Loaded {name}: {len(rows)} rows")
-    return len(rows)
-
-
-def load_historical(conn, cutoff, data_dir):
-    """Load every historical CSV under data_dir/dinesafe-historical.
-
-    cutoff is the earliest inspection_date in the recent CSV; historical
-    rows on or after it are skipped to avoid double-counting. Returns the
-    number of rows inserted.
-    """
-    csv_dir = os.path.join(data_dir, HISTORICAL_DIR)
-    print(f"Reading historical data from {csv_dir} ...")
-    inserted = 0
-    for name in sorted(os.listdir(csv_dir)):
-        if name.endswith(".csv"):
-            inserted += _insert_historical_csv(conn, os.path.join(csv_dir, name), name, cutoff)
+    inserted = bulk_insert(conn, exclude_on_or_after(_read_csv_rows(csv_path, HISTORICAL_COLUMN_MAP), cutoff))
+    print(f"  Loaded {os.path.basename(csv_path)}: {inserted} rows")
     return inserted
 
 
-def _read_recent_rows(data_dir):
-    """Return parsed, de-duplicated recent rows from data_dir/Dinesafe.csv."""
-    source = os.path.join(data_dir, RECENT_NAME)
-    print(f"Reading recent data from {source} ...")
-    rows = _read_csv_rows(source, RECENT_COLUMN_MAP)
-    before = len(rows)
-    rows = drop_old_id_duplicates(rows)
-    print(f"  Dropped old-ID duplicate rows: {before - len(rows)}")
+class RecentScan(NamedTuple):
+    """What the insert pass over the recent CSV needs from the first pass."""
+    path: str
+    encoding: str
+    cutoff: str   # earliest inspection_date
+    keys: set     # (old ID, date) pairs that drop_old_id_duplicates drops
+    total: int    # row count
+
+
+def scan_recent(csv_path):
+    """First pass over the recent CSV, so the insert pass can stream."""
+    print(f"Reading recent data from {csv_path} ...")
+    encoding = csv_encoding(csv_path)
+    cutoff, keys, total, unparsed = None, set(), 0, 0
+    for r in _read_csv_rows(csv_path, RECENT_COLUMN_MAP, encoding):
+        total += 1
+        date = r["inspection_date"]
+        if date is not None and (cutoff is None or date < cutoff):
+            cutoff = date
+        old_id = r["old_establishment_id"]
+        if old_id and old_id != r["establishment_id"]:
+            keys.add((old_id, date))
+        address = r["establishment_address"]
+        unparsed += bool(address) and not _POSTAL_RE.match(address)
+    if cutoff is None:
+        raise ValueError(f"{csv_path} has no inspection dates")
     # Non-zero means the upstream address format changed; the raw address is kept in street.
-    print(f"  Unparsed recent addresses: {count_unparsed_addresses(rows)}")
-    return rows
+    print(f"  Unparsed recent addresses: {unparsed}")
+    return RecentScan(csv_path, encoding, cutoff, keys, total)
 
 
-def seed(conn, data_dir):
-    """Full seed: historical data before the recent CSV's date window, then
-    the recent data, so overlapping inspections aren't double-counted.
+def _insert_recent(conn, scan):
+    """Stream the recent CSV into inspections, without old-ID duplicates."""
+    rows = _read_csv_rows(scan.path, RECENT_COLUMN_MAP, scan.encoding)
+    inserted = bulk_insert(conn, drop_old_id_duplicates(rows, scan.keys))
+    print(f"  Dropped old-ID duplicate rows: {scan.total - inserted}")
+    print(f"  Loaded recent CSV: {inserted} rows")
+    return inserted
+
+
+def seed(conn, recent_csv, historical_csvs):
+    """Full seed: empty the table, load historical data before the recent
+    CSV's date window, then the recent data, so overlapping inspections
+    aren't double-counted. historical_csvs is an iterable of paths, read one
+    at a time, so the caller can fetch each just before it's needed.
     Doesn't commit. Returns (rows deleted, rows inserted).
     """
-    recent_rows = _read_recent_rows(data_dir)
-    cutoff = min_inspection_date(recent_rows)
-    inserted = load_historical(conn, cutoff, data_dir)
-    bulk_insert(conn, recent_rows)
-    print(f"  Loaded recent CSV: {len(recent_rows)} rows")
-    return 0, inserted + len(recent_rows)
+    scan = scan_recent(recent_csv)
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM inspections")
+        deleted = cur.rowcount
+    inserted = sum(_insert_historical_csv(conn, path, scan.cutoff) for path in historical_csvs)
+    inserted += _insert_recent(conn, scan)
+    return deleted, inserted
 
 
-def refresh(conn, data_dir):
+def refresh(conn, recent_csv):
     """Replace all recent data: delete every row on or after the earliest
     date in the fresh CSV, then insert the CSV. The cutoff tracks the
     upstream data window automatically. Doesn't commit, so the caller's
     single transaction covers the delete, the insert, and the log row.
     Returns (rows deleted, rows inserted).
     """
-    rows = _read_recent_rows(data_dir)
-    cutoff = min_inspection_date(rows)
+    scan = scan_recent(recent_csv)
     with conn.cursor() as cur:
-        cur.execute("DELETE FROM inspections WHERE inspection_date >= %s", (cutoff,))
+        cur.execute("DELETE FROM inspections WHERE inspection_date >= %s", (scan.cutoff,))
         deleted = cur.rowcount
-    bulk_insert(conn, rows)
-    return deleted, len(rows)
+    return deleted, _insert_recent(conn, scan)
 
 
 # ---------------------------------------------------------------------------
-# load_log: which raw-zone file is loaded
+# load_log: which raw-zone files are loaded
 # ---------------------------------------------------------------------------
 
 
-def last_loaded_path(conn):
-    """Return the recent blob path of the newest load, or None."""
+def last_load(conn):
+    """Return (recent path of the newest load, historical path of the newest
+    seed). Either is None when there's no such load."""
     with conn.cursor() as cur:
-        cur.execute("SELECT recent_path FROM load_log ORDER BY id DESC LIMIT 1")
-        row = cur.fetchone()
-    return row[0] if row else None
+        cur.execute(
+            "SELECT (SELECT recent_path FROM load_log ORDER BY id DESC LIMIT 1), "
+            "(SELECT historical_path FROM load_log WHERE kind = 'seed' ORDER BY id DESC LIMIT 1)"
+        )
+        return cur.fetchone()
 
 
 def record_load(conn, kind, recent_path, historical_path, deleted, inserted):

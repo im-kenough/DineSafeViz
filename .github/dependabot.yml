@@ -6,11 +6,11 @@
 version: 2
 
 updates:
-  # Python packages in the webapp and the data loader
+  # Python packages in the webapp and the data pipeline
   - package-ecosystem: "pip"
     directories:
       - "/src/dsv-app"
-      - "/src/dsv-db"
+      - "/src/dsv-pipeline"
     target-branch: "main"
     schedule:
       interval: "weekly"
@@ -18,11 +18,11 @@ updates:
       pip-minor-patch:
         update-types: ["minor", "patch"]
 
-  # Dockerfile base images in the webapp and the data loader
+  # Dockerfile base images in the webapp and the data pipeline
   - package-ecosystem: "docker"
     directories:
       - "/src/dsv-app"
-      - "/src/dsv-db"
+      - "/src/dsv-pipeline"
     target-branch: "main"
     schedule:
       interval: "weekly"

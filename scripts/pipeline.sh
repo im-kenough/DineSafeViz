@@ -6,6 +6,7 @@
 #
 #   ingest  Toronto Open Data -> Blob, only if Toronto has newer data
 #   load    Blob -> Postgres, only if the newest file isn't loaded yet.
+#           Applies the database migrations first (load and run).
 #           Never contacts Toronto Open Data.
 #   run     ingest, load, then fail if the newest data is over 10 days old
 #   --force ingest: download even if Toronto's data isn't newer.
@@ -23,11 +24,6 @@ set -euo pipefail
 usage() {
   echo "usage: pipeline.sh stg|prod run|ingest|load [--force] [--historical] | pipeline.sh dev load [--force]" >&2
   exit 2
-}
-
-die() {
-  echo "pipeline: $*" >&2
-  exit 1
 }
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -53,8 +49,7 @@ cd "$repo_dir"
 
 settings=deploy/$env_name.env
 require_settings "$settings" "$env_name"
-account=$(setting "$settings" DSV_STORAGE_ACCOUNT)
-[[ -n $account ]] || die "DSV_STORAGE_ACCOUNT is missing from $settings"
+account=$(require_setting "$settings" DSV_STORAGE_ACCOUNT)
 [[ $account =~ ^[a-z0-9]{3,24}$ ]] \
   || die "DSV_STORAGE_ACCOUNT in $settings isn't a valid storage account name: '$account'"
 
@@ -76,6 +71,13 @@ trap 'rm -rf "$token_dir"' EXIT
 build=()
 if [[ $env_name == dev ]]; then
   build=(--build)
+fi
+
+# Loads need the current schema and dinesafe_migrator's grants, which a new
+# volume doesn't have until the migrations run. ingest never touches the DB.
+if [[ $command != ingest ]]; then
+  apply_migrations \
+    || die "the database migrations failed. Is the stack running? (scripts/deploy.sh $env_name)"
 fi
 
 # Runs as you: the container drops every capability, so root couldn't read

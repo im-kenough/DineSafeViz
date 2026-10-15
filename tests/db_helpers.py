@@ -1,4 +1,5 @@
 """Start the real Postgres image with this repo's init scripts, for tests."""
+import re
 import subprocess
 import time
 import uuid
@@ -10,9 +11,11 @@ DB_DIR = ROOT / "src" / "dsv-db"
 # The same mounts, in the same name order, as dsv-db in docker-compose.yml.
 INIT_FILES = {
     "init.sql": DB_DIR / "init.sql",
-    "migrations-001_load_log.sql": DB_DIR / "migrations" / "001_load_log.sql",
     "set-passwords.sh": DB_DIR / "set-passwords.sh",
 }
+MIGRATIONS = sorted((DB_DIR / "migrations").glob("*.sql"))
+# Read from apply_migrations, so these tests run the real command line.
+MIGRATE_PSQL = re.search(r"'(psql [^']*)'", (ROOT / "scripts" / "lib.sh").read_text())[1]
 
 
 def docker(*args, check=True):
@@ -57,6 +60,24 @@ def wait_ready(name, timeout=90):
             return True
         time.sleep(1)
     raise TimeoutError(f"{name} didn't become ready in {timeout}s")
+
+
+def run_migration(name, sql):
+    """Run sql through apply_migrations' own psql command line."""
+    return subprocess.run(
+        ["docker", "exec", "-i", name, "sh", "-c", MIGRATE_PSQL],
+        input=sql, capture_output=True, text=True, timeout=60,
+    )
+
+
+def migrate(name):
+    """Apply every migration as the superuser, the way apply_migrations in
+    scripts/lib.sh does."""
+    for migration in MIGRATIONS:
+        result = run_migration(name, migration.read_text())
+        if result.returncode != 0:
+            return result
+    return result
 
 
 def container_ip(name):

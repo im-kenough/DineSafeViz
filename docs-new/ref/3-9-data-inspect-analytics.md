@@ -1,9 +1,9 @@
 # Inspection Analytics
 
-### Inspections dashboard (Grafana)
+This page describes how the inspections analytics dashboard works.
 
-The inspections dashboard (Grafana) shows statistics and metrics about the
-DineSafe dataset. It isn't used to monitor the app or its infrastructure.
+Grafana uses the postgresql db as datasource and queries using a custom dashboard. It shows statistics and metrics about the
+DineSafe dataset, not used for infrastructure monitoring.
 
 `/dashboard` embeds the inspections dashboard (Grafana)
 `/analytics/d/dinesafe/dinesafe-inspections?kiosk` in an iframe. Visitors see
@@ -18,3 +18,5 @@ it as anonymous Viewers.
   historical rows have no category.
 - Establishment-type panels show historical rows only. Those end on November
   9, 2023, so the panels are empty in the default 90-day range.
+- The text panel says establishment type runs to 2023-12-31. That's wrong:
+  the data ends on 2023-11-09.

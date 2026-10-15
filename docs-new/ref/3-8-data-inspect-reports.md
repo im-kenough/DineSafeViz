@@ -1,4 +1,6 @@
-### Inspections page
+# Data - Inspection Reports
+
+This page explains data layer for how the inspection reports are generated for the webapp.
 
 The page queries one month at a time. Older months load when you expand them.
 
@@ -54,9 +56,5 @@ inspection dates. Every page reads it.
 - Not cached when the table is empty or the database is down. The range then
   falls back to January 1, 2001 → today, and the next request retries.
 
-<!-- prettier-ignore -->
-> [!NOTE]
-> New rows show on the inspections pages as soon as a load commits. The home
-> totals and the quarter picker range lag by up to 5 days, until the cache
-> expires or `dsv-app` restarts. When a new quarter starts, you can't open it
-> until then.
+Because of the cache, the home totals and the quarter picker range can lag a
+refresh by up to 5 days. See [Guarantees](datapipe-refresh.md#guarantees).

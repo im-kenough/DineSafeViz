@@ -22,7 +22,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
-from refresh import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP, RECENT_NAME, open_csv
+from loader import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP, RECENT_NAME, open_csv
 
 
 # ---------------------------------------------------------------------------
@@ -243,6 +243,14 @@ def newest_recent(store):
     return paths[-1], blobs[paths[-1]]
 
 
+def require_newest_recent(store):
+    """Return newest_recent(store), or raise DataError if recent/ is empty."""
+    newest = newest_recent(store)
+    if newest is None:
+        raise DataError(f"{RECENT_PREFIX} is empty. Run ingest first: scripts/pipeline.sh <env> ingest")
+    return newest
+
+
 def newest_historical(store):
     """Return (folder path, [CSV blob names]) of the newest complete
     historical folder, or None. A folder is complete once it has _SUCCESS."""
@@ -371,9 +379,7 @@ def check_fresh(store, now=None):
     Toronto Open Data publishes most business days, so a long gap usually
     means the dataset moved or its ID changed.
     """
-    newest = newest_recent(store)
-    if newest is None:
-        raise DataError(f"{RECENT_PREFIX} is empty. Run ingest first.")
+    newest = require_newest_recent(store)
     source = newest[1].metadata.get(SOURCE_MODIFIED_KEY)
     if not source:
         raise DataError(f"{newest[0]} has no {SOURCE_MODIFIED_KEY} metadata")

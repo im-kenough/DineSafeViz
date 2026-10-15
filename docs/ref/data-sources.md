@@ -5,7 +5,7 @@ they come from, and what the files actually contain. For how the columns map
 into the database, see [Data mapping](./data-mapping.md).
 
 The facts and counts on this page come from a download on October 14, 2026,
-checked with the transforms in `src/dsv-db/refresh.py`.
+checked with the transforms in `src/dsv-pipeline/loader.py`.
 
 ## The DineSafe package
 
@@ -29,7 +29,7 @@ ID. The historical data still uses the old schema.
 
 ### How the pipeline finds the files
 
-`dsv-pipeline ingest` (`src/dsv-db/data.py`) calls CKAN's `package_show` for
+`dsv-pipeline ingest` (`src/dsv-pipeline/data.py`) calls CKAN's `package_show` for
 the `dinesafe` package and picks resources by exact name and format, not by
 ID, so a changed resource ID doesn't break it.
 

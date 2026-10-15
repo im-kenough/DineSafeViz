@@ -12,6 +12,8 @@
 # Revisit them with `docker stats` on prod.
 
 x-hardening: &hardening
+  # Services that need a capability add it back with cap_add.
+  cap_drop: [ALL]
   security_opt:
     - no-new-privileges:true
   logging:
@@ -34,7 +36,6 @@ services:
     networks: [edge]
     read_only: true
     tmpfs: [/tmp]
-    cap_drop: [ALL]
     mem_limit: 64m
     restart: unless-stopped
     depends_on:
@@ -46,7 +47,6 @@ services:
     volumes:
       - ./src/dsv-nginx/snippets:/etc/nginx/snippets:ro
     networks: [edge, backend]
-    cap_drop: [ALL]
     cap_add: [CHOWN, DAC_OVERRIDE, NET_BIND_SERVICE, SETGID, SETUID]
     mem_limit: 64m
     restart: unless-stopped
@@ -59,7 +59,6 @@ services:
     networks: [backend]
     read_only: true
     tmpfs: [/tmp]
-    cap_drop: [ALL]
     mem_limit: 192m
     restart: unless-stopped
 
@@ -70,14 +69,13 @@ services:
       DSV_DB_APP_PASSWORD: ${DSV_DB_APP_PASSWORD:?}
       DSV_DB_MIGRATOR_PASSWORD: ${DSV_DB_MIGRATOR_PASSWORD:?}
     networks: [backend]
-    cap_drop: [ALL]
     cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
     mem_limit: 320m
     restart: unless-stopped
 
   dsv-pipeline:
     <<: *hardening
-    image: ghcr.io/im-kenough/dsv-init-db:${DSV_VERSION:?}
+    image: ghcr.io/im-kenough/dsv-pipeline:${DSV_VERSION:?}
     environment:
       DSV_DB_PASSWORD: ${DSV_DB_MIGRATOR_PASSWORD:?}
     # The only service on both: egress for Toronto Open Data and the storage
@@ -85,11 +83,10 @@ services:
     networks: [egress, backend]
     read_only: true
     tmpfs: [/tmp]
-    cap_drop: [ALL]
-    # refresh.py peaked at about 430 MiB on the full seed (October 5, 2026),
-    # and the downloaded CSVs (about 125 MB on a seed) sit in the /tmp tmpfs,
-    # which counts against this limit. One-shot, so swap absorbs it.
-    mem_limit: 768m
+    # A full seed peaked at 121 MiB, including the /tmp tmpfs, which counts
+    # against this limit (October 15, 2026). loader.py streams rows into COPY,
+    # and the seed keeps one historical CSV in /tmp at a time.
+    mem_limit: 256m
 
   dsv-analytics:
     <<: *hardening

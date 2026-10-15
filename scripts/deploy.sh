@@ -22,11 +22,6 @@ usage() {
   exit 2
 }
 
-die() {
-  echo "deploy: $*" >&2
-  exit 1
-}
-
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 # Prints the stack's state, then the logs of every failed service plus any
@@ -47,13 +42,11 @@ fail() {
   exit 1
 }
 
-# Starts the stack with `up $1` (--build or --no-build), waits for the
-# long-running services named after $1 to be healthy, and smoke-tests nginx.
+# Starts the stack with `up $1` (--build or --no-build), waits for every
+# service to be healthy, and smoke-tests nginx. dsv-pipeline, the only
+# one-shot job, is in a profile, so `up --wait` never waits on it.
 start_stack() {
-  local up_flag=$1
-  shift
-  docker compose up -d "$up_flag" --remove-orphans || fail
-  docker compose up -d --no-build --wait --wait-timeout 600 "$@" || fail
+  docker compose up -d "$1" --remove-orphans --wait --wait-timeout 600 || fail
   docker compose exec -T dsv-nginx wget -q -O /dev/null http://127.0.0.1/healthz \
     || fail dsv-nginx dsv-app
 }
@@ -62,12 +55,10 @@ start_stack() {
 # raw-zone data (scripts/pipeline.sh <env> load). Migrations are idempotent.
 # A failed load keeps the site up on the data it has, unless there's none.
 load_data() {
-  local env_name=$1 migration has_rows
-  for migration in src/dsv-db/migrations/*.sql; do
-    docker compose exec -T dsv-db sh -c \
-      'psql -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <"$migration" \
-      || fail dsv-db
-  done
+  local env_name=$1 has_rows
+  # pipeline.sh applies them too; migrating here first makes a failed
+  # migration fail the deploy, not just the load.
+  apply_migrations || fail dsv-db
   if scripts/pipeline.sh "$env_name" load; then
     return
   fi
@@ -82,7 +73,7 @@ load_data() {
 # Writes .env, builds and starts the stack, then loads stg's raw zone.
 deploy_dev() {
   scripts/fetch-secrets.sh dev
-  start_stack --build dsv-nginx dsv-app dsv-db dsv-analytics
+  start_stack --build
   load_data dev
   echo "deploy: dev is running on http://localhost:8080"
 }
@@ -126,7 +117,7 @@ $dirty"
 
   # 2. Stop before changing anything if the images aren't published yet.
   local image
-  for image in dsv-app dsv-init-db; do
+  for image in dsv-app dsv-pipeline; do
     docker manifest inspect "ghcr.io/im-kenough/$image:$tag" >/dev/null 2>&1 \
       || die "ghcr.io/im-kenough/$image:$tag isn't published. Wait for images.yml to finish, then rerun."
   done
@@ -141,7 +132,7 @@ $dirty"
   # 5. Pull (including the pipeline image, which is in a profile), start and
   # wait for health, then migrate and load.
   docker compose --profile pipeline pull --quiet
-  start_stack --no-build dsv-tunnel dsv-nginx dsv-app dsv-db dsv-analytics
+  start_stack --no-build
   load_data "$env_name"
 
   # 6. Smoke test: start_stack checked nginx reaches the app; check the VM's

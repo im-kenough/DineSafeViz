@@ -16,6 +16,18 @@ Two services read Postgres, both as `dinesafe_app`: `SELECT` only, with a
 
 - `load_log` is readable, but nothing displays it yet.
 - Connections are plaintext, on the internal `backend` network only.
+- Both read the `dinesafe_app` password from a Key Vault secret, via
+  `.env`.
+
+### When Postgres is down
+
+The readers don't fall back to other data. A pipeline failure doesn't affect
+them, because the table keeps its last good load.
+
+- `/inspections` returns 500.
+- `/` works only while stats are cached.
+- `/info` renders, with totals only if cached.
+- `/readyz` returns 503.
 
 ### Table granularity: one row per infraction
 

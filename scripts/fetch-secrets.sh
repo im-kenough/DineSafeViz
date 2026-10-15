@@ -22,11 +22,6 @@ SECRETS=(
   DSV_ANALYTICS_ADMIN_PASSWORD=dsv-analytics-admin-password
 )
 
-die() {
-  echo "fetch-secrets: $*" >&2
-  exit 1
-}
-
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 env_name=${1:-}
@@ -46,8 +41,7 @@ if [[ $env_name == dev ]]; then
   read_secret() { setting "$settings" "$1"; }
   secret_label() { echo "$1 in deploy/dev.env"; }
 else
-  vault=$(setting "$settings" DSV_KEY_VAULT)
-  [[ -n $vault ]] || die "DSV_KEY_VAULT is missing from $settings"
+  vault=$(require_setting "$settings" DSV_KEY_VAULT)
   source_label=$vault
   compose_file=docker-compose.yml:docker-compose.vm.yml
   # Only the VM runs the tunnel (docker-compose.vm.yml).

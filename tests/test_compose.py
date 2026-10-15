@@ -44,6 +44,13 @@ def test_local_db_role_passwords_default_to_todays_values(local):
     assert env["DSV_DB_MIGRATOR_PASSWORD"] == "dinesafe_migrator"
 
 
+# Postgres always listens on 5432 inside dsv-db, so clients can't be told otherwise.
+@pytest.mark.parametrize("name", ["dsv-app", "dsv-analytics", "dsv-pipeline"])
+def test_db_clients_use_postgres_default_port(local, name):
+    env = local["services"][name]["environment"]
+    assert (env["DSV_DB_HOST"], env["DSV_DB_PORT"]) == ("dsv-db", "5432")
+
+
 def test_local_db_runs_set_passwords_after_init_sql(local):
     targets = sorted(
         v["target"]
@@ -51,9 +58,9 @@ def test_local_db_runs_set_passwords_after_init_sql(local):
         if v["target"].startswith("/docker-entrypoint-initdb.d/")
     )
     # The image runs these in name order: init.sql creates the roles first.
+    # No migrations: deploy.sh applies those.
     assert targets == [
         "/docker-entrypoint-initdb.d/init.sql",
-        "/docker-entrypoint-initdb.d/migrations-001_load_log.sql",
         "/docker-entrypoint-initdb.d/set-passwords.sh",
     ]
 
@@ -80,7 +87,7 @@ def test_local_stack_is_unaffected_by_the_vm_file(local):
 def test_vm_uses_published_images(vm):
     services = vm["services"]
     assert services["dsv-app"]["image"] == "ghcr.io/im-kenough/dsv-app:test-version"
-    assert services["dsv-pipeline"]["image"] == "ghcr.io/im-kenough/dsv-init-db:test-version"
+    assert services["dsv-pipeline"]["image"] == "ghcr.io/im-kenough/dsv-pipeline:test-version"
     assert services["dsv-tunnel"]["image"].startswith("cloudflare/cloudflared:2026.10.0@sha256:")
 
 
@@ -94,6 +101,11 @@ def test_vm_long_running_services_restart_and_are_hardened(vm, name):
         "options": {"max-size": "10m", "max-file": "3"},
     }
     assert "mem_limit" in svc
+
+
+@pytest.mark.parametrize("name", LONG_RUNNING + ONE_SHOT)
+def test_vm_services_drop_all_capabilities(vm, name):
+    assert vm["services"][name]["cap_drop"] == ["ALL"]
 
 
 @pytest.mark.parametrize("name", ONE_SHOT)
@@ -190,9 +202,8 @@ def test_vm_refuses_to_start_without_required_values(tmp_path, var):
 
 
 def test_vm_pipeline_memory_covers_the_seed(vm):
-    # refresh.py peaked at about 430 MiB on the full seed (October 5, 2026),
-    # and the downloaded CSVs sit in the /tmp tmpfs, which counts too.
-    assert int(vm["services"]["dsv-pipeline"]["mem_limit"]) >= 768 * 1024 * 1024
+    # A full seed peaked at 121 MiB, /tmp tmpfs included (October 15, 2026).
+    assert int(vm["services"]["dsv-pipeline"]["mem_limit"]) >= 256 * 1024 * 1024
 
 
 def test_vm_tunnel_serves_readiness_for_deploy_sh(vm):

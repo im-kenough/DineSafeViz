@@ -1,13 +1,12 @@
 """init.sql, the migrations, and set-passwords.sh in the real Postgres image."""
 import os
-import subprocess
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from db_helpers import DB_DIR, docker, psql, start_db, wait_ready
+from db_helpers import DB_DIR, docker, migrate, psql, run_migration, start_db, wait_ready
 
 SET_PASSWORDS = DB_DIR / "set-passwords.sh"
-MIGRATION = DB_DIR / "migrations" / "001_load_log.sql"
 # A quote and a dollar sign prove the psql quoting in set-passwords.sh.
 APP_PW = "app'pw$x"
 MIGRATOR_PW = "migrator-pw"
@@ -38,6 +37,8 @@ def ready_db():
     )
     try:
         assert wait_ready(name), docker("logs", name).stderr
+        result = migrate(name)
+        assert result.returncode == 0, result.stderr
         yield name
     finally:
         docker("rm", "-f", name, check=False)
@@ -83,17 +84,15 @@ def test_init_fails_when_a_password_is_unset(db, missing):
     assert missing in logs.stdout + logs.stderr
 
 
-def migrate(name):
-    """Apply the migration as the superuser, the way deploy.sh does."""
-    return subprocess.run(
-        ["docker", "exec", "-i", name, "sh", "-c",
-         'psql -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'],
-        stdin=open(MIGRATION), capture_output=True, text=True, timeout=60,
-    )
-
-
-def test_new_volume_has_load_log(ready_db):
-    result = login(ready_db, "dinesafe_migrator", MIGRATOR_PW, "SELECT count(*) FROM load_log")
+# The image's init runs init.sql and set-passwords.sh only. Migrations come
+# from apply_migrations in scripts/lib.sh, which deploy.sh and every
+# pipeline.sh load run first.
+def test_new_volume_waits_for_a_migration(db):
+    name = db({"DSV_DB_APP_PASSWORD": APP_PW, "DSV_DB_MIGRATOR_PASSWORD": MIGRATOR_PW})
+    assert wait_ready(name), docker("logs", name).stderr
+    assert "load_log" in psql(name, "SELECT count(*) FROM load_log").stderr
+    assert migrate(name).returncode == 0
+    result = login(name, "dinesafe_migrator", MIGRATOR_PW, "SELECT count(*) FROM load_log")
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "0"
 
@@ -102,6 +101,25 @@ def test_migration_runs_again_without_errors(ready_db):
     for _ in range(2):
         result = migrate(ready_db)
         assert result.returncode == 0, result.stderr
+
+
+# Each file is one transaction: a failure part-way leaves no REVOKE without
+# its GRANT, so a load running alongside sees the old grants or the new ones.
+def test_failed_migration_rolls_back_the_whole_file(ready_db):
+    result = run_migration(
+        ready_db, "REVOKE ALL ON TABLE load_log FROM dinesafe_migrator; SELECT 1/0;"
+    )
+    assert result.returncode != 0
+    result = login(ready_db, "dinesafe_migrator", MIGRATOR_PW, "SELECT count(*) FROM load_log")
+    assert result.returncode == 0, result.stderr
+
+
+# A deploy and the pipeline timer can migrate at once. Without a lock, two
+# concurrent GRANTs on one table fail with "tuple concurrently updated".
+def test_concurrent_migrations_all_succeed(ready_db):
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        results = list(pool.map(lambda _: migrate(ready_db), range(12)))
+    assert [r.stderr for r in results if r.returncode != 0] == []
 
 
 def test_migrator_can_load(ready_db):

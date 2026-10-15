@@ -2,13 +2,12 @@ import pytest
 
 from fakes import historical_csv, historical_row, recent_csv, recent_row
 
-from refresh import (
+from loader import (
     normalize,
     normalize_date,
     map_row,
     split_address,
-    count_unparsed_addresses,
-    min_inspection_date,
+    scan_recent,
     exclude_on_or_after,
     drop_old_id_duplicates,
     _read_csv_rows,
@@ -16,6 +15,12 @@ from refresh import (
     HISTORICAL_COLUMN_MAP,
     RECENT_COLUMN_MAP,
     INSPECTIONS_COLUMNS,
+    COPY_BATCH,
+    bulk_insert,
+    last_load,
+    record_load,
+    refresh,
+    seed,
 )
 
 
@@ -33,22 +38,38 @@ class TestNormalize:
         assert normalize("  ") == "  "
 
 
-class TestMinInspectionDate:
-    def test_returns_earliest_date(self):
-        rows = [
-            {"inspection_date": "2024-03-06"},
-            {"inspection_date": "2023-11-10"},
-            {"inspection_date": "2024-01-15"},
-        ]
-        assert min_inspection_date(rows) == "2023-11-10"
+class TestScanRecent:
+    # The first pass over the recent CSV, so the second pass can stream.
+    def test_cutoff_is_the_earliest_date_skipping_blanks(self, tmp_path):
+        p = recent_csv(tmp_path / "r.csv", [recent_row("1", "2024-03-06"), recent_row("2", ""),
+                                            recent_row("3", "2023-11-10")])
+        scan = scan_recent(str(p))
+        assert (scan.cutoff, scan.total) == ("2023-11-10", 3)
 
-    def test_skips_none_dates(self):
-        rows = [
-            {"inspection_date": None},
-            {"inspection_date": "2024-03-06"},
-            {"inspection_date": "2023-11-10"},
-        ]
-        assert min_inspection_date(rows) == "2023-11-10"
+    def test_collects_old_id_keys(self, tmp_path):
+        p = recent_csv(tmp_path / "r.csv", [
+            recent_row("001Vo000013Qna7IAC", "2025-08-18", oldEstId="10820991"),
+            recent_row("10820991", "2025-08-18", oldEstId="10820991"),
+            recent_row("001Vo000013QjdPIAS", "2026-04-21"),
+        ])
+        assert scan_recent(str(p)).keys == {("10820991", "2025-08-18")}
+
+    def test_reports_unparsed_addresses(self, tmp_path, capsys):
+        # Recent addresses always end in a postal code or "None"; anything
+        # else means the upstream format has drifted.
+        p = recent_csv(tmp_path / "r.csv", [
+            recent_row("1", "2024-01-01", address="65 Front St W Unit-442 M5J 1E6"),
+            recent_row("2", "2024-01-01", address="102 Fort York Blvd None None"),
+            recent_row("3", "2024-01-01", address="65 Front St W, Toronto ON"),
+            recent_row("4", "2024-01-01", address=""),
+        ])
+        scan_recent(str(p))
+        assert "Unparsed recent addresses: 1" in capsys.readouterr().out
+
+    def test_no_dates_is_an_error(self, tmp_path):
+        p = recent_csv(tmp_path / "r.csv", [recent_row("1", "")])
+        with pytest.raises(ValueError, match="no inspection dates"):
+            scan_recent(str(p))
 
 
 class TestMapHistoricalRow:
@@ -227,19 +248,6 @@ class TestMapRowSplitsAddress:
         assert (result["street"], result["unit"], result["postal_code"]) == ("266 EDDYSTONE AVE", "Unit-0", None)
 
 
-class TestCountUnparsedAddresses:
-    # Recent addresses always end in a postal code or "None"; anything else
-    # means the upstream format has drifted.
-    def test_counts_recent_addresses_without_postal_token(self):
-        rows = [
-            {"establishment_address": "65 Front St W Unit-442 M5J 1E6"},
-            {"establishment_address": "102 Fort York Blvd None None"},
-            {"establishment_address": "65 Front St W, Toronto ON"},
-            {"establishment_address": None},
-        ]
-        assert count_unparsed_addresses(rows) == 1
-
-
 class TestReadCsvRows:
     # Historical exports mix encodings: older years are UTF-8, newer files are
     # Windows-1252. The reader must handle both.
@@ -250,13 +258,13 @@ class TestReadCsvRows:
     def test_reads_utf8_file(self, tmp_path):
         p = tmp_path / "utf8.csv"
         p.write_text(self.HEADER + "1,CAFÉ MONTRÉAL,2024-01-01\n", encoding="utf-8")
-        rows = _read_csv_rows(str(p), HISTORICAL_COLUMN_MAP)
+        rows = list(_read_csv_rows(str(p), HISTORICAL_COLUMN_MAP))
         assert rows[0]["establishment_name"] == "CAFÉ MONTRÉAL"
 
     def test_reads_windows1252_file(self, tmp_path):
         p = tmp_path / "cp1252.csv"
         p.write_bytes((self.HEADER + "1,CAFÉ MONTRÉAL,2024-01-01\n").encode("cp1252"))
-        rows = _read_csv_rows(str(p), HISTORICAL_COLUMN_MAP)
+        rows = list(_read_csv_rows(str(p), HISTORICAL_COLUMN_MAP))
         assert rows[0]["establishment_name"] == "CAFÉ MONTRÉAL"
 
 
@@ -288,19 +296,22 @@ class TestDropOldIdDuplicates:
     def row(est_id, old_id, date):
         return {"establishment_id": est_id, "old_establishment_id": old_id, "inspection_date": date}
 
+    # keys are the (old ID, date) pairs scan_recent found under a new ID.
+    KEYS = {("10820991", "2025-08-18")}
+
     def test_drops_old_id_row_when_new_id_has_same_inspection(self):
         new = self.row("001Vo000013Qna7IAC", "10820991", "2025-08-18")
         old = self.row("10820991", "10820991", "2025-08-18")
-        assert drop_old_id_duplicates([old, new]) == [new]
+        assert list(drop_old_id_duplicates([old, new], self.KEYS)) == [new]
 
     def test_keeps_old_id_row_on_a_different_date(self):
         new = self.row("001Vo000013Qna7IAC", "10820991", "2025-08-18")
         old = self.row("10820991", "10820991", "2024-02-01")
-        assert drop_old_id_duplicates([old, new]) == [old, new]
+        assert list(drop_old_id_duplicates([old, new], self.KEYS)) == [old, new]
 
     def test_keeps_new_id_row_without_old_id(self):
         new = self.row("001Vo000013QjdPIAS", None, "2026-04-21")
-        assert drop_old_id_duplicates([new]) == [new]
+        assert list(drop_old_id_duplicates([new], self.KEYS)) == [new]
 
 
 class TestExcludeOnOrAfter:
@@ -313,12 +324,12 @@ class TestExcludeOnOrAfter:
             {"inspection_date": "2023-11-10"},
             {"inspection_date": "2023-12-29"},
         ]
-        result = exclude_on_or_after(rows, "2023-11-10")
+        result = list(exclude_on_or_after(rows, "2023-11-10"))
         assert result == [{"inspection_date": "2023-11-09"}]
 
     def test_keeps_none_dates(self):
         rows = [{"inspection_date": None}, {"inspection_date": "2023-11-10"}]
-        assert exclude_on_or_after(rows, "2023-11-10") == [{"inspection_date": None}]
+        assert list(exclude_on_or_after(rows, "2023-11-10")) == [{"inspection_date": None}]
 
 
 class TestCsvEncoding:
@@ -331,12 +342,6 @@ class TestCsvEncoding:
         p = tmp_path / "a.csv"
         p.write_bytes("caf\xe9\n".encode("cp1252"))
         assert csv_encoding(str(p)) == "cp1252"
-
-
-
-from refresh import (
-    HISTORICAL_DIR, RECENT_NAME, last_loaded_path, record_load, refresh, seed,
-)
 
 
 class FakeCursor:
@@ -355,7 +360,7 @@ class FakeCursor:
         self.rowcount = self.conn.delete_rowcount if sql.lstrip().startswith("DELETE") else 0
 
     def copy_from(self, buf, table, columns):
-        self.conn.copied += sum(1 for _ in buf)
+        self.conn.batches.append(sum(1 for _ in buf))
 
     def fetchone(self):
         return self.conn.fetch
@@ -366,8 +371,12 @@ class FakeConn:
         self.delete_rowcount = delete_rowcount
         self.fetch = fetch
         self.executed = []
-        self.copied = 0
+        self.batches = []
         self.commits = 0
+
+    @property
+    def copied(self):
+        return sum(self.batches)
 
     def cursor(self):
         return FakeCursor(self)
@@ -376,42 +385,91 @@ class FakeConn:
         self.commits += 1
 
 
-def data_dir(tmp_path):
-    recent_csv(tmp_path / RECENT_NAME, [recent_row("1", "2023-05-01"), recent_row("2", "2024-01-02")])
-    (tmp_path / HISTORICAL_DIR).mkdir()
-    historical_csv(tmp_path / HISTORICAL_DIR / "dinesafe_hist_2022.csv",
-                   [historical_row("9", "2022-03-01")])
-    historical_csv(tmp_path / HISTORICAL_DIR / "dinesafe_hist_2023.csv",
-                   [historical_row("8", "2023-04-30"), historical_row("7", "2023-05-01")])
-    return str(tmp_path)
+def files(tmp_path):
+    """The recent CSV and the historical CSVs, in load order."""
+    recent = recent_csv(tmp_path / "Dinesafe.csv",
+                        [recent_row("1", "2023-05-01"), recent_row("2", "2024-01-02")])
+    h22 = historical_csv(tmp_path / "dinesafe_hist_2022.csv", [historical_row("9", "2022-03-01")])
+    h23 = historical_csv(tmp_path / "dinesafe_hist_2023.csv",
+                         [historical_row("8", "2023-04-30"), historical_row("7", "2023-05-01")])
+    return str(recent), [str(h22), str(h23)]
+
+
+class TestBulkInsert:
+    def test_copies_in_batches_and_counts(self):
+        conn = FakeConn()
+        rows = ({col: None for col in INSPECTIONS_COLUMNS} for _ in range(COPY_BATCH + 1))
+        assert bulk_insert(conn, rows) == COPY_BATCH + 1
+        assert conn.batches == [COPY_BATCH, 1]
+
+    def test_no_rows_copies_nothing(self):
+        conn = FakeConn()
+        assert bulk_insert(conn, iter([])) == 0
+        assert conn.batches == []
 
 
 class TestSeedAndRefresh:
     def test_seed_skips_historical_rows_in_the_recent_window(self, tmp_path):
         conn = FakeConn()
-        assert seed(conn, data_dir(tmp_path)) == (0, 4)  # 2 historical before 2023-05-01, 2 recent
+        recent, historical = files(tmp_path)
+        assert seed(conn, recent, historical) == (0, 4)  # 2 historical before 2023-05-01, 2 recent
         assert conn.copied == 4
+
+    def test_seed_empties_the_table_first(self, tmp_path):
+        # A reseed replaces every row, so a new historical folder can't
+        # double-count the old one.
+        conn = FakeConn(delete_rowcount=7)
+        recent, historical = files(tmp_path)
+        assert seed(conn, recent, historical) == (7, 4)
+        assert conn.executed[0] == ("DELETE FROM inspections", None)
+
+    def test_seed_reads_historical_files_one_at_a_time(self, tmp_path):
+        # pipeline.py downloads each file just before seed reads it.
+        conn = FakeConn()
+        recent, historical = files(tmp_path)
+        seen = []
+
+        def lazily():
+            for path in historical:
+                seen.append(conn.copied)
+                yield path
+
+        seed(conn, recent, lazily())
+        assert seen == [0, 1]  # the 2023 file was fetched after 2022's rows went in
 
     def test_refresh_deletes_from_the_cutoff_and_inserts(self, tmp_path):
         conn = FakeConn(delete_rowcount=5)
-        assert refresh(conn, data_dir(tmp_path)) == (5, 2)
+        recent, _ = files(tmp_path)
+        assert refresh(conn, recent) == (5, 2)
         assert ("DELETE FROM inspections WHERE inspection_date >= %s", ("2023-05-01",)) in conn.executed
+
+    def test_recent_old_id_duplicates_are_dropped(self, tmp_path, capsys):
+        conn = FakeConn()
+        recent = recent_csv(tmp_path / "Dinesafe.csv", [
+            recent_row("10820991", "2025-08-18", oldEstId="10820991"),
+            recent_row("001Vo000013Qna7IAC", "2025-08-18", oldEstId="10820991"),
+        ])
+        assert refresh(conn, str(recent)) == (0, 1)
+        assert "Dropped old-ID duplicate rows: 1" in capsys.readouterr().out
 
     def test_neither_commits(self, tmp_path):
         conn = FakeConn()
-        seed(conn, data_dir(tmp_path))
-        refresh(conn, str(tmp_path))
+        recent, historical = files(tmp_path)
+        seed(conn, recent, historical)
+        refresh(conn, recent)
         assert conn.commits == 0
 
 
 class TestLoadLog:
-    def test_last_loaded_path_of_empty_log_is_none(self):
-        assert last_loaded_path(FakeConn(fetch=None)) is None
+    def test_last_load_of_empty_log_is_none(self):
+        assert last_load(FakeConn(fetch=(None, None))) == (None, None)
 
-    def test_last_loaded_path_returns_the_newest(self):
-        conn = FakeConn(fetch=("recent/20261012T113012Z/Dinesafe.csv",))
-        assert last_loaded_path(conn) == "recent/20261012T113012Z/Dinesafe.csv"
-        assert "ORDER BY id DESC LIMIT 1" in conn.executed[0][0]
+    def test_last_load_returns_newest_load_and_newest_seed(self):
+        conn = FakeConn(fetch=("recent/20261012T113012Z/Dinesafe.csv", "historical/20261001T113000Z/"))
+        assert last_load(conn) == ("recent/20261012T113012Z/Dinesafe.csv", "historical/20261001T113000Z/")
+        sql = conn.executed[0][0]
+        assert "ORDER BY id DESC LIMIT 1" in sql
+        assert "kind = 'seed'" in sql
 
     def test_record_load_inserts_one_row(self):
         conn = FakeConn()
