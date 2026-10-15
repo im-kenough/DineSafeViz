@@ -126,7 +126,7 @@ $dirty"
 
   # 2. Stop before changing anything if the images aren't published yet.
   local image
-  for image in dsv-app dsv-init-db; do
+  for image in dsv-app dsv-pipeline; do
     docker manifest inspect "ghcr.io/im-kenough/$image:$tag" >/dev/null 2>&1 \
       || die "ghcr.io/im-kenough/$image:$tag isn't published. Wait for images.yml to finish, then rerun."
   done

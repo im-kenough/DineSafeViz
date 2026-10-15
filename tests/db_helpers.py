@@ -10,9 +10,9 @@ DB_DIR = ROOT / "src" / "dsv-db"
 # The same mounts, in the same name order, as dsv-db in docker-compose.yml.
 INIT_FILES = {
     "init.sql": DB_DIR / "init.sql",
-    "migrations-001_load_log.sql": DB_DIR / "migrations" / "001_load_log.sql",
     "set-passwords.sh": DB_DIR / "set-passwords.sh",
 }
+MIGRATIONS = sorted((DB_DIR / "migrations").glob("*.sql"))
 
 
 def docker(*args, check=True):
@@ -57,6 +57,20 @@ def wait_ready(name, timeout=90):
             return True
         time.sleep(1)
     raise TimeoutError(f"{name} didn't become ready in {timeout}s")
+
+
+def migrate(name):
+    """Apply every migration as the superuser, the way deploy.sh does."""
+    for migration in MIGRATIONS:
+        with open(migration) as f:
+            result = subprocess.run(
+                ["docker", "exec", "-i", name, "sh", "-c",
+                 'psql -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'],
+                stdin=f, capture_output=True, text=True, timeout=60,
+            )
+        if result.returncode != 0:
+            return result
+    return result
 
 
 def container_ip(name):

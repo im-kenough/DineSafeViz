@@ -1,13 +1,11 @@
 """init.sql, the migrations, and set-passwords.sh in the real Postgres image."""
 import os
-import subprocess
 
 import pytest
 
-from db_helpers import DB_DIR, docker, psql, start_db, wait_ready
+from db_helpers import DB_DIR, docker, migrate, psql, start_db, wait_ready
 
 SET_PASSWORDS = DB_DIR / "set-passwords.sh"
-MIGRATION = DB_DIR / "migrations" / "001_load_log.sql"
 # A quote and a dollar sign prove the psql quoting in set-passwords.sh.
 APP_PW = "app'pw$x"
 MIGRATOR_PW = "migrator-pw"
@@ -38,6 +36,8 @@ def ready_db():
     )
     try:
         assert wait_ready(name), docker("logs", name).stderr
+        result = migrate(name)
+        assert result.returncode == 0, result.stderr
         yield name
     finally:
         docker("rm", "-f", name, check=False)
@@ -83,17 +83,14 @@ def test_init_fails_when_a_password_is_unset(db, missing):
     assert missing in logs.stdout + logs.stderr
 
 
-def migrate(name):
-    """Apply the migration as the superuser, the way deploy.sh does."""
-    return subprocess.run(
-        ["docker", "exec", "-i", name, "sh", "-c",
-         'psql -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'],
-        stdin=open(MIGRATION), capture_output=True, text=True, timeout=60,
-    )
-
-
-def test_new_volume_has_load_log(ready_db):
-    result = login(ready_db, "dinesafe_migrator", MIGRATOR_PW, "SELECT count(*) FROM load_log")
+# deploy.sh is the only thing that applies migrations; the image's init
+# runs init.sql and set-passwords.sh only.
+def test_new_volume_waits_for_deploy_to_migrate(db):
+    name = db({"DSV_DB_APP_PASSWORD": APP_PW, "DSV_DB_MIGRATOR_PASSWORD": MIGRATOR_PW})
+    assert wait_ready(name), docker("logs", name).stderr
+    assert "load_log" in psql(name, "SELECT count(*) FROM load_log").stderr
+    assert migrate(name).returncode == 0
+    result = login(name, "dinesafe_migrator", MIGRATOR_PW, "SELECT count(*) FROM load_log")
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "0"
 

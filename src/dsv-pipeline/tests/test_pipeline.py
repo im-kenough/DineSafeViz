@@ -1,20 +1,31 @@
 import pytest
 
-import fakes  # noqa: F401  (puts src/dsv-db on sys.path)
+import fakes  # noqa: F401  (puts src/dsv-pipeline on sys.path)
 import pipeline
 from data import DataError
 
 
-@pytest.mark.parametrize("empty,last,newest,force,expected", [
-    (True, None, "recent/b/Dinesafe.csv", False, "seed"),
-    (True, "recent/b/Dinesafe.csv", "recent/b/Dinesafe.csv", False, "seed"),
-    (False, "recent/b/Dinesafe.csv", "recent/b/Dinesafe.csv", False, "skip"),
-    (False, "recent/a/Dinesafe.csv", "recent/b/Dinesafe.csv", False, "refresh"),
-    (False, None, "recent/b/Dinesafe.csv", False, "refresh"),
-    (False, "recent/b/Dinesafe.csv", "recent/b/Dinesafe.csv", True, "refresh"),
+R1, R2 = "recent/a/Dinesafe.csv", "recent/b/Dinesafe.csv"
+H1, H2 = "historical/a/", "historical/b/"
+
+
+# loaded: (recent path of the last load, historical path of the last seed).
+# newest: (newest recent file, newest complete historical folder) in Blob.
+@pytest.mark.parametrize("empty,loaded,newest,force,expected", [
+    (True, (None, None), (R2, H1), False, "seed"),
+    (True, (R2, H1), (R2, H1), False, "seed"),
+    (False, (R2, H1), (R2, H1), False, "skip"),
+    (False, (R1, H1), (R2, H1), False, "refresh"),
+    (False, (R2, H1), (R2, H1), True, "refresh"),
+    # A new historical folder reseeds, even when the recent file is current.
+    (False, (R2, H1), (R2, H2), False, "seed"),
+    (False, (R1, H1), (R2, H2), True, "seed"),
+    (False, (R2, None), (R2, H1), False, "seed"),
+    # No historical folder in Blob: nothing to reseed from.
+    (False, (R1, H1), (R2, None), False, "refresh"),
 ])
-def test_decide(empty, last, newest, force, expected):
-    assert pipeline.decide(empty, last, newest, force) == expected
+def test_decide(empty, loaded, newest, force, expected):
+    assert pipeline.decide(empty, loaded, newest, force) == expected
 
 
 class Recorder:

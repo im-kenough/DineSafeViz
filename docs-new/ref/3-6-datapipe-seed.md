@@ -1,7 +1,8 @@
 # Seed pipeline
 
 This page describes the `seed` pipeline. It fully loads the Postgres
-`inspections` table from the raw zone when the table is empty. For the
+`inspections` table from the raw zone when the table is empty, or when the
+raw zone has a historical folder the last seed didn't use. For the
 overview of all three pipelines, see
 [Data architecture](3-1-data-architecture.md).
 
@@ -13,26 +14,29 @@ once per database.
 | Property         | Value                                                     |
 | ---------------- | --------------------------------------------------------- |
 | From → to        | Bronze (Blob raw zone) → silver (`inspections`)           |
-| Code             | `src/dsv-db/pipeline.py: load` → `refresh.py: seed`       |
+| Code             | `src/dsv-pipeline/pipeline.py: load` → `loader.py: seed`  |
 | Contacts Toronto | No                                                        |
-| Runs when        | The load step finds `inspections` empty                   |
+| Runs when        | `inspections` is empty, or a new `historical/` folder     |
 | Reads            | Newest complete `historical/` folder and newest `recent/` CSV |
 
 ## Triggers
 
 You don't start a seed directly. The load step picks seed, refresh, or skip
-from the state of the database, and picks seed whenever `inspections` is
-empty. For the decision itself, see
+from the state of the database. It picks seed when `inspections` is empty,
+or when the newest complete `historical/` folder isn't the one the last seed
+used. For the decision itself, see
 [Load decision](datapipe-refresh.md#load-decision).
 
 | Trigger                          | Command                     | Seeds when                     |
 | -------------------------------- | --------------------------- | ------------------------------ |
 | `deploy.sh stg`, `prod`, `dev`   | `pipeline.sh <env> load`    | First deploy on a new volume   |
-| `dsv-pipeline.timer` (stg, prod) | `pipeline.sh <env> run`     | The timer finds the table empty |
-| Operator                         | `pipeline.sh <env> load`    | The table is empty             |
+| `dsv-pipeline.timer` (stg, prod) | `pipeline.sh <env> run`     | Empty table or new historical folder |
+| Operator                         | `pipeline.sh <env> load`    | Empty table or new historical folder |
 
 - A fresh deployment of the app triggers a seed, because Postgres creates an
   empty schema on the first start of a new `dsv-db-data` volume.
+- `ingest --historical` writes a new `historical/` folder, so the next load
+  reseeds: it deletes every row and seeds again, in one transaction.
 - dev seeds from stg's raw zone.
 
 ## Prerequisites
@@ -53,14 +57,14 @@ The seed reads only from the raw zone, so the raw zone must be filled first.
 
 ## Flow
 
-At a high level, the seed reads both datasets, transforms them in memory, and
-bulk loads them in one transaction.
+At a high level, the seed streams both datasets through the transforms into
+`COPY`, in one transaction. Memory holds one batch of rows, not a file.
 
 ```mermaid
 flowchart LR
-    load(["load:<br/>table empty"]) --> read["Extract: read historical<br/>+ newest recent CSV<br/>from Blob"]
-    read --> xform["Transform in memory:<br/>rename, clean,<br/>split addresses,<br/>de-duplicate"]
-    xform --> copy["Load: bulk COPY<br/>into inspections"]
+    load(["load:<br/>empty table or<br/>new historical folder"]) --> read["Extract: read historical<br/>+ newest recent CSV<br/>from Blob"]
+    read --> xform["Transform, streaming:<br/>rename, clean,<br/>split addresses,<br/>de-duplicate"]
+    xform --> copy["Load: COPY in batches<br/>into inspections"]
     copy --> log["Add load_log row,<br/>COMMIT"]
 ```
 
@@ -68,33 +72,33 @@ In detail, the seed handles the recent CSV first, because its earliest date
 sets the cutoff for the historical rows:
 
 1. Take the advisory lock, so only one load runs.
-2. Download the newest recent CSV and every CSV in the newest complete
-   historical folder into a temporary directory.
-3. Read the recent CSV, map its rows, and drop old-ID duplicates.
-4. Set the cutoff to the earliest `inspection_date` in the recent rows
-   (2023-11-10 with the current feed).
-5. Load each historical CSV, one at a time in file name order to cap memory.
-   Drop rows on or after the cutoff, then `COPY` the rest.
-6. `COPY` the recent rows.
-7. Insert a `load_log` row with `kind = 'seed'`, `rows_deleted = 0`, and both
-   `recent_path` and `historical_path`, then commit.
+2. Download the newest recent CSV into a temporary directory.
+3. Scan the recent CSV once (`scan_recent()`). This finds the cutoff, the
+   earliest `inspection_date` (2023-11-10 with the current feed), and the
+   old-ID duplicates to drop.
+4. Delete every row in `inspections`. On a new volume, this deletes nothing.
+5. Load each historical CSV in file name order. Download it, stream its rows,
+   drop rows on or after the cutoff, `COPY` the rest, then delete the file.
+   `/tmp` holds one historical file at a time.
+6. Stream the recent CSV again, drop the old-ID duplicates, and `COPY` it.
+7. Insert a `load_log` row with `kind = 'seed'`, the rows deleted and
+   inserted, and both `recent_path` and `historical_path`, then commit.
 
 `seed()` never commits. `pipeline.py` adds the `load_log` row and commits
 once.
 
 ## Transformations
 
-Seed and refresh run the same row transforms from `src/dsv-db/refresh.py`.
+Seed and refresh run the same row transforms from
+`src/dsv-pipeline/loader.py`.
 The seed is the only pipeline that runs the historical side.
 
 ```mermaid
 flowchart LR
-    rc["Recent CSV"] --> rmap["Decode, map_row()<br/>RECENT_COLUMN_MAP"]
-    rmap --> dd["drop_old_id_<br/>duplicates()"]
-    dd --> cut{{"cutoff = earliest<br/>inspection_date"}}
-    cut -- seed --> hist["Each historical CSV:<br/>decode, map_row()<br/>HISTORICAL_COLUMN_MAP,<br/>drop rows on or after cutoff"]
-    hist --> hcopy["COPY historical rows"] --> rcopy["COPY recent rows"]
-    cut -- refresh --> del["DELETE rows on<br/>or after cutoff"] --> rcopy
+    rc["Recent CSV"] --> scan{{"scan_recent():<br/>cutoff, old-ID keys"}}
+    scan -- seed --> sdel["DELETE all rows"] --> hist["Each historical CSV:<br/>decode, map_row()<br/>HISTORICAL_COLUMN_MAP,<br/>drop rows on or after cutoff"]
+    hist --> hcopy["COPY historical rows"] --> rcopy["Recent CSV again:<br/>decode, map_row(),<br/>drop_old_id_duplicates(),<br/>COPY recent rows"]
+    scan -- refresh --> del["DELETE rows on<br/>or after cutoff"] --> rcopy
     rcopy --> log["INSERT load_log<br/>COMMIT"]
 ```
 
@@ -110,30 +114,34 @@ Every row goes through these steps, in order:
 | 6   | Address   | `split_address()`          | `3155 Markham Rd Unit-D1 M1X 0B5` → `3155 Markham Rd`, `Unit-D1`, `M1X 0B5`     |
 | 7   | De-dupe   | `drop_old_id_duplicates()` | Drops the numeric-ID copy of a recent inspection: 3,996 rows                    |
 | 8   | Overlap   | `exclude_on_or_after()`    | Drops historical rows on or after the cutoff: 4,791 rows                        |
-| 9   | Escape    | `bulk_insert()`            | Tab, CR, LF in values → space. `NULL` → `\N`.                                   |
+| 9   | Escape    | `bulk_insert()`            | Tab, CR, LF in values → space. `NULL` → `\N`. Batches of 10,000 rows.           |
 | 10  | Cast      | Postgres `COPY`            | Text → `DATE` or `DOUBLE PRECISION`. One bad value fails the load.              |
 
 - Row counts are from the October 14, 2026 data.
-- Overlap rule: the cutoff is computed after de-dupe. Rows with no date are
-  kept.
+- Overlap rule: the cutoff is the earliest date in the recent CSV. De-dupe
+  can't change it, because every dropped row shares its date with a kept
+  row. Rows with no date are kept.
 
 For the full column mapping, the address split, and a worked example, see
 [Data mapping](3-6-data-mapping.md).
 
 ## Size
 
-The seed is the largest load. Measured with the October 14, 2026 data:
+The seed is the largest load. Measured with the October 15, 2026 data:
 
-| Measure          | Value                                                |
-| ---------------- | ---------------------------------------------------- |
-| Rows inserted    | 508,445: 390,835 historical, 117,610 recent          |
-| Download         | About 125 MB, held in `/tmp`                         |
-| Memory peak      | About 430 MiB, under the 768 MiB container limit     |
+| Measure          | Value                                                     |
+| ---------------- | --------------------------------------------------------- |
+| Rows inserted    | 508,618: 390,835 historical, 117,783 recent               |
+| Time             | About 24 seconds                                          |
+| `/tmp`           | The recent CSV and one historical CSV at a time           |
+| Memory peak      | 121 MiB, `/tmp` included, under the 256 MiB container limit |
+
+Before streaming (October 14, 2026), the same seed peaked at 573 MiB.
 
 ## Guarantees and failure handling
 
 The seed is one transaction. If it fails, nothing is committed and the table
-stays empty.
+keeps the rows it had: none on a first deploy, the old data on a reseed.
 
 | Failure                                        | Result                                    |
 | ---------------------------------------------- | ----------------------------------------- |
@@ -158,7 +166,7 @@ the raw zone is the source for every rebuild.
 | Transform bug in historical rows | Empty `inspections`, then `load` to reseed. No script does this yet. |
 
 - Prod also takes a manual OS disk snapshot before each deploy.
-- A new `historical/` folder takes effect only on the next seed. Refreshes
+- A new `historical/` folder triggers a reseed on the next load. Refreshes
   never read `historical/`.
 
 ## Known gaps
@@ -168,8 +176,9 @@ These limits exist in the current code:
 - **Transform changes don't reach historical rows:** a refresh only replaces
   the recent window. To apply a transform change to rows before the cutoff
   (currently November 10, 2023), you must reseed.
-- **No reseed script:** reseeding needs a manual empty of `inspections`, or
-  destroying the database volume and redeploying.
+- **No reseed command:** to reseed from the same files, run
+  `pipeline.sh <env> ingest --historical` (stg and prod), which writes a new
+  `historical/` folder. Or destroy the database volume and redeploy.
 - **No `Closed` status before the cutoff:** historical data has no closures,
   so closure counts start in November 2023.
 

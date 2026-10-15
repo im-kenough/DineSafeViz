@@ -5,7 +5,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY refresh.py data.py pipeline.py ./
+COPY loader.py data.py pipeline.py ./
 
 # scripts/pipeline.sh passes the subcommand: ingest, load, or run.
 ENTRYPOINT ["python3", "pipeline.py"]

@@ -245,8 +245,8 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Data files
-src/dsv-db/**/*.csv
-src/dsv-db/**/*.zip
+src/dsv-pipeline/**/*.csv
+src/dsv-pipeline/**/*.zip
 
 # draw.io tempfiles
 *.bkp

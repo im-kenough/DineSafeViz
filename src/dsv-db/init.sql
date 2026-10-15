@@ -22,7 +22,7 @@ CREATE TABLE inspections (
     unique_id                   TEXT,
     establishment_status        TEXT,
     min_inspections_per_year    TEXT,
-    -- Split from establishment_address at ingest by refresh.py
+    -- Split from establishment_address at load by loader.py
     street                      TEXT,
     unit                        TEXT,
     postal_code                 TEXT

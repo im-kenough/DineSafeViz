@@ -2,7 +2,7 @@
 
 These tests cover the Azure VM deployment files: the deploy scripts, the
 Compose override, the nginx config, and the database init scripts. App and
-data-loader unit tests stay in src/dsv-app/tests and src/dsv-db/tests.
+data-loader unit tests stay in src/dsv-app/tests and src/dsv-pipeline/tests.
 """
 import subprocess
 from pathlib import Path

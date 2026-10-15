@@ -4,7 +4,8 @@ Two source schemas map into one table. The recent and historical CSVs use
 different column names, and each has columns the other lacks. For the source
 files themselves, see [Data sources](3-2-data-sources.md).
 
-Seed and refresh run the same row transforms from `src/dsv-db/refresh.py`.
+Seed and refresh run the same row transforms from
+`src/dsv-pipeline/loader.py`.
 For the load path and the order of the transform steps, see
 [Transformations](datapipe-seed.md#transformations).
 

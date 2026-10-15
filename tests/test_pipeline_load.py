@@ -5,11 +5,11 @@ import sys
 import psycopg2
 import pytest
 
-from db_helpers import container_ip, docker, start_db, wait_ready
+from db_helpers import container_ip, docker, migrate, start_db, wait_ready
 from helpers import ROOT
 
-sys.path.insert(0, str(ROOT / "src" / "dsv-db" / "tests"))
-sys.path.insert(0, str(ROOT / "src" / "dsv-db"))
+sys.path.insert(0, str(ROOT / "src" / "dsv-pipeline" / "tests"))
+sys.path.insert(0, str(ROOT / "src" / "dsv-pipeline"))
 
 from fakes import FakeStore, historical_csv, historical_row, recent_csv, recent_row  # noqa: E402
 import pipeline  # noqa: E402
@@ -26,6 +26,7 @@ def db():
     name = start_db({"DSV_DB_APP_PASSWORD": "app-pw", "DSV_DB_MIGRATOR_PASSWORD": MIGRATOR_PW})
     try:
         assert wait_ready(name), docker("logs", name).stderr
+        assert migrate(name).returncode == 0
         yield name
     finally:
         docker("rm", "-f", name, check=False)
@@ -95,6 +96,20 @@ def test_new_recent_file_refreshes_the_window(conn, store, tmp_path):
     assert count(conn, "SELECT count(*) FROM inspections") == 4
     assert count(conn, "SELECT rows_deleted || '/' || rows_inserted FROM load_log ORDER BY id DESC LIMIT 1") \
         == "1/2"
+
+
+def test_new_historical_folder_reseeds(conn, store, tmp_path):
+    pipeline.load(store, conn)
+    hist2 = "historical/20261014T153259Z/"
+    store.put(hist2 + "dinesafe_hist_2022.csv",
+              csv_bytes(historical_csv, [historical_row("9", "2022-03-01"),
+                                         historical_row("6", "2022-07-01")], tmp_path, "h22b.csv"))
+    store.put(hist2 + "_SUCCESS", b"")
+    assert pipeline.load(store, conn) == "seed"
+    assert count(conn, "SELECT count(*) FROM inspections") == 3  # 2 from the new folder + 1 recent
+    assert count(conn, "SELECT rows_deleted || ' ' || historical_path FROM load_log ORDER BY id DESC LIMIT 1") \
+        == f"3 {hist2}"
+    assert pipeline.load(store, conn) == "skip"
 
 
 def test_force_reloads_the_current_file(conn, store):

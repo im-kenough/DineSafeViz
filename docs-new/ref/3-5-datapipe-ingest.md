@@ -12,7 +12,7 @@ The `ingest` pipeline moves data from Toronto into the bronze layer.
 | Property         | Value                                                           |
 | ---------------- | --------------------------------------------------------------- |
 | From → to        | Toronto Open Data → bronze (Blob raw zone)                      |
-| Code             | `src/dsv-db/data.py: ingest`                                    |
+| Code             | `src/dsv-pipeline/data.py: ingest`                              |
 | Contacts Toronto | Yes                                                             |
 | Touches Postgres | No                                                              |
 | Environments     | stg and prod only. dev can't ingest; it loads from stg's raw zone |
@@ -123,7 +123,7 @@ stdsv<env>01 / dinesafe
 - Folder name: the ingest's UTC start time, not Toronto's date. Names sort in
   time order, so there's no manifest.
 - A forced download with new content gets its own folder.
-- A new `historical/` folder takes effect only on the next seed. Refreshes
+- A new complete `historical/` folder makes the next load reseed. Refreshes
   never read `historical/`. See [Seed pipeline](datapipe-seed.md).
 
 ## Retention

@@ -76,7 +76,7 @@ flowchart LR
         db[("dsv-db<br/>postgres:18.6-alpine3.24<br/>:5432")]
     end
 
-    pipeline["dsv-pipeline<br/>ghcr.io/im-kenough/dsv-init-db<br/>profile: pipeline"]
+    pipeline["dsv-pipeline<br/>ghcr.io/im-kenough/dsv-pipeline<br/>profile: pipeline"]
 
     subgraph egress["egress network"]
         internet((Internet))
@@ -103,11 +103,11 @@ flowchart LR
 | `dsv-app`       | `backend`           | 192 MiB     | Runs as `nonroot`.                           |
 | `dsv-db`        | `backend`           | 320 MiB     | Data in the `dsv-db-data` volume.            |
 | `dsv-analytics` | `backend`           | 320 MiB     | Fixed IP for the admin SSH tunnel.           |
-| `dsv-pipeline`  | `egress`, `backend` | 768 MiB     | `ingest`, `load`, or `run`. One-shot.        |
+| `dsv-pipeline`  | `egress`, `backend` | 256 MiB     | `ingest`, `load`, or `run`. One-shot.        |
 
 - Locally:
   - Compose builds `dsv-app` and `dsv-pipeline` from `src/dsv-app` and
-    `src/dsv-db`.
+    `src/dsv-pipeline`.
   - All services share the default network.
   - nginx is published on `8080` and the inspections dashboard (Grafana) on
     `3000`.

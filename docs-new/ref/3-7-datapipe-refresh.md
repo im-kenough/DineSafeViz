@@ -13,7 +13,7 @@ right after ingest.
 | Property         | Value                                                         |
 | ---------------- | ------------------------------------------------------------- |
 | From → to        | Bronze (Blob raw zone) → silver (`inspections`)               |
-| Code             | `src/dsv-db/pipeline.py: load` → `refresh.py: refresh`        |
+| Code             | `src/dsv-pipeline/pipeline.py: load` → `loader.py: refresh`   |
 | Contacts Toronto | No                                                            |
 | Runs when        | The load step finds the newest blob not loaded yet, or `--force` |
 | Reads            | Newest `recent/` CSV only. Never `historical/`.               |
@@ -55,7 +55,7 @@ sequenceDiagram
     S->>P: docker compose run --rm, token as a mode-600 file
     P->>B: ingest (see Ingest pipeline)
     P->>D: BEGIN, pg_advisory_xact_lock
-    P->>D: Table empty? Newest load_log.recent_path?
+    P->>D: Table empty? Last recent_path? Last seed's historical_path?
     alt Already current
         P->>D: ROLLBACK, which releases the lock
     else Seed or refresh
@@ -97,8 +97,8 @@ flowchart LR
 ```mermaid
 flowchart LR
     start([load]) --> lock["Take advisory lock<br/>waits for any other load"]
-    lock --> empty{"inspections<br/>empty?"}
-    empty -- yes --> seed["Seed<br/>historical before cutoff, then recent"]
+    lock --> empty{"inspections empty,<br/>or new historical<br/>folder in Blob?"}
+    empty -- yes --> seed["Seed<br/>DELETE all, historical<br/>before cutoff, then recent"]
     empty -- no --> cur{"Newest blob is the<br/>newest load_log row,<br/>without --force?"}
     cur -- yes --> skip(["Skip: already current"])
     cur -- no --> refresh["Refresh<br/>DELETE on or after cutoff, COPY recent"]
@@ -107,6 +107,9 @@ flowchart LR
 ```
 
 - The skip check compares blob paths, not content.
+- "New historical folder" means the newest complete `historical/` folder
+  isn't the `historical_path` of the last seed. `--force` never skips a
+  needed reseed.
 - For the seed branch, see [Seed pipeline](datapipe-seed.md).
 
 ## The recent window
@@ -128,11 +131,12 @@ inspection_date ─────────────────────�
 
 In detail, a refresh does the following inside one transaction:
 
-1. Read the newest recent CSV, map its rows, and drop old-ID duplicates.
-2. Set the cutoff to the earliest `inspection_date` in those rows.
-3. Run `DELETE FROM inspections WHERE inspection_date >= cutoff`.
-4. `COPY` every recent row.
-5. Insert a `load_log` row with `kind = 'refresh'`, `rows_deleted`, and
+1. Scan the newest recent CSV once for the cutoff, the earliest
+   `inspection_date`, and the old-ID duplicates.
+2. Run `DELETE FROM inspections WHERE inspection_date >= cutoff`.
+3. Stream the recent CSV again, drop the old-ID duplicates, and `COPY` the
+   rows in batches of 10,000.
+4. Insert a `load_log` row with `kind = 'refresh'`, `rows_deleted`, and
    `rows_inserted`, then commit.
 
 - Picks up Toronto's corrections, deletions, and backfill anywhere in the
@@ -208,7 +212,7 @@ identity.
 | Commands       | `load`                      | `ingest`, `load`, `run`            | `ingest`, `load`, `run`    |
 | Timer          | No                          | Yes                                | Yes                        |
 | Storage token  | Your `az login`             | VM managed identity                | VM managed identity        |
-| Pipeline image | Built from the working tree | GHCR `dsv-init-db:sha-<short SHA>` | GHCR `dsv-init-db:<X.Y.Z>` |
+| Pipeline image | Built from the working tree | GHCR `dsv-pipeline:sha-<short SHA>` | GHCR `dsv-pipeline:<X.Y.Z>` |
 
 - Before you compare environments, check `load_log` in each one.
 

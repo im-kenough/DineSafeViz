@@ -795,7 +795,7 @@ packages are already linked to the repository.
 
 - **Web:** Your profile > **Packages** > `dsv-app` > **Package settings** >
   **Danger Zone** > **Change visibility** > **Public**. Repeat for
-  `dsv-init-db`. Under **Manage Actions access**, confirm that `DineSafeViz`
+  `dsv-pipeline`. Under **Manage Actions access**, confirm that `DineSafeViz`
   is listed.
 - **Verify:** `docker logout ghcr.io; docker manifest inspect ghcr.io/im-kenough/dsv-app:main >/dev/null && echo public`
 - **Source:** [Configuring a package's access control and visibility](https://docs.github.com/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility)

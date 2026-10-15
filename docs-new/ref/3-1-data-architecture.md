@@ -55,10 +55,10 @@ database:
 | Pipeline  | From → to        | Contacts TODP? | Runs when                     | Code                                        |
 | --------- | ---------------- | ----------------- | ----------------------------- | ------------------------------------------- |
 | `ingest`  | Toronto → bronze | Yes               | `run` or `ingest`             | `data.py: ingest`                           |
-| `seed`    | Bronze → silver  | No                | Load step, table is empty     | `pipeline.py: load` → `refresh.py: seed`    |
-| `refresh` | Bronze → silver  | No                | Load step, newest file in Blob not loaded yet (or `--force`) | `pipeline.py: load` → `refresh.py: refresh` |
+| `seed`    | Bronze → silver  | No                | Load step, table is empty or Blob has a new historical folder | `pipeline.py: load` → `loader.py: seed`    |
+| `refresh` | Bronze → silver  | No                | Load step, newest file in Blob not loaded yet (or `--force`) | `pipeline.py: load` → `loader.py: refresh` |
 
-All code paths are under `src/dsv-db/`.
+All code paths are under `src/dsv-pipeline/`.
 
 In `run`, each step only starts if the one before it succeeded. If ingest
 fails, the load and the freshness check don't run.
@@ -80,10 +80,13 @@ For details, see [Ingest pipeline](datapipe-ingest.md).
 
 The `seed` pipeline fully loads the `inspections` table from the raw zone.
 The load step runs it whenever the table is empty, so a fresh deployment
-triggers a seed.
+triggers a seed. It also reseeds when Blob has a newer complete historical
+folder than the last seed used.
 
-- Loads the historical data up to the start of the recent CSV, then the
-  recent CSV, in one transaction. If it fails, the table stays empty.
+- Empties the table, then loads the historical data up to the start of the
+  recent CSV, then the recent CSV, in one transaction. If it fails, the table
+  keeps the rows it had.
+- Streams rows into `COPY`, so a full seed peaks at about 121 MiB.
 - Needs a filled raw zone: ingest before the first deploy.
 
 For details, see [Seed pipeline](datapipe-seed.md).
@@ -121,14 +124,15 @@ only load from the raw zone.
 | ------------------------------ | ----------------------------- | ---------------------------------------------------------------------------- |
 | First deploy, empty raw zone   | Untouched                     | Schema created. The load fails, and the deploy fails with an empty database. |
 | First deploy, raw zone filled  | Read only                     | Schema created, then **seed**.                                               |
-| Redeploy                       | Read only                     | Migrations rerun. Then **refresh** if Blob has a newer file, otherwise skip. |
+| Redeploy                       | Read only                     | Migrations rerun. Then **seed** if Blob has a new historical folder, **refresh** if it has a newer recent file, otherwise skip. |
 | Restart or `docker compose up` | Untouched                     | Untouched. The pipeline isn't started by `up`.                               |
-| Scheduled run                  | New folder if Toronto changed | **Refresh** or skip, then the staleness check.                               |
+| Scheduled run                  | New folder if Toronto changed | **Seed**, **refresh**, or skip, then the staleness check.                    |
 | Database volume destroyed      | Untouched                     | Lost. The next deploy is a first deploy, so it seeds from the raw zone.      |
 
-- Postgres creates the schema (`init.sql` and the migrations) the first time
-  `dsv-db` starts on an empty volume. On every deploy, `deploy.sh` reruns the
-  migrations, then runs the load step. Migrations are idempotent.
+- Postgres runs `init.sql` the first time `dsv-db` starts on an empty volume.
+  On every deploy, `deploy.sh` applies the migrations, then runs the load
+  step. `deploy.sh` is the only place migrations run, so they must be
+  idempotent.
 - If a redeploy's load fails, the deploy prints a warning and the site keeps
   serving the data it already has.
 - If the timer fires during a deploy, the load lock makes one load wait for the
@@ -145,8 +149,8 @@ the pipeline in stg.
 - **Transform changes don't reach historical rows.** A refresh only replaces
   the recent window. If you change the transform, rows before the recent
   CSV's earliest date (currently November 10, 2023) keep the old logic. To
-  reprocess everything, destroy the database volume and redeploy, so the next
-  deploy seeds from the raw zone.
+  reprocess everything, reseed: run `pipeline.sh <env> ingest --historical`,
+  or destroy the database volume and redeploy.
 - **No down migrations.** Migrations only move forward. Rolling back to an
   older image runs old code against the newer schema.
 - **Limited replay window.** The raw zone keeps the newest 30 recent folders,

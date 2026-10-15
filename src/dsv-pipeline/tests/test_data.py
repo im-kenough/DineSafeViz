@@ -12,7 +12,7 @@ from data import (
     BlobStore, DataError, folders, http_download, md5_b64, newest_historical,
     newest_recent, resolve_resources, validate_csv,
 )
-from refresh import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP
+from loader import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP
 
 LIST = "?restype=container&comp=list&prefix=recent%2F&include=metadata"
 

@@ -77,7 +77,7 @@ services:
 
   dsv-pipeline:
     <<: *hardening
-    image: ghcr.io/im-kenough/dsv-init-db:${DSV_VERSION:?}
+    image: ghcr.io/im-kenough/dsv-pipeline:${DSV_VERSION:?}
     environment:
       DSV_DB_PASSWORD: ${DSV_DB_MIGRATOR_PASSWORD:?}
     # The only service on both: egress for Toronto Open Data and the storage
@@ -86,10 +86,10 @@ services:
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
-    # refresh.py peaked at about 430 MiB on the full seed (October 5, 2026),
-    # and the downloaded CSVs (about 125 MB on a seed) sit in the /tmp tmpfs,
-    # which counts against this limit. One-shot, so swap absorbs it.
-    mem_limit: 768m
+    # A full seed peaked at 121 MiB, including the /tmp tmpfs, which counts
+    # against this limit (October 15, 2026). loader.py streams rows into COPY,
+    # and the seed keeps one historical CSV in /tmp at a time.
+    mem_limit: 256m
 
   dsv-analytics:
     <<: *hardening

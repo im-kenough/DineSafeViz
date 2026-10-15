@@ -34,8 +34,8 @@ jobs:
         include:
           - image: dsv-app
             context: src/dsv-app
-          - image: dsv-init-db
-            context: src/dsv-db
+          - image: dsv-pipeline
+            context: src/dsv-pipeline
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -86,8 +86,8 @@ jobs:
         include:
           - image: dsv-app
             context: src/dsv-app
-          - image: dsv-init-db
-            context: src/dsv-db
+          - image: dsv-pipeline
+            context: src/dsv-pipeline
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -137,7 +137,7 @@ jobs:
             # Pinned upstream images; lines with ${...} are the owned images.
             grep -hE '^\s+image:\s*[^$[:space:]]+\s*$' docker-compose.yml docker-compose.vm.yml \
               | awk '{print $2}'
-            for image in dsv-app dsv-init-db; do
+            for image in dsv-app dsv-pipeline; do
               echo "ghcr.io/im-kenough/$image:main"
               if [ -n "$release" ]; then
                 echo "ghcr.io/im-kenough/$image:${release#v}"

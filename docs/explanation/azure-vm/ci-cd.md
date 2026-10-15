@@ -44,10 +44,10 @@ The repository has these automation pieces:
 `images.yml` builds two images. Upstream images (nginx, Postgres, Grafana,
 curl, and cloudflared) are pulled by pinned tag and aren't rebuilt.
 
-| Image                            | Source        |
-| -------------------------------- | ------------- |
-| `ghcr.io/im-kenough/dsv-app`     | `src/dsv-app` |
-| `ghcr.io/im-kenough/dsv-init-db` | `src/dsv-db`  |
+| Image                             | Source             |
+| --------------------------------- | ------------------ |
+| `ghcr.io/im-kenough/dsv-app`      | `src/dsv-app`      |
+| `ghcr.io/im-kenough/dsv-pipeline` | `src/dsv-pipeline` |
 
 ## Image tags
 
@@ -69,12 +69,12 @@ Three free tools keep dependencies current and flag known vulnerabilities.
 
 - **Dependabot version updates** open weekly PRs for each ecosystem:
 
-  | Ecosystem        | Location                       | Updates                                  |
-  | ---------------- | ------------------------------ | ---------------------------------------- |
-  | `github-actions` | `.github/workflows`            | Action SHA pins and their version comments |
-  | `docker`         | `src/dsv-app`, `src/dsv-db`    | Dockerfile base images                   |
-  | `docker-compose` | Repository root                | nginx, Postgres, Grafana, curl, cloudflared tags |
-  | `pip`            | `src/dsv-app`, `src/dsv-db`    | `requirements.txt` packages              |
+  | Ecosystem        | Location                          | Updates                                          |
+  | ---------------- | --------------------------------- | ------------------------------------------------ |
+  | `github-actions` | `.github/workflows`               | Action SHA pins and their version comments       |
+  | `docker`         | `src/dsv-app`, `src/dsv-pipeline` | Dockerfile base images                           |
+  | `docker-compose` | Repository root                   | nginx, Postgres, Grafana, curl, cloudflared tags |
+  | `pip`            | `src/dsv-app`, `src/dsv-pipeline` | `requirements.txt` packages                      |
 
   Minor and patch updates are grouped into one PR per ecosystem. Major
   Postgres updates are ignored, because moving from 17 to 18 needs a data

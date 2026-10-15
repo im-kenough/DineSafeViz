@@ -91,10 +91,11 @@ One row per successful seed or refresh. The newest row records what's loaded.
 | `kind`            | TEXT        | `NOT NULL`, `CHECK (kind IN ('seed', 'refresh'))`               |
 | `recent_path`     | TEXT        | `NOT NULL`. For example, `recent/20261012T113012Z/Dinesafe.csv` |
 | `historical_path` | TEXT        | Seed only. For example, `historical/20261005T140211Z/`          |
-| `rows_deleted`    | INTEGER     | `NOT NULL`. Always 0 for a seed.                                |
+| `rows_deleted`    | INTEGER     | `NOT NULL`. 0 for a seed on a new volume.                       |
 | `rows_inserted`   | INTEGER     | `NOT NULL`                                                      |
 
-- The load step reads the newest `recent_path` to decide whether to skip. See
+- The load step reads the newest `recent_path` and the newest seed's
+  `historical_path` to pick seed, refresh, or skip. See
   [Load decision](datapipe-refresh.md#load-decision).
 
 ### Indexes and constraints
@@ -123,10 +124,10 @@ Three roles. The pipeline and readers never use the superuser.
 Postgres creates the schema once. Deploys keep it current.
 
 1. On the first start of an empty `dsv-db-data` volume, the Postgres image
-   runs, in name order: `init.sql`, `migrations-001_load_log.sql`, then
-   `set-passwords.sh`.
-2. On every deploy, `deploy.sh` reruns each `src/dsv-db/migrations/*.sql` as
-   the superuser. Migrations are idempotent.
+   runs `init.sql`, then `set-passwords.sh`.
+2. On every deploy, `deploy.sh` applies each `src/dsv-db/migrations/*.sql` as
+   the superuser, before the load. This is the only place migrations run, so
+   every migration must be idempotent.
 3. The load step fills the tables. See [Seed pipeline](datapipe-seed.md).
 
 - `DSV_DB_NAME` must be `dinesafe`, because `init.sql` grants on that name.

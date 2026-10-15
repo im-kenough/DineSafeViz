@@ -1,7 +1,6 @@
 -- 001: the load_log table, and narrow dinesafe_migrator to what the data
--- pipeline needs. Idempotent: the Postgres image runs it once on a new
--- volume (mounted after init.sql), and scripts/deploy.sh runs it on every
--- deploy, so existing databases pick it up too.
+-- pipeline needs. scripts/deploy.sh applies every migration on every deploy,
+-- new volume or not, so each one must be idempotent.
 
 CREATE TABLE IF NOT EXISTS load_log (
     id               SERIAL PRIMARY KEY,

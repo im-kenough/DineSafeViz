@@ -10,8 +10,9 @@ The source of truth is the code:
 - `src/dsv-db/init.sql`: roles, table, and index.
 - `src/dsv-db/migrations/001_load_log.sql`: the `load_log` table and the
   loader role's final grants.
-- `src/dsv-db/refresh.py`: the seed and refresh logic and the column maps.
-- `src/dsv-db/pipeline.py`: chooses seed, refresh, or skip, and commits.
+- `src/dsv-pipeline/loader.py`: the seed and refresh logic and the column
+  maps.
+- `src/dsv-pipeline/pipeline.py`: chooses seed, refresh, or skip, and commits.
 - `src/dsv-app/app.py` and
   `src/dsv-analytics/provisioning/dashboards/dinesafe.json`: the queries that
   read the table.
@@ -22,9 +23,9 @@ The database is built in two stages. Postgres creates an empty schema, and
 then a one-shot container fills it.
 
 1. `dsv-db` (`postgres:18.6`) starts. On the first start only, when the
-   `dsv-db-data` volume is empty, Postgres runs `init.sql`,
-   `migrations/001_load_log.sql`, and `set-passwords.sh` from
-   `/docker-entrypoint-initdb.d/`, in that order. They create:
+   `dsv-db-data` volume is empty, Postgres runs `init.sql` and
+   `set-passwords.sh` from `/docker-entrypoint-initdb.d/`, in that order.
+   With the migrations that `deploy.sh` applies next, they create:
    - the `inspections` table and an index on `inspection_date`.
    - the `load_log` table, which records each load.
    - `dinesafe_app`, a role with `SELECT` on both tables and a 10-second
@@ -35,12 +36,12 @@ then a one-shot container fills it.
    - the passwords for both roles, from `DSV_DB_APP_PASSWORD` and
      `DSV_DB_MIGRATOR_PASSWORD`.
 2. `scripts/deploy.sh` runs every file in `src/dsv-db/migrations/` as the
-   superuser on every deploy. The migrations are idempotent, so existing
-   databases pick up new ones.
+   superuser on every deploy, before the load. It's the only place
+   migrations run, so they're idempotent.
 3. `dsv-pipeline load` fills the table. It takes a Postgres advisory lock,
    so two loads can't run at once, then picks one action:
-   - **Empty table:** `seed()` loads the historical data and then the recent
-     data.
+   - **Empty table, or a new complete `historical/` folder:** `seed()`
+     empties the table, then loads the historical data and the recent data.
    - **Newest raw-zone file not loaded yet, or `--force`:** `refresh()`
      replaces the recent data.
    - **Newest raw-zone file already loaded:** it skips, and changes nothing.
@@ -62,16 +63,17 @@ each business-day morning. Locally, it runs on `./scripts/deploy.sh dev` or
 
 `seed()` runs as a single transaction and commits once at the end:
 
-1. Read the recent CSV and map each row (see
-   [Row processing](#row-processing)).
-2. Drop duplicate rows filed under an old ID (see
-   [Old ID duplicates](#old-id-duplicates)).
-3. Take the earliest `inspection_date` in the recent data as the cutoff.
-   With the current feed, the cutoff is `2023-11-10`.
-4. Load each historical CSV in filename order. Rows dated on or after the
-   cutoff are skipped. `dinesafe_hist_2023.csv` runs to `2023-12-29`, so its
-   rows from the overlap window are dropped in favor of the recent feed.
-5. Bulk-insert the recent rows.
+1. Scan the recent CSV once for the cutoff, the earliest `inspection_date`,
+   and the duplicate rows filed under an old ID (see
+   [Old ID duplicates](#old-id-duplicates)). With the current feed, the
+   cutoff is `2023-11-10`.
+2. Delete every row in `inspections`.
+3. Load each historical CSV in filename order, streaming its rows (see
+   [Row processing](#row-processing)). Rows dated on or after the cutoff are
+   skipped. `dinesafe_hist_2023.csv` runs to `2023-12-29`, so its rows from
+   the overlap window are dropped in favor of the recent feed.
+4. Stream the recent CSV again, drop the old-ID duplicates, and bulk-insert
+   the rest.
 
 `seed()` doesn't commit. `pipeline.py` adds the `load_log` row and commits
 once.
@@ -82,8 +84,8 @@ and are skipped) and 117,610 recent rows.
 
 ### Refresh path
 
-`refresh()` reads, maps, and de-duplicates the recent CSV first. Then it
-runs `DELETE FROM inspections WHERE inspection_date >= cutoff` and inserts
+`refresh()` scans the recent CSV for the cutoff and the old-ID duplicates
+first. Then it runs `DELETE FROM inspections WHERE inspection_date >= cutoff` and inserts
 the new rows. `pipeline.py` adds the `load_log` row and commits all three in
 one transaction, so readers never see a partially loaded table. Historical
 rows stay in place because they're older than the cutoff.

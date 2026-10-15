@@ -1,4 +1,4 @@
-"""Fakes and CSV builders shared by the dsv-db tests."""
+"""Fakes and CSV builders shared by the dsv-pipeline tests."""
 import base64
 import csv
 import hashlib
@@ -11,7 +11,7 @@ from urllib.error import HTTPError
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from data import BlobInfo, DataError
-from refresh import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP
+from loader import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP
 
 RECENT_FIELDS = ["_id", "phone", "observation", *RECENT_COLUMN_MAP]
 HISTORICAL_FIELDS = ["Rec #", *HISTORICAL_COLUMN_MAP]

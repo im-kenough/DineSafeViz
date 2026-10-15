@@ -18,7 +18,7 @@ import tempfile
 import psycopg2
 
 import data
-import refresh
+import loader
 from data import BlobStore, DataError
 
 
@@ -36,53 +36,68 @@ LOAD_LOCK = 0x44535640AD
 # Load logic
 # ---------------------------------------------------------------------------
 
-def decide(table_empty, last_loaded, newest, force):
-    """Seed an empty table; otherwise refresh unless newest is already loaded."""
-    if table_empty:
+def decide(table_empty, loaded, newest, force):
+    """Pick the load action. loaded is (recent path of the last load,
+    historical path of the last seed); newest is (newest recent file,
+    newest complete historical folder) in Blob.
+
+    Seed an empty table, or reseed when Blob has a historical folder the
+    last seed didn't use. Otherwise refresh unless the newest recent file is
+    already loaded.
+    """
+    if table_empty or (newest[1] is not None and newest[1] != loaded[1]):
         return "seed"
-    if force or last_loaded != newest:
+    if force or loaded[0] != newest[0]:
         return "refresh"
     return "skip"
+
+
+def _download_each(store, names, tmp):
+    """Yield a local path for each blob, downloading it just before it's
+    read and deleting it after, so /tmp holds one historical file at a time."""
+    for name in names:
+        path = os.path.join(tmp, os.path.basename(name))
+        store.download_to(name, path)
+        yield path
+        os.remove(path)
 
 
 def load(store, conn, force=False):
     """Load the newest raw-zone files into Postgres, in one transaction.
 
-    Downloads into a temp directory laid out the way refresh.py reads it,
-    runs the seed or refresh, records the load in load_log, and commits.
-    On any error nothing is committed. Returns "seed", "refresh", or "skip".
+    Downloads into a temp directory, runs the seed or refresh, records the
+    load in load_log, and commits. On any error nothing is committed.
+    Returns "seed", "refresh", or "skip".
     """
     newest = data.newest_recent(store)
     if newest is None:
         raise DataError(f"{data.RECENT_PREFIX} is empty. Run ingest first: scripts/pipeline.sh <env> ingest")
     recent_path = newest[0]
+    historical = data.newest_historical(store)
+    historical_path = historical[0] if historical else None
     with conn.cursor() as cur:
         cur.execute("SELECT pg_advisory_xact_lock(%s)", (LOAD_LOCK,))
-    action = decide(refresh.is_empty(conn), refresh.last_loaded_path(conn), recent_path, force)
+    action = decide(loader.is_empty(conn), loader.last_load(conn), (recent_path, historical_path), force)
     if action == "skip":
         print(f"Already current: {recent_path} is loaded.")
         conn.rollback()  # releases the lock
         return action
+    if action == "seed" and historical is None:
+        raise DataError(
+            f"{data.HISTORICAL_PREFIX} has no complete folder. "
+            "Run: scripts/pipeline.sh <env> ingest --historical"
+        )
 
-    historical_path = None
     with tempfile.TemporaryDirectory() as tmp:
-        store.download_to(recent_path, os.path.join(tmp, refresh.RECENT_NAME))
+        recent_csv = os.path.join(tmp, loader.RECENT_NAME)
+        store.download_to(recent_path, recent_csv)
         if action == "seed":
-            historical = data.newest_historical(store)
-            if historical is None:
-                raise DataError(
-                    f"{data.HISTORICAL_PREFIX} has no complete folder. "
-                    "Run: scripts/pipeline.sh <env> ingest --historical"
-                )
-            historical_path, names = historical
-            hist_dir = os.path.join(tmp, refresh.HISTORICAL_DIR)
-            os.makedirs(hist_dir)
-            for name in names:
-                store.download_to(name, os.path.join(hist_dir, os.path.basename(name)))
-            deleted, inserted = refresh.seed(conn, tmp)
+            print(f"Seeding from {historical_path} and {recent_path} ...")
+            deleted, inserted = loader.seed(conn, recent_csv, _download_each(store, historical[1], tmp))
         else:
-            deleted, inserted = refresh.refresh(conn, tmp)
-    refresh.record_load(conn, action, recent_path, historical_path, deleted, inserted)
+            historical_path = None  # only seeds record a historical folder
+            deleted, inserted = loader.refresh(conn, recent_csv)
+    loader.record_load(conn, action, recent_path, historical_path, deleted, inserted)
     conn.commit()
     print(f"{action.capitalize()} complete from {recent_path}: "
           f"deleted {deleted}, inserted {inserted} rows.")
@@ -132,7 +147,7 @@ def main(argv=None, store_factory=None, connect=None):
         if args.command in ("ingest", "run"):
             data.ingest(store, force=args.force, historical=args.historical)
         if args.command in ("load", "run"):
-            conn = (connect or refresh.get_connection)()
+            conn = (connect or loader.get_connection)()
             load(store, conn, force=args.force if args.command == "load" else False)
         if args.command == "run":
             data.check_fresh(store)

@@ -41,10 +41,10 @@ published images, networks, hardening, and memory limits.
 | `dsv-app`       | `ghcr.io/im-kenough/dsv-app`          | `backend`           | 192 MiB     | Flask app. Read-only database role.                        |
 | `dsv-db`        | `postgres:18.6-alpine3.24`            | `backend`           | 320 MiB     | Postgres with the `inspections` and `load_log` tables.     |
 | `dsv-analytics` | `grafana/grafana:13.2.3`              | `backend`           | 320 MiB     | Dashboard. Read-only database role.                        |
-| `dsv-pipeline`  | `ghcr.io/im-kenough/dsv-init-db`      | `egress`, `backend` | 768 MiB     | On demand: `ingest`, `load`, or `run`. Profile `pipeline`. |
+| `dsv-pipeline`  | `ghcr.io/im-kenough/dsv-pipeline`     | `egress`, `backend` | 256 MiB     | On demand: `ingest`, `load`, or `run`. Profile `pipeline`. |
 
 Locally, Compose builds `dsv-app` and `dsv-pipeline` from `src/dsv-app` and
-`src/dsv-db`, and every service shares the default network. On the VMs, the
+`src/dsv-pipeline`, and every service shares the default network. On the VMs, the
 two app images are pinned to the deployed version's tag. Every service sets
 `no-new-privileges` and rotates its logs. Every service except
 `dsv-analytics` drops all Linux capabilities and adds back only the ones it

@@ -41,7 +41,7 @@ def test_stg_deploys_main_by_its_commit_tag(vm_repo):
     lines = calls(log)
     assert "git rev-parse --verify --quiet origin/main^{commit}" in lines
     assert "docker manifest inspect ghcr.io/im-kenough/dsv-app:sha-abc1234" in lines
-    assert "docker manifest inspect ghcr.io/im-kenough/dsv-init-db:sha-abc1234" in lines
+    assert "docker manifest inspect ghcr.io/im-kenough/dsv-pipeline:sha-abc1234" in lines
     assert f"git checkout --quiet --detach {SHA}" in lines
     assert "docker compose --profile pipeline pull --quiet" in lines
     assert "docker compose up -d --no-build --remove-orphans" in lines
@@ -101,9 +101,9 @@ def test_unknown_tag_stops_before_anything(vm_repo):
 
 def test_missing_image_stops_before_changing_anything(vm_repo):
     repo, env, log = vm_repo
-    result = deploy(repo, env | {"FAKE_MISSING_IMAGES": "dsv-init-db:sha-abc1234"}, "stg", "main")
+    result = deploy(repo, env | {"FAKE_MISSING_IMAGES": "dsv-pipeline:sha-abc1234"}, "stg", "main")
     assert result.returncode == 1
-    assert "dsv-init-db:sha-abc1234" in result.stderr
+    assert "dsv-pipeline:sha-abc1234" in result.stderr
     assert "images.yml" in result.stderr
     lines = calls(log)
     assert not ran(lines, "git checkout")

@@ -50,10 +50,9 @@ services:
       # 18+ images keep PGDATA in a versioned subdirectory
       # (/var/lib/postgresql/18/docker), so mount the parent directory.
       - dsv-db-data:/var/lib/postgresql
+      # Run once, on an empty volume. Migrations aren't mounted: deploy.sh
+      # applies src/dsv-db/migrations/ on every deploy, before the load.
       - ./src/dsv-db/init.sql:/docker-entrypoint-initdb.d/init.sql
-      # Runs between init.sql and set-passwords.sh (name order). deploy.sh
-      # also runs it on existing volumes.
-      - ./src/dsv-db/migrations/001_load_log.sql:/docker-entrypoint-initdb.d/migrations-001_load_log.sql:ro
       - ./src/dsv-db/set-passwords.sh:/docker-entrypoint-initdb.d/set-passwords.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DSV_DB_USER}"]
@@ -66,7 +65,7 @@ services:
   # passes the subcommand (ingest, load, or run). The profile keeps
   # `docker compose up` from ever starting it, so restarts never touch data.
   dsv-pipeline:
-    build: ./src/dsv-db
+    build: ./src/dsv-pipeline
     profiles: [pipeline]
     environment:
       DSV_DB_HOST: dsv-db
