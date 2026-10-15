@@ -21,11 +21,20 @@ import data
 import refresh
 from data import BlobStore, DataError
 
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
 # Arbitrary advisory lock key. load() holds it for its whole transaction, so
 # a deploy's load and the timer's load can't both seed or both refresh: the
 # second waits, then sees the first one's load_log row.
 LOAD_LOCK = 0x44535640AD
 
+
+# ---------------------------------------------------------------------------
+# Load logic
+# ---------------------------------------------------------------------------
 
 def decide(table_empty, last_loaded, newest, force):
     """Seed an empty table; otherwise refresh unless newest is already loaded."""
@@ -80,6 +89,10 @@ def load(store, conn, force=False):
     return action
 
 
+# ---------------------------------------------------------------------------
+# Environment setup
+# ---------------------------------------------------------------------------
+
 def _store_from_env():
     account = os.environ.get("DSV_STORAGE_ACCOUNT", "").strip()
     container = os.environ.get("DSV_STORAGE_CONTAINER", "dinesafe")
@@ -93,6 +106,10 @@ def _store_from_env():
         raise DataError(f"can't read the storage token at {token_file}: {e.strerror}") from e
     return BlobStore(account, container, token)
 
+
+# ---------------------------------------------------------------------------
+# CLI entry point
+# ---------------------------------------------------------------------------
 
 def main(argv=None, store_factory=None, connect=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])

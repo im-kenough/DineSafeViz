@@ -1,7 +1,12 @@
 """Flask application for visualizing DineSafe food inspection data.
 
-This module provides a web interface to query and display food safety inspections
-from Toronto's DineSafe program, grouped by inspection date with severity-based sorting.
+Reads inspection records from Postgres (via psycopg2) and renders Jinja2 templates.
+Organises inspections into year/quarter/month views; a quarter page loads its most
+recent month up front, then serves older months as HTML fragments via
+/inspections/month so the browser fetches them on demand. Establishments within
+a day are grouped from their per-infraction rows and sorted by closure severity.
+Homepage stats (total inspections, date range) are cached in-process for 5 days
+to avoid a DB round-trip on every page load.
 """
 import calendar
 import os

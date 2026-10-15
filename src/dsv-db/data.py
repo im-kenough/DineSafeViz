@@ -24,6 +24,11 @@ from urllib.request import Request, urlopen
 
 from refresh import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP, RECENT_NAME, open_csv
 
+
+# ---------------------------------------------------------------------------
+# Constants and configuration
+# ---------------------------------------------------------------------------
+
 CKAN_PACKAGE_URL = (
     "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/package_show?id=dinesafe"
 )
@@ -53,12 +58,21 @@ API_VERSION = "2023-11-03"
 # can't hang a deploy or the timer.
 DOWNLOAD_TIMEOUT = 120
 
+
+# ---------------------------------------------------------------------------
+# Exceptions and types
+# ---------------------------------------------------------------------------
+
 BlobInfo = collections.namedtuple("BlobInfo", ["metadata", "md5"])
 
 
 class DataError(Exception):
     """A raw-zone problem that should stop the run with a message."""
 
+
+# ---------------------------------------------------------------------------
+# HTTP and file utilities
+# ---------------------------------------------------------------------------
 
 def md5_b64(path):
     """Return the base64 MD5 of a file, the encoding Blob uses for Content-MD5."""
@@ -96,6 +110,10 @@ def http_download(url, path, opener=urlopen):
         raise DataError(f"download from {url} failed: {e}") from e
 
 
+# ---------------------------------------------------------------------------
+# CKAN API
+# ---------------------------------------------------------------------------
+
 def resolve_resources(opener=urlopen):
     """Find the recent CSV and the historical ZIP in the CKAN package.
 
@@ -122,6 +140,10 @@ def resolve_resources(opener=urlopen):
         found[key] = {"url": matches[0]["url"], "last_modified": matches[0].get("last_modified") or ""}
     return found
 
+
+# ---------------------------------------------------------------------------
+# Blob storage
+# ---------------------------------------------------------------------------
 
 class BlobStore:
     """Minimal Blob REST client authorized with a Microsoft Entra bearer token."""
@@ -199,6 +221,10 @@ class BlobStore:
             resp.close()
 
 
+# ---------------------------------------------------------------------------
+# Blob queries
+# ---------------------------------------------------------------------------
+
 def folders(names, prefix):
     """Sorted, unique folder names directly under prefix."""
     return sorted({
@@ -230,6 +256,10 @@ def newest_historical(store):
     folder = f"{HISTORICAL_PREFIX}{complete[-1]}/"
     return folder, sorted(n for n in blobs if n.startswith(folder) and n.endswith(".csv"))
 
+
+# ---------------------------------------------------------------------------
+# Ingestion
+# ---------------------------------------------------------------------------
 
 def _download_historical(url, tmp, download):
     """Download the historical ZIP into tmp and validate every CSV in it.
@@ -330,6 +360,10 @@ def prune_recent(store, keep=KEEP_RECENT):
     if old:
         print(f"Pruned {len(old)} old {RECENT_PREFIX} folders.")
 
+
+# ---------------------------------------------------------------------------
+# Staleness check
+# ---------------------------------------------------------------------------
 
 def check_fresh(store, now=None):
     """Raise DataError if the newest recent file's source is older than STALE_AFTER.
