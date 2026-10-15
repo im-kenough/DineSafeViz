@@ -1,23 +1,21 @@
 # Data architecture
 
 This page gives a high-level view of how DineSafeViz stores, moves, and serves
-DineSafe inspection data. It covers three things, each in its own section:
+DineSafe inspection data. It covers...
 
 - **Layers:** where the data lives, and what state it's in.
 - **Pipelines:** how data moves between the layers.
 - **Operational events:** what happens to each layer when you deploy, redeploy,
   or restart the app.
 
-Each section links to a sub-document with the implementation details.
-
 ## Overview
 
 DineSafeViz adapts the
 [medallion architecture](https://learn.microsoft.com/azure/databricks/lakehouse/medallion), sorting data into layers, with each layer more refined.
 
-| Medallion layer | Function                                  | DineSafeViz                                                                   |
+| Medallion layer | Function                                  | DineSafeViz Component                                                                   |
 | --------------- | ----------------------------------------- | ----------------------------------------------------------------------------- |
-| Bronze          | Raw data, exactly as the source sent it   | Blob container `dinesafe`, the *raw zone*                                     |
+| Bronze          | Raw data, exactly as the source sent it   | Azure Blob container `dinesafe`, the *raw zone*                                     |
 | Silver          | Cleaned, validated, de-duplicated rows    | Postgres `inspections` table, the *serving zone*                              |
 | Gold            | Aggregated, ready for a specific consumer | Not stored. The app and the inspections dashboard (Grafana) aggregate on read |
 
@@ -33,10 +31,7 @@ Modifications:
 
 ## Infrastructure
 
-This section shows the stg environment. The diagram groups every Azure resource
-and app component that handles data by medallion layer. The ETL group sits
-between the layers, because it moves data from one to the next. Identity and
-secrets serve every layer.
+DineSafeViz modified medallion architecture.
 
 ```mermaid
 flowchart LR
@@ -123,13 +118,13 @@ For details, see [App architecture](2-app-architecture.md),
 
 ## Layers
 
-Each layer has one job. Data only moves forward: bronze feeds silver, and
-silver feeds gold.
-
 ### Bronze: raw zone
+
+The `ingest` process 
 
 The raw zone holds the source files exactly as Toronto Open Data published
 them. It's the source of truth for everything downstream.
+
 
 ```mermaid
 flowchart LR
@@ -182,6 +177,8 @@ For details, see [Data sources](3-2-data-sources.md) and
 [Data ingest](3-8-data-ingest.md).
 
 ### Silver: serving zone
+
+The datapipeline runs ``
 
 The serving zone holds cleaned rows in Postgres, ready to query. The pipeline
 writes it, and nothing else does.
