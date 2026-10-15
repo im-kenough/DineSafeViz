@@ -6,7 +6,7 @@ DineSafe inspection data.
 ## Overview
 
 The key data related tasks of DineSafeViz is to:
-1. Perform initial ingest of raw datasets from the Toronto Open Data Portal
+1. Perform initial ingest of raw datasets from the Toronto Open Data Portal (TODP)
 2. Perform periodic checks to download updated data from the Toronto Data Portal
 3. Convert raw data into finished inspection reports and dashboards
 
@@ -36,12 +36,9 @@ Modifications:
 
 ## Pipelines
 
-Three pipelines move data between the layers. `ingest` fills bronze. `seed` and
-`refresh` fill silver from bronze. They're separate steps, and only the
-scheduled run does both.
+There are three pipelines: `ingest`, `seed`, `refresh` which is triggered by a timer or manually.
 
-Every pipeline runs through one entry point:
-`scripts/pipeline.sh <env> <command>`. It gets a storage token on the host, then starts the one-shot
+It is run from `scripts/pipeline.sh <env> <command>`. It gets a storage token on the host, then starts the one-shot
 `dsv-pipeline` container, which runs `pipeline.py <command>`. The command
 decides which pipelines run:
 
@@ -54,7 +51,7 @@ decides which pipelines run:
 The load step picks `seed` or `refresh` on its own, from the state of the
 database:
 
-| Pipeline  | From → to        | Contacts Toronto? | Runs when                     | Code                                        |
+| Pipeline  | From → to        | Contacts TODP? | Runs when                     | Code                                        |
 | --------- | ---------------- | ----------------- | ----------------------------- | ------------------------------------------- |
 | `ingest`  | Toronto → bronze | Yes               | `run` or `ingest`             | `data.py: ingest`                           |
 | `seed`    | Bronze → silver  | No                | Load step, table is empty     | `pipeline.py: load` → `refresh.py: seed`    |
@@ -62,14 +59,15 @@ database:
 
 All code paths are under `src/dsv-db/`.
 
-### Ingest: Toronto Open Data to bronze
+### Ingest: Pull data into to bronze layer
 
-Ingest copies new files from Toronto Open Data to Blob Storage. It never
+The `ingest` pipeline copies new files from Toronto Open Data to Azure Blob Storage. It never
 touches the database.
 
-- **Run by:** `dsv-pipeline.timer` (`pipeline.sh <env> run`), or by hand with
-  `scripts/pipeline.sh <env> ingest`. Deploys never ingest.
-
+- **Runs:**
+  - **automatically**: `dsv-pipeline.timer` (`pipeline.sh <env> run`)
+  - **manually** run `scripts/pipeline.sh <env> ingest`.
+ 
 ```mermaid
 flowchart LR
     start(["ingest"]) --> ask["Ask Toronto's catalog<br/>when files last changed"]
@@ -82,17 +80,20 @@ flowchart LR
     up --> prune["Keep the newest<br/>30 recent folders"]
 ```
 
+- Deploys never ingest.
+
 - If the raw zone has no complete historical folder, ingest downloads the
   historical ZIP too. You don't need a separate step for it.
 
-For details, see [Data ingest](3-8-data-ingest.md).
+- For details, see [Data ingest](3-8-data-ingest.md).
 
-### Seed: first fill of silver
+### Seed: Initial full load of silver layer
 
-A seed fills an empty `inspections` table from the raw zone. It runs as part
-of the load step whenever the table is empty.
+The `seed` pipeline fully loads postgres db's `inspections` table from the Azure Blob storage. It runs as part
+of the `load` step whenever the table is empty, so a fresh deployment of the app triggers a `seed` operation.
 
-- **Run by:** `scripts/deploy.sh` (`pipeline.sh <env> load`) on the first
+- **Runs:**
+  - **automatically:** `scripts/deploy.sh` (`pipeline.sh <env> load`) on the first
   deploy. The timer's `run` also seeds if it finds the table empty.
 
 ```mermaid
@@ -107,16 +108,16 @@ flowchart LR
 
 For details, see [Data mapping](3-6-data-mapping.md).
 
-### Refresh: keep silver current
+### Refresh: keep silver layer current
 
-A refresh replaces the recent rows with the newest recent file. The systemd
+The `refresh` pipeline replaces the recent rows with the newest recent file. The systemd
 timer runs it on weekday mornings, right after ingest.
 
-- **Run by:** `dsv-pipeline.timer` (`pipeline.sh <env> run`), Monday to Friday
-  at 07:30 Toronto time, plus a random delay of up to 10 minutes. Every
-  redeploy also runs it through `scripts/deploy.sh`
-  (`pipeline.sh <env> load`), and `scripts/pipeline.sh <env> load --force` reloads the newest file
-  by hand.
+- **Run by:**
+  - **automatically**: 
+    - `dsv-pipeline.timer` (`pipeline.sh <env> run`), Monday to Friday at 07:30 Toronto time, plus a random delay of up to 10 minutes.
+    - Every redeploy also runs it through `scripts/deploy.sh` (`pipeline.sh <env> load`)
+  - **manually:** run `scripts/pipeline.sh <env> load --force` . reloads the newest file
 
 ```mermaid
 flowchart LR
@@ -194,7 +195,3 @@ the pipeline in stg.
 
 Disaster recovery isn't covered yet. The raw zone can rebuild the database,
 but losing the storage account itself has no recovery plan.
-
-
-## Old
-
