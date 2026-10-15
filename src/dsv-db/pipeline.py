@@ -21,11 +21,20 @@ import data
 import refresh
 from data import BlobStore, DataError
 
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
 # Arbitrary advisory lock key. load() holds it for its whole transaction, so
 # a deploy's load and the timer's load can't both seed or both refresh: the
 # second waits, then sees the first one's load_log row.
 LOAD_LOCK = 0x44535640AD
 
+
+# ---------------------------------------------------------------------------
+# Load logic
+# ---------------------------------------------------------------------------
 
 def decide(table_empty, last_loaded, newest, force):
     """Seed an empty table; otherwise refresh unless newest is already loaded."""
@@ -45,7 +54,7 @@ def load(store, conn, force=False):
     """
     newest = data.newest_recent(store)
     if newest is None:
-        raise DataError("recent/ is empty. Run ingest first: scripts/pipeline.sh <env> ingest")
+        raise DataError(f"{data.RECENT_PREFIX} is empty. Run ingest first: scripts/pipeline.sh <env> ingest")
     recent_path = newest[0]
     with conn.cursor() as cur:
         cur.execute("SELECT pg_advisory_xact_lock(%s)", (LOAD_LOCK,))
@@ -62,7 +71,8 @@ def load(store, conn, force=False):
             historical = data.newest_historical(store)
             if historical is None:
                 raise DataError(
-                    "historical/ has no complete folder. Run: scripts/pipeline.sh <env> ingest --historical"
+                    f"{data.HISTORICAL_PREFIX} has no complete folder. "
+                    "Run: scripts/pipeline.sh <env> ingest --historical"
                 )
             historical_path, names = historical
             hist_dir = os.path.join(tmp, refresh.HISTORICAL_DIR)
@@ -79,6 +89,10 @@ def load(store, conn, force=False):
     return action
 
 
+# ---------------------------------------------------------------------------
+# Environment setup
+# ---------------------------------------------------------------------------
+
 def _store_from_env():
     account = os.environ.get("DSV_STORAGE_ACCOUNT", "").strip()
     container = os.environ.get("DSV_STORAGE_CONTAINER", "dinesafe")
@@ -92,6 +106,10 @@ def _store_from_env():
         raise DataError(f"can't read the storage token at {token_file}: {e.strerror}") from e
     return BlobStore(account, container, token)
 
+
+# ---------------------------------------------------------------------------
+# CLI entry point
+# ---------------------------------------------------------------------------
 
 def main(argv=None, store_factory=None, connect=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])

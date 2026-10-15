@@ -12,7 +12,7 @@ from refresh import (
     exclude_on_or_after,
     drop_old_id_duplicates,
     _read_csv_rows,
-    decode_csv,
+    csv_encoding,
     HISTORICAL_COLUMN_MAP,
     RECENT_COLUMN_MAP,
     INSPECTIONS_COLUMNS,
@@ -321,12 +321,16 @@ class TestExcludeOnOrAfter:
         assert exclude_on_or_after(rows, "2023-11-10") == [{"inspection_date": None}]
 
 
-class TestDecodeCsv:
-    def test_utf8_with_bom(self):
-        assert decode_csv("\ufeffa,b\n".encode("utf-8")) == "a,b\n"
+class TestCsvEncoding:
+    def test_utf8_with_bom(self, tmp_path):
+        p = tmp_path / "a.csv"
+        p.write_bytes("\ufeffa,b\n".encode("utf-8"))
+        assert csv_encoding(str(p)) == "utf-8-sig"
 
-    def test_falls_back_to_cp1252(self):
-        assert decode_csv("caf\xe9\n".encode("cp1252")) == "caf\xe9\n"
+    def test_falls_back_to_cp1252(self, tmp_path):
+        p = tmp_path / "a.csv"
+        p.write_bytes("caf\xe9\n".encode("cp1252"))
+        assert csv_encoding(str(p)) == "cp1252"
 
 
 

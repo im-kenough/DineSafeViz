@@ -6,9 +6,15 @@ Usage:
     ansible-vault view vault/secrets.yml --ask-vault-pass | python3 scripts/render-vars.py terraform
 """
 
-import sys
-import yaml
 import os
+import sys
+
+import yaml
+
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ALL_VARS_PATH = os.path.join(SCRIPT_DIR, "..", "ansible", "group_vars", "all.yml")
@@ -56,6 +62,10 @@ MAPPINGS = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Utilities
+# ---------------------------------------------------------------------------
+
 def load_yaml(path):
     try:
         with open(path, "r") as f:
@@ -64,6 +74,10 @@ def load_yaml(path):
         print(f"Warning: {path} not found", file=sys.stderr)
         return {}
 
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 def main():
     if len(sys.argv) != 2 or sys.argv[1] not in MAPPINGS:

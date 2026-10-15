@@ -1,10 +1,12 @@
-# DineSafe colours
+# Appendix
+
+## DineSafe colours
 
 DineSafeViz uses the colours from Toronto Public Health's official DineSafe
 notice signs. The hex values were sampled from the most common colour in each
 sign image in `src/dsv-app/static/imgs/`.
 
-## Colour values
+### Colour values
 
 Each colour marks one inspection status and the infraction severity that
 leads to it.
@@ -15,7 +17,7 @@ leads to it.
 | `--dinesafe-yellow` | `#FBEF45` | Conditional Pass  | Significant         |
 | `--dinesafe-red`    | `#F04B45` | Closed            | Crucial             |
 
-## Where the colours are defined
+### Where the colours are defined
 
 The colours live in two places, because the Grafana dashboard can't read CSS
 variables.

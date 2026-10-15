@@ -254,7 +254,6 @@ errors you're most likely to see on a first stg deploy.
 | Dashboards are empty, and the PostgreSQL data source is missing in Grafana | `dsv-analytics` runs an image without the bundled plugin, such as a `-slim` one. The `backend` network has no internet, so Grafana can't download the plugin. Use the full `grafana/grafana` image in `docker-compose.yml`. See [Grafana: the bundled PostgreSQL plugin](../../explanation/grafana-postgres-plugin.md). |
 | `dsv-db` never becomes healthy | `DSV_DB_NAME` must be `dinesafe`. Check `deploy/stg.env`. |
 | Smoke test fails on `dsv-tunnel` | The tunnel token is wrong or was rotated. See checklist step 9.3. |
-| Site returns `502` but the app is healthy | Run `docker compose restart dsv-nginx`. nginx kept the app's old IP address. |
 
 To read any service's logs after the script exits, run
 `docker compose logs --tail 100 <service>` from `~/DineSafeViz`.

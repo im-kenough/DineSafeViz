@@ -156,17 +156,13 @@ $dirty"
   # cloudflared's /ready returns 200 only while it has a live connection to
   # Cloudflare. (Searching its logs would match old lines, and grep -q on a
   # long log stream fails under pipefail.)
-  local attempt
-  for attempt in $(seq 1 15); do
-    if docker compose exec -T dsv-nginx wget -q -O /dev/null http://dsv-tunnel:2000/ready \
-        2>/dev/null; then
-      break
-    fi
-    if [[ $attempt == 15 ]]; then
-      fail dsv-tunnel
-    fi
+  local tunnel_ready=(docker compose exec -T dsv-nginx wget -q -O /dev/null
+    http://dsv-tunnel:2000/ready)
+  for _ in {1..14}; do
+    "${tunnel_ready[@]}" 2>/dev/null && break
     sleep 2
   done
+  "${tunnel_ready[@]}" 2>/dev/null || fail dsv-tunnel
 
   docker image prune -af >/dev/null
   # No container keeps the pipeline image (compose run --rm), so prune
