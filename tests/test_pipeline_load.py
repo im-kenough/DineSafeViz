@@ -165,3 +165,19 @@ def test_concurrent_loads_wait_for_each_other(db, conn, store):
         other.close()
     assert pipeline.load(store, conn) == "skip"
     assert count(conn, "SELECT count(*) FROM inspections") == 3
+
+
+# COPY's text format treats a backslash as an escape: "\n" would load as a
+# newline, "\N" as NULL, and a trailing "\" would swallow the next tab.
+@pytest.mark.parametrize("value", [r"C:\new\table", r"A \N B", "ends in \\", "\\\\"])
+def test_backslashes_load_unchanged(conn, value):
+    import loader
+
+    row = {col: None for col in loader.INSPECTIONS_COLUMNS} | {
+        "establishment_name": value, "establishment_type": "after",
+    }
+    assert loader.bulk_insert(conn, [row]) == 1
+    with conn.cursor() as cur:
+        cur.execute("SELECT establishment_name, establishment_type FROM inspections")
+        assert cur.fetchall() == [(value, "after")]
+    conn.rollback()

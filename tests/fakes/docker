@@ -10,10 +10,6 @@ case "$1 $2" in
     echo '{}'
     ;;
   "compose up")
-    # The --wait call checks health; the first call only starts the stack.
-    if [[ " $* " == *" --wait "* ]]; then
-      exit "${FAKE_UP_WAIT_EXIT:-0}"
-    fi
     exit "${FAKE_UP_EXIT:-0}"
     ;;
   "compose ps")

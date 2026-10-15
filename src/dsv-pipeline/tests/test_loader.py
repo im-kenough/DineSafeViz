@@ -15,6 +15,12 @@ from loader import (
     HISTORICAL_COLUMN_MAP,
     RECENT_COLUMN_MAP,
     INSPECTIONS_COLUMNS,
+    COPY_BATCH,
+    bulk_insert,
+    last_load,
+    record_load,
+    refresh,
+    seed,
 )
 
 
@@ -337,10 +343,6 @@ class TestCsvEncoding:
         p = tmp_path / "a.csv"
         p.write_bytes("caf\xe9\n".encode("cp1252"))
         assert csv_encoding(str(p)) == "cp1252"
-
-
-
-from loader import COPY_BATCH, bulk_insert, last_load, record_load, refresh, seed
 
 
 class FakeCursor:

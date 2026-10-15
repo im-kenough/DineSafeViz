@@ -1,10 +1,14 @@
 name: dsv
 
-# Read-only app-role DB connection, shared by dsv-app and dsv-analytics.
-x-db-app-env: &db-app-env
+# Where the database is, shared by every service that connects to it.
+x-db-env: &db-env
   DSV_DB_HOST: dsv-db
   DSV_DB_PORT: ${DSV_DB_PORT}
   DSV_DB_NAME: ${DSV_DB_NAME}
+
+# Read-only app-role DB connection, shared by dsv-app and dsv-analytics.
+x-db-app-env: &db-app-env
+  <<: *db-env
   DSV_DB_USER: ${DSV_DB_APP_USER:-dinesafe_app}
   DSV_DB_PASSWORD: ${DSV_DB_APP_PASSWORD:-dinesafe_app}
 
@@ -26,7 +30,8 @@ services:
     build: ./src/dsv-app
     environment: *db-app-env
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      # busybox wget, not python -c: no interpreter cold start every 5s.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8000/healthz"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -68,9 +73,7 @@ services:
     build: ./src/dsv-pipeline
     profiles: [pipeline]
     environment:
-      DSV_DB_HOST: dsv-db
-      DSV_DB_PORT: ${DSV_DB_PORT}
-      DSV_DB_NAME: ${DSV_DB_NAME}
+      <<: *db-env
       DSV_DB_USER: dinesafe_migrator
       DSV_DB_PASSWORD: ${DSV_DB_MIGRATOR_PASSWORD:-dinesafe_migrator}
     depends_on:

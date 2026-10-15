@@ -44,9 +44,8 @@ def test_stg_deploys_main_by_its_commit_tag(vm_repo):
     assert "docker manifest inspect ghcr.io/im-kenough/dsv-pipeline:sha-abc1234" in lines
     assert f"git checkout --quiet --detach {SHA}" in lines
     assert "docker compose --profile pipeline pull --quiet" in lines
-    assert "docker compose up -d --no-build --remove-orphans" in lines
-    assert ("docker compose up -d --no-build --wait --wait-timeout 600 "
-            "dsv-tunnel dsv-nginx dsv-app dsv-db dsv-analytics") in lines
+    assert "docker compose up -d --no-build --remove-orphans --wait --wait-timeout 600" in lines
+    assert len([line for line in lines if line.startswith("docker compose up")]) == 1
     assert not ran(lines, "docker compose wait")
     assert ran(lines, "docker image prune")
     assert "DSV_VERSION=sha-abc1234\n" in (repo / ".env").read_text()
@@ -66,9 +65,6 @@ def test_images_are_checked_before_checkout_secrets_and_start(vm_repo):
     )
 
 
-# `up --wait` over the whole project fails when a one-shot job that depends on
-# another service exits before the wait starts. Jobs are waited on first, and
-# --wait only covers the long-running services.
 def test_missing_settings_file_stops_before_checkout(vm_repo):
     repo, env, log = vm_repo
     (repo / "deploy" / "stg.env").unlink()
@@ -127,7 +123,7 @@ def test_failed_checkout_stops_before_containers_change(vm_repo):
 def test_unhealthy_service_fails_the_deploy_with_its_logs(vm_repo):
     repo, env, log = vm_repo
     result = deploy(repo, env | {
-        "FAKE_UP_WAIT_EXIT": "1",
+        "FAKE_UP_EXIT": "1",
         "FAKE_PS_JSON": '{"Service":"dsv-app","State":"running","ExitCode":0,"Health":"unhealthy"}',
     }, "stg", "main")
     assert result.returncode == 1
@@ -216,14 +212,11 @@ def test_dev_builds_and_starts_the_working_tree(vm_repo):
     assert not ran(lines, "docker compose pull")
     assert not ran(lines, "docker image prune")  # not on a workstation
     assert (
-        first(lines, "docker compose up -d --build --remove-orphans")
-        < first(lines, "docker compose up -d --no-build --wait")
+        first(lines, "docker compose up -d --build --remove-orphans --wait")
         < first(lines, "docker compose exec -T dsv-db sh -c psql -q -v ON_ERROR_STOP=1")
         < first(lines, "az account get-access-token")
         < first(lines, "docker compose --profile pipeline run")
     )
-    up_wait = lines[first(lines, "docker compose up -d --no-build --wait")]
-    assert up_wait.endswith("dsv-nginx dsv-app dsv-db dsv-analytics")
     assert ("docker compose exec -T dsv-nginx wget -q -O /dev/null "
             "http://127.0.0.1/healthz") in lines
     assert "DSV_DB_PASSWORD='dev-db-password'\n" in (repo / ".env").read_text()
@@ -240,7 +233,7 @@ def test_data_loads_after_the_stack_is_healthy_and_migrated(vm_repo):
     lines = calls(log)
     assert (
         first(lines, "docker compose --profile pipeline pull")
-        < first(lines, "docker compose up -d --no-build --wait")
+        < first(lines, "docker compose up -d --no-build --remove-orphans --wait")
         < first(lines, MIGRATE)
         < first(lines, LOAD)
         < first(lines, "docker image prune")

@@ -399,19 +399,14 @@ def inject_globals():
         for y in sorted(years, reverse=True)
     ]
     recent, archive = year_quarters[:RECENT_YEARS], year_quarters[RECENT_YEARS:]
-    # Only the inspections page has a selected quarter to highlight in the picker.
-    year, q = (
-        parse_year_quarter(request.args, first, last)
-        if request.endpoint == "index" else (None, None)
-    )
     return {
         "current_year": date.today().year,
         "version": _VERSION,
         "recent_year_quarters": recent,
         "archive_year_quarters": archive,
-        "archive_open": bool(archive) and year is not None and year <= archive[0][0],
-        "selected_year": year,
-        "selected_q": q,
+        # index() overrides these; other pages have no quarter to highlight.
+        "selected_year": None,
+        "selected_q": None,
     }
 
 
@@ -455,6 +450,8 @@ def index():
         end=end,
         prev_q=prev_q,
         next_q=next_q,
+        selected_year=year,
+        selected_q=q,
     )
 
 

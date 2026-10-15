@@ -39,7 +39,7 @@
                     <tbody>{{ year_rows(recent_year_quarters) }}</tbody>
                 </table>
                 {% if archive_year_quarters %}
-                <details class="picker-archive"{{ ' open' if archive_open }}>
+                <details class="picker-archive"{{ ' open' if selected_year and selected_year <= archive_year_quarters[0][0] }}>
                     <summary>Older years ({{ archive_year_quarters[-1][0] }}–{{ archive_year_quarters[0][0] }})</summary>
                     <table class="picker-grid">
                         <tbody>{{ year_rows(archive_year_quarters) }}</tbody>

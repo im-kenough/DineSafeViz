@@ -25,11 +25,6 @@ usage() {
   exit 2
 }
 
-die() {
-  echo "pipeline: $*" >&2
-  exit 1
-}
-
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 env_name=${1:-}
@@ -53,8 +48,7 @@ cd "$repo_dir"
 
 settings=deploy/$env_name.env
 require_settings "$settings" "$env_name"
-account=$(setting "$settings" DSV_STORAGE_ACCOUNT)
-[[ -n $account ]] || die "DSV_STORAGE_ACCOUNT is missing from $settings"
+account=$(require_setting "$settings" DSV_STORAGE_ACCOUNT)
 [[ $account =~ ^[a-z0-9]{3,24}$ ]] \
   || die "DSV_STORAGE_ACCOUNT in $settings isn't a valid storage account name: '$account'"
 

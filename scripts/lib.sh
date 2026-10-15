@@ -1,10 +1,24 @@
-# Helpers shared by the scripts in this directory. Source it after defining
-# die, which these call to report errors.
+# Helpers shared by the scripts in this directory.
+
+# Prints "<script name>: $*" to stderr and exits 1.
+die() {
+  local name=${0##*/}
+  echo "${name%.sh}: $*" >&2
+  exit 1
+}
 
 # Prints the value of $2 in env file $1. Last assignment wins, as it does when
 # compose reads .env.
 setting() {
   sed -n "s/^$2=//p" "$1" | tail -n 1
+}
+
+# Prints the value of $2 in env file $1, or dies if it's missing or empty.
+require_setting() {
+  local value
+  value=$(setting "$1" "$2")
+  [[ -n $value ]] || die "$2 is missing from $1"
+  printf '%s\n' "$value"
 }
 
 # Dies unless the settings file $1 for environment $2 exists.

@@ -78,8 +78,8 @@ HISTORICAL_COLUMN_MAP = {
 
 # Maps recent CSV headers → unified inspections column names.
 # "_id", "phone", and "observation" are intentionally absent (discarded on
-# import). "oldEstId" is read only by drop_old_id_duplicates and isn't stored,
-# because it isn't in INSPECTIONS_COLUMNS. The recent feed no longer carries an
+# import). "oldEstId" is read only by scan_recent and isn't stored: bulk_insert
+# writes only INSPECTIONS_COLUMNS. The recent feed no longer carries an
 # "actionDesc" column, so `action` stays NULL for recent rows.
 RECENT_COLUMN_MAP = {
     "estId": "establishment_id",
@@ -206,13 +206,17 @@ def is_empty(conn):
         return cur.fetchone() is None
 
 
+_COPY_ESCAPES = str.maketrans({"\\": "\\\\", "\t": " ", "\r": " ", "\n": " "})
+
+
 def bulk_insert(conn, rows):
     """Insert mapped row dicts into inspections via COPY, COPY_BATCH at a time.
 
     Takes any iterable, so rows can stream from a CSV. Each batch is a
-    tab-separated StringIO buffer. None values become \\N (Postgres COPY
-    null marker). Tabs, carriage returns, and newlines in data values are
-    replaced with spaces to avoid COPY format errors. Returns the row count.
+    tab-separated StringIO buffer in COPY's text format. None values become
+    \\N (the null marker), and _COPY_ESCAPES doubles backslashes, which COPY
+    reads as escapes, and turns tabs, carriage returns, and newlines into
+    spaces. Returns the row count.
     """
     inserted = 0
     with conn.cursor() as cur:
@@ -220,8 +224,7 @@ def bulk_insert(conn, rows):
             buf = io.StringIO()
             for row in batch:
                 line = "\t".join(
-                    "\\N" if row[col] is None
-                    else str(row[col]).replace("\t", " ").replace("\r", " ").replace("\n", " ")
+                    "\\N" if row[col] is None else str(row[col]).translate(_COPY_ESCAPES)
                     for col in INSPECTIONS_COLUMNS
                 )
                 buf.write(line + "\n")
@@ -255,14 +258,15 @@ def csv_encoding(csv_path):
     return "utf-8-sig"
 
 
-def open_csv(csv_path):
-    """Open a DineSafe CSV file as text for the csv module, in its encoding."""
-    return open(csv_path, encoding=csv_encoding(csv_path), newline="")
+def open_csv(csv_path, encoding=None):
+    """Open a DineSafe CSV file as text for the csv module, in its encoding.
+    Pass encoding when it's already known, to skip csv_encoding's full read."""
+    return open(csv_path, encoding=encoding or csv_encoding(csv_path), newline="")
 
 
-def _read_csv_rows(csv_path, column_map):
+def _read_csv_rows(csv_path, column_map, encoding=None):
     """Yield mapped rows from a DineSafe CSV file, one at a time."""
-    with open_csv(csv_path) as f:
+    with open_csv(csv_path, encoding) as f:
         for r in csv.DictReader(f):
             yield map_row(r, column_map)
 
@@ -280,7 +284,7 @@ def _insert_historical_csv(conn, csv_path, cutoff):
     return inserted
 
 
-def scan_recent(csv_path):
+def scan_recent(csv_path, encoding=None):
     """First pass over the recent CSV, so the insert pass can stream.
 
     Returns (cutoff, keys, total): the earliest inspection_date, the
@@ -288,7 +292,7 @@ def scan_recent(csv_path):
     """
     print(f"Reading recent data from {csv_path} ...")
     cutoff, keys, total, unparsed = None, set(), 0, 0
-    for r in _read_csv_rows(csv_path, RECENT_COLUMN_MAP):
+    for r in _read_csv_rows(csv_path, RECENT_COLUMN_MAP, encoding):
         total += 1
         date = r["inspection_date"]
         if date is not None and (cutoff is None or date < cutoff):
@@ -304,9 +308,10 @@ def scan_recent(csv_path):
     return cutoff, keys, total
 
 
-def _insert_recent(conn, csv_path, keys, total):
+def _insert_recent(conn, csv_path, encoding, keys, total):
     """Stream the recent CSV into inspections, without old-ID duplicates."""
-    inserted = bulk_insert(conn, drop_old_id_duplicates(_read_csv_rows(csv_path, RECENT_COLUMN_MAP), keys))
+    rows = _read_csv_rows(csv_path, RECENT_COLUMN_MAP, encoding)
+    inserted = bulk_insert(conn, drop_old_id_duplicates(rows, keys))
     print(f"  Dropped old-ID duplicate rows: {total - inserted}")
     print(f"  Loaded recent CSV: {inserted} rows")
     return inserted
@@ -319,12 +324,13 @@ def seed(conn, recent_csv, historical_csvs):
     at a time, so the caller can fetch each just before it's needed.
     Doesn't commit. Returns (rows deleted, rows inserted).
     """
-    cutoff, keys, total = scan_recent(recent_csv)
+    encoding = csv_encoding(recent_csv)
+    cutoff, keys, total = scan_recent(recent_csv, encoding)
     with conn.cursor() as cur:
         cur.execute("DELETE FROM inspections")
         deleted = cur.rowcount
     inserted = sum(_insert_historical_csv(conn, path, cutoff) for path in historical_csvs)
-    inserted += _insert_recent(conn, recent_csv, keys, total)
+    inserted += _insert_recent(conn, recent_csv, encoding, keys, total)
     return deleted, inserted
 
 
@@ -335,11 +341,12 @@ def refresh(conn, recent_csv):
     single transaction covers the delete, the insert, and the log row.
     Returns (rows deleted, rows inserted).
     """
-    cutoff, keys, total = scan_recent(recent_csv)
+    encoding = csv_encoding(recent_csv)
+    cutoff, keys, total = scan_recent(recent_csv, encoding)
     with conn.cursor() as cur:
         cur.execute("DELETE FROM inspections WHERE inspection_date >= %s", (cutoff,))
         deleted = cur.rowcount
-    return deleted, _insert_recent(conn, recent_csv, keys, total)
+    return deleted, _insert_recent(conn, recent_csv, encoding, keys, total)
 
 
 # ---------------------------------------------------------------------------

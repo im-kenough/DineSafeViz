@@ -69,10 +69,7 @@ def load(store, conn, force=False):
     load in load_log, and commits. On any error nothing is committed.
     Returns "seed", "refresh", or "skip".
     """
-    newest = data.newest_recent(store)
-    if newest is None:
-        raise DataError(f"{data.RECENT_PREFIX} is empty. Run ingest first: scripts/pipeline.sh <env> ingest")
-    recent_path = newest[0]
+    recent_path = data.require_newest_recent(store)[0]
     historical = data.newest_historical(store)
     historical_path = historical[0] if historical else None
     with conn.cursor() as cur:
@@ -95,9 +92,10 @@ def load(store, conn, force=False):
             print(f"Seeding from {historical_path} and {recent_path} ...")
             deleted, inserted = loader.seed(conn, recent_csv, _download_each(store, historical[1], tmp))
         else:
-            historical_path = None  # only seeds record a historical folder
             deleted, inserted = loader.refresh(conn, recent_csv)
-    loader.record_load(conn, action, recent_path, historical_path, deleted, inserted)
+    # Only seeds record a historical folder.
+    loader.record_load(conn, action, recent_path,
+                       historical_path if action == "seed" else None, deleted, inserted)
     conn.commit()
     print(f"{action.capitalize()} complete from {recent_path}: "
           f"deleted {deleted}, inserted {inserted} rows.")

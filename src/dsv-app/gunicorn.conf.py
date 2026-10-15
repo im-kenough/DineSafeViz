@@ -1,8 +1,8 @@
 # Gunicorn WSGI server configuration for the dsv-app Flask service.
 #
-# Runs one process with 4 gthread workers so a slow DB query doesn't block
-# other requests. preload_app=True forks after the app is initialised, which
-# shares the in-process stats cache and speeds up restarts under load.
+# Runs one worker process with 4 gthread threads so a slow DB query doesn't
+# block other requests. The threads share the in-process stats cache.
+# preload_app=True imports the app in the master before forking the worker.
 # Logs go to stdout/stderr so Docker captures them without extra config.
 
 # Worker
