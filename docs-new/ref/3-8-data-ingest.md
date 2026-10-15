@@ -40,7 +40,7 @@ sequenceDiagram
 | Unzip               | Every `.csv` in the ZIP, flattened to its base name. Other files are skipped.                                                                                                             |
 | Validate            | Every file, before any upload: mapped headers present, UTF-8 or cp1252, at least 50,000 recent rows and 1,000 rows per historical file. Values aren't checked.                            |
 | Skip duplicates     | Doesn't upload a recent file whose MD5 matches the newest blob.                                                                                                                           |
-| Upload order        | Historical CSVs, `_SUCCESS`, recent CSV, then prune.                                                                                                                                      |
+| Upload order        | Historical CSVs, `_SUCCESS`, recent CSV, then prune. No recent upload, no prune.                                                                                                  |
 | Integrity           | `Content-MD5` on every upload, so Blob rejects a corrupted body.                                                                                                                          |
 | Timeouts            | 120 seconds without data, per request.                                                                                                                                                    |
 | Client              | Plain Blob REST API (`x-ms-version: 2023-11-03`) with a bearer token. No Azure SDK.                                                                                                       |

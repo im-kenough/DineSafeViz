@@ -243,8 +243,9 @@ def bulk_insert(conn, rows):
 def csv_encoding(csv_path):
     """Return the encoding of a DineSafe CSV file: utf-8-sig, else cp1252.
 
-    DineSafe exports mix encodings across files (older years are UTF-8 with a BOM,
-    newer files are Windows-1252), so try UTF-8 first and fall back to cp1252.
+    DineSafe exports mix encodings across files (the recent CSV and the 2001 to
+    2022 historical files are UTF-8, dinesafe_hist_2023.csv is Windows-1252), so
+    try UTF-8 first and fall back to cp1252. utf-8-sig also accepts a BOM.
     Checks the file in chunks, so it never holds the whole file in memory.
     """
     decoder = codecs.getincrementaldecoder("utf-8-sig")()

@@ -10,8 +10,8 @@ DineSafeViz shows the City of Toronto's DineSafe restaurant inspections.
 - Cloudflare Tunnel brings visitors in. The VM publishes no ports.
 - nginx routes `/analytics/` to Grafana and everything else to the Flask app.
 - The Flask app and Grafana read the same Postgres database.
-- An on-demand data pipeline loads the data: Toronto Open Data → Azure Blob
-  raw zone → Postgres.
+- A data pipeline, on a weekday timer or on demand, loads the data:
+  Toronto Open Data → Azure Blob raw zone → Postgres.
 
 ```mermaid
 flowchart LR

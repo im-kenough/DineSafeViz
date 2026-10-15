@@ -49,7 +49,7 @@ means the source has no such column, so the value is `NULL`.
 | `latitude`, `longitude`    | `Latitude`, `Longitude`     | `latitude`, `longitude` | Cast to `DOUBLE PRECISION`                              |
 | `unique_id`                | —                           | `unique_id`        | None                                                         |
 | `establishment_status`     | `Establishment Status`      | `inspectionStatus` | None                                                         |
-| `min_inspections_per_year` | `Min. Inspections Per Year` | —                  | None. Stays `TEXT`, because 37 rows hold the letter `O`.     |
+| `min_inspections_per_year` | `Min. Inspections Per Year` | —                  | None. Stays `TEXT`, because 35 stored rows hold the letter `O`. |
 
 Source columns that aren't stored:
 
@@ -145,4 +145,4 @@ eras must handle these differences.
 | Category            | None                                | Two schemes: `5C. …` to November 7, 2025, `05. …` from November 5, 2025 |
 | Outcome spelling    | —                                   | `Conviction - Fined` and `Conviction: Fined`  |
 | Casing              | Upper case names and addresses      | Mixed case                                    |
-| Trailing spaces     | Not trimmed: 44,616 `infraction_details` values | Not trimmed: 24,111 `infraction_details` values |
+| Trailing spaces     | Not trimmed: 44,616 `infraction_details` values | Not trimmed: 24,114 `infraction_details` values |

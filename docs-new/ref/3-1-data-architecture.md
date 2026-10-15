@@ -64,7 +64,7 @@ touches the database.
 ```mermaid
 flowchart LR
     start(["ingest"]) --> ask["Ask Toronto's catalog<br/>when files last changed"]
-    ask --> newer{"Newer than the<br/>newest blob?"}
+    ask --> newer{"Newer recent file,<br/>or no complete<br/>historical folder?"}
     newer -- no --> done(["Exit: no new data"])
     newer -- yes --> dl["Download to /tmp"]
     dl --> val{"Headers and<br/>row counts OK?"}

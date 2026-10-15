@@ -208,7 +208,7 @@ identity.
 | Commands          | `load`                      | `ingest`, `load`, `run`         | `ingest`, `load`, `run`    |
 | Timer             | No                          | Yes                             | Yes                        |
 | Storage token     | Your `az login`             | VM managed identity             | VM managed identity        |
-| Pipeline image    | Built from the working tree | GHCR `dsv-init-db:sha-<commit>` | GHCR `dsv-init-db:<X.Y.Z>` |
+| Pipeline image    | Built from the working tree | GHCR `dsv-init-db:sha-<short SHA>` | GHCR `dsv-init-db:<X.Y.Z>` |
 | Network isolation | None (default network)      | `egress` and `backend`          | `egress` and `backend`     |
 
 - stg and prod each ingest on their own, so they can briefly serve different
