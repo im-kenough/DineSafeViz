@@ -33,7 +33,9 @@ services:
     environment: *db-app-env
     healthcheck:
       # busybox wget, not python -c: no interpreter cold start every 5s.
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8000/healthz"]
+      # 127.0.0.1, not localhost: busybox wget tries only ::1, and gunicorn
+      # binds IPv4 only.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8000/healthz"]
       interval: 5s
       timeout: 3s
       retries: 5
