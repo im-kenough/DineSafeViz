@@ -2,7 +2,7 @@
 
 Placeholder until real IAC is introduced
 
-## Configure and deploy VM
+## 1. Configure and deploy VM
 
 On your workstation, configure and run `infra/az/create-gen-vm.sh`
 
@@ -12,45 +12,40 @@ bash infra/az/create-gen-vm.sh
 This provisions the VM, storage, public IP and NIC
 The VM's ssh admin key and a github deploy key will be uploaded
 
-## Connect to the VM
+## 2. Connect to the VM
 
 The script will add the VM to the workstation's SSH config file
 
 ```bash
 ssh dsv-vm-admin@vm02-dsv-stg01
 ```
-## Clone Repo
+## 3. Clone Repo
 
 ```bash
 git clone git@github.com:im-kenough/DineSafeViz.git
 cd DineSafeViz
 ```
 
-## Configure VM
+## 4. Configure VM
 
-### Perform initial setup
+### 4.1 Perform initial setup
 
-Install required apps and perform VM configurations
+Run the setup wrapper script which runs
+- init-setup-vm.sh: installs required apps & performs VM configurations
+- harden-vm.sh: performs basic hardening
+- 
 ```bash
-bash infra/az/init-setup-vm.sh
+bash infra/az/setup-vm.sh
 ```
 
-### Harden VM
-
-Perform basic vm hardening
-```bash
-bash infra/az/harden-vm.sh
-```
-
-
-## Configure application
+## 5. Configure application
 
 Configure the env file
 ```bash
 cp deploy/stg.env-example deploy/stg.env
 ```
 
-### Initial blob storage ingestion
+### 5.1 Initial blob storage ingestion
 
 Only required for brand new environments, otherwise can be skipped.
 
@@ -62,14 +57,14 @@ from Toronto Open Data, then rerun the deploy:
 ./scripts/pipeline.sh stg ingest
 ```
 
-### Deploy application
+### 5.2 Deploy application
 
 ```bash
 ./scripts/deploy.sh stg main
 docker compose ps
 ```
 
-### Reboot and validate
+## 6. Reboot and validate
 
 reboot the VM and confirm the stack comes back up and operates normally
 
