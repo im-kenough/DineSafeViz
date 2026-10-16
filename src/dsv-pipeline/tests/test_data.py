@@ -2,6 +2,7 @@ import datetime
 import io
 import json
 import shutil
+import struct
 import zipfile as _zipfile
 from email.message import Message
 from urllib.error import HTTPError, URLError
@@ -187,6 +188,12 @@ class TestBlobStore:
         assert req.get_header("Content-length") == "4"
         assert req.body == b"data"
 
+    def test_upload_of_a_stream_without_length_is_refused(self):
+        store, opener = self.store({})
+        with pytest.raises(ValueError, match="length"):
+            store.upload("historical/t/2001.csv", io.BytesIO(b"data"), b64md5(b"data"))
+        assert opener.requests == []
+
     def test_upload_streams_body_with_explicit_length(self):
         store, opener = self.store({("PUT", "/historical/t/2001.csv"): FakeResponse()})
         store.upload("historical/t/2001.csv", io.BytesIO(b"data"), b64md5(b"data"), length=4)
@@ -258,19 +265,28 @@ def resolver(recent_modified="2026-10-12T09:14:00"):
     return resolve
 
 
-def downloader(tmp_path, recent_header=RECENT_HEADER, recent_extra=b""):
-    """Serves a valid recent CSV and a 2-file historical ZIP. Records URLs."""
+HIST_MEMBERS = ("some folder/dinesafe_hist_2001.csv", "some folder/dinesafe_hist_2002.csv")
+
+
+def downloader(tmp_path, recent_header=RECENT_HEADER, recent_extra=b"",
+               hist_members=HIST_MEMBERS, compression=_zipfile.ZIP_STORED, patch_zip=None):
+    """Serves a valid recent CSV and a 2-file historical ZIP. Records URLs.
+    patch_zip, if given, rewrites the ZIP's bytes (a bytearray) in place."""
     src = tmp_path / "src"
     src.mkdir(exist_ok=True)
     recent = write_csv(src / "dinesafe.csv", recent_header, MIN_RECENT_ROWS)
     if recent_extra:
         recent.write_bytes(recent.read_bytes() + recent_extra)
     zpath = src / "hist.zip"
-    with _zipfile.ZipFile(zpath, "w") as zf:
-        for year in (2001, 2002):
-            h = write_csv(src / f"dinesafe_hist_{year}.csv", HIST_HEADER, MIN_HISTORICAL_ROWS)
-            zf.write(h, f"some folder/dinesafe_hist_{year}.csv")
+    with _zipfile.ZipFile(zpath, "w", compression) as zf:
+        for i, member in enumerate(hist_members):
+            h = write_csv(src / f"member_{i}.csv", HIST_HEADER, MIN_HISTORICAL_ROWS)
+            zf.write(h, member)
         zf.writestr("readme.txt", "not a csv")
+    if patch_zip:
+        raw = bytearray(zpath.read_bytes())
+        patch_zip(raw)
+        zpath.write_bytes(bytes(raw))
     calls = []
 
     def download(url, path):
@@ -367,6 +383,74 @@ class TestIngest:
             ingest(store, resolve=resolver(), download=download, now=NOW)
         assert store.uploads == []
 
+    def ingest_with_zip(self, tmp_path, **zip_args):
+        store = FakeStore()
+        ingest(store, resolve=resolver(), download=downloader(tmp_path, **zip_args), now=NOW)
+        return store
+
+    # Review finding: ZipFile() only parses the central directory, so member
+    # corruption shows up only once a member is read.
+    @pytest.mark.parametrize("patch_zip, compression", [
+        (lambda z: flip_member_byte(z, 200), _zipfile.ZIP_STORED),       # CRC mismatch
+        (lambda z: flip_member_byte(z, 20), _zipfile.ZIP_DEFLATED),      # corrupt deflate stream
+        (lambda z: patch_central(z, 8, "<H", 0x1), _zipfile.ZIP_STORED),  # encrypted
+        (lambda z: patch_central(z, 10, "<H", 99), _zipfile.ZIP_STORED),  # unknown compression
+        (lambda z: z.__setitem__(slice(0, 4), b"XXXX"), _zipfile.ZIP_STORED),  # bad local header
+    ], ids=["crc", "deflate", "encrypted", "compression", "local-header"])
+    def test_corrupt_member_is_a_data_error_and_uploads_nothing(self, tmp_path, patch_zip, compression):
+        store = FakeStore()
+        with pytest.raises(DataError, match="dinesafe_hist_2001.csv"):
+            ingest(store, resolve=resolver(), now=NOW,
+                   download=downloader(tmp_path, compression=compression, patch_zip=patch_zip))
+        assert store.uploads == []
+
+    def test_member_shorter_than_its_header_is_a_data_error(self, tmp_path):
+        # A stored member whose central file_size overstates its data: zipfile
+        # returns the real bytes without complaint, so ingest must count them.
+        def grow_file_size(z):
+            size = struct.unpack_from("<I", z, central_offset(z) + 24)[0]
+            patch_central(z, 24, "<I", size + 10)
+
+        store = FakeStore()
+        with pytest.raises(DataError, match="ZIP header says"):
+            ingest(store, resolve=resolver(), now=NOW, download=downloader(tmp_path, patch_zip=grow_file_size))
+        assert store.uploads == []
+
+    def test_member_over_the_size_cap_is_a_data_error(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("data.MAX_HISTORICAL_BYTES", 1000)
+        store = FakeStore()
+        with pytest.raises(DataError, match="limit"):
+            ingest(store, resolve=resolver(), download=downloader(tmp_path), now=NOW)
+        assert store.uploads == []
+
+    def test_duplicate_member_names_are_a_data_error(self, tmp_path):
+        store = FakeStore()
+        members = ("2020/dinesafe.csv", "2021/dinesafe.csv")
+        with pytest.raises(DataError, match="more than one dinesafe.csv"):
+            ingest(store, resolve=resolver(), download=downloader(tmp_path, hist_members=members), now=NOW)
+        assert store.uploads == []
+
+    def test_unchanged_recent_is_deleted_before_historical_upload(self, tmp_path):
+        store = seeded(tmp_path)
+        tmp_dirs = []
+        dl = downloader(tmp_path)
+
+        def download(url, path):
+            tmp_dirs.append(tmp_path.__class__(path).parent)
+            dl(url, path)
+
+        seen = []
+        orig_upload = store.upload
+
+        def check_upload(*args, **kwargs):
+            seen.extend(p.name for p in tmp_dirs[-1].iterdir())
+            return orig_upload(*args, **kwargs)
+
+        store.upload = check_upload
+        assert ingest(store, force=True, historical=True, resolve=resolver("2026-10-09T08:00:00"),
+                      download=download, now=NOW) is None
+        assert seen and "Dinesafe.csv" not in seen
+
     def test_historical_never_writes_member_files_to_tmp(self, tmp_path, monkeypatch):
         store = seeded(tmp_path)
         dl = downloader(tmp_path)
@@ -396,6 +480,26 @@ class TestIngest:
         store.upload = check_upload
         ingest(store, historical=True, resolve=resolver("2026-10-09T08:00:00"), download=download, now=NOW)
         assert set(seen_files) == {"historical.zip"}
+
+
+def _first_header(z, signature):
+    return bytes(z).index(signature)
+
+
+def central_offset(z):
+    """Offset of the first central directory header, for dinesafe_hist_2001.csv."""
+    return _first_header(z, b"PK\x01\x02")
+
+
+def patch_central(z, field, fmt, value):
+    struct.pack_into(fmt, z, central_offset(z) + field, value)
+
+
+def flip_member_byte(z, at):
+    """Corrupt byte `at` of the first member's data."""
+    local = _first_header(z, b"PK\x03\x04")
+    name_len, extra_len = struct.unpack_from("<HH", z, local + 26)
+    z[local + 30 + name_len + extra_len + at] ^= 0xFF
 
 
 class TestPrune:

@@ -19,11 +19,12 @@ import shutil
 import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
+import zlib
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
-from loader import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP, RECENT_NAME, csv_encoding, open_csv
+from loader import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP, RECENT_NAME, EncodingDetector, open_csv
 
 
 # ---------------------------------------------------------------------------
@@ -59,6 +60,15 @@ API_VERSION = "2023-11-03"
 # can't hang a deploy or the timer.
 DOWNLOAD_TIMEOUT = 120
 
+# Largest historical CSV accepted from the ZIP, decompressed. Today's are a
+# few MiB each; the cap stops a decompression bomb from running unbounded.
+MAX_HISTORICAL_BYTES = 256 << 20
+
+# What zipfile raises for a corrupt, truncated, or encrypted member, or an
+# unsupported compression method. ZipFile() only parses the central directory,
+# so these surface only once a member is opened or read.
+ZIP_MEMBER_ERRORS = (zipfile.BadZipFile, zlib.error, EOFError, RuntimeError, NotImplementedError)
+
 
 # ---------------------------------------------------------------------------
 # Exceptions and types
@@ -77,7 +87,7 @@ class DataError(Exception):
 
 def md5_b64(source):
     """Return the base64 MD5 of a file or binary stream, the encoding Blob uses
-    for Content-MD5."""
+    for Content-MD5. A stream is read to EOF and not rewound."""
     if isinstance(source, (str, os.PathLike)):
         with open(source, "rb") as f:
             return md5_b64(f)
@@ -89,7 +99,7 @@ def md5_b64(source):
 
 def validate_csv(source, column_map, min_rows, name=None):
     """Check headers and row count of a CSV path or text stream; return the row
-    count or raise DataError."""
+    count or raise DataError. A stream is read to EOF and not rewound."""
     if isinstance(source, (str, os.PathLike)):
         with open_csv(source) as f:
             return validate_csv(f, column_map, min_rows, name or os.path.basename(source))
@@ -213,11 +223,14 @@ class BlobStore:
 
     def upload(self, name, source, md5, metadata=None, length=None):
         # Streams a file path or binary stream. Put Blob needs Content-Length;
-        # without it, urllib would send the body chunked.
+        # without it, urllib would send the body chunked. A stream needs an
+        # explicit length, the exact number of bytes it will yield.
         if isinstance(source, (str, os.PathLike)):
             with open(source, "rb") as body:
                 self.upload(name, body, md5, metadata=metadata, length=os.path.getsize(source))
             return
+        if length is None:
+            raise ValueError(f"upload of {name} from a stream needs a length")
         headers = {"x-ms-blob-type": "BlockBlob", "Content-MD5": md5, "Content-Type": "text/csv",
                    "Content-Length": str(length)}
         for key, value in (metadata or {}).items():
@@ -282,9 +295,33 @@ def newest_historical(store):
 # Ingestion
 # ---------------------------------------------------------------------------
 
+def _scan_member(zf, info, name):
+    """One pass over a ZIP member's bytes. Returns (encoding, md5, size).
+
+    Counts the bytes actually decompressed, rather than trusting the header's
+    file_size, and enforces MAX_HISTORICAL_BYTES.
+    """
+    if info.file_size > MAX_HISTORICAL_BYTES:
+        raise DataError(f"{name}: {info.file_size} bytes, more than the {MAX_HISTORICAL_BYTES} limit")
+    detector = EncodingDetector()
+    digest = hashlib.md5(usedforsecurity=False)  # integrity checksum, not security
+    size = 0
+    with zf.open(info) as raw:
+        for chunk in iter(lambda: raw.read(1 << 20), b""):
+            size += len(chunk)
+            if size > MAX_HISTORICAL_BYTES:
+                raise DataError(f"{name}: more than the {MAX_HISTORICAL_BYTES} byte limit")
+            digest.update(chunk)
+            detector.feed(chunk)
+    if size != info.file_size:
+        raise DataError(f"{name}: {size} bytes decompressed, but the ZIP header says {info.file_size}")
+    return detector.result(), base64.b64encode(digest.digest()).decode(), size
+
+
 def _download_historical(url, tmp, download):
     """Download the historical ZIP into tmp and validate every CSV member in
-    place, without extracting. Returns (zip_path, [(file name, ZipInfo, md5)])."""
+    place, without extracting. Returns (zip_path, [(file name, ZipInfo, md5,
+    size)]), sorted by file name."""
     zip_path = os.path.join(tmp, "historical.zip")
     print(f"Downloading {url} ...")
     download(url, zip_path)
@@ -292,22 +329,26 @@ def _download_historical(url, tmp, download):
         zf = zipfile.ZipFile(zip_path)
     except zipfile.BadZipFile as e:
         raise DataError(f"historical download isn't a ZIP file: {e}") from e
-    staged = []
+    staged = {}
     with zf:
         for info in zf.infolist():
             base = os.path.basename(info.filename)
             if not base.endswith(".csv"):
                 continue
-            with zf.open(info) as raw:
-                encoding = csv_encoding(raw)
-            with zf.open(info) as raw, io.TextIOWrapper(raw, encoding=encoding, newline="") as text:
-                validate_csv(text, HISTORICAL_COLUMN_MAP, MIN_HISTORICAL_ROWS, name=base)
-            with zf.open(info) as raw:
-                md5 = md5_b64(raw)
-            staged.append((base, info, md5))
+            # Members are flattened into one folder, and blobs are never
+            # overwritten, so two members can't share a file name.
+            if base in staged:
+                raise DataError(f"the historical ZIP has more than one {base}")
+            try:
+                encoding, md5, size = _scan_member(zf, info, base)
+                with zf.open(info) as raw, io.TextIOWrapper(raw, encoding=encoding, newline="") as text:
+                    validate_csv(text, HISTORICAL_COLUMN_MAP, MIN_HISTORICAL_ROWS, name=base)
+            except ZIP_MEMBER_ERRORS as e:
+                raise DataError(f"historical ZIP member {info.filename} is unreadable: {e}") from e
+            staged[base] = (base, info, md5, size)
     if not staged:
         raise DataError("the historical ZIP has no CSV files")
-    return zip_path, sorted(staged, key=lambda m: m[0])
+    return zip_path, [staged[k] for k in sorted(staged)]
 
 
 def ingest(store, force=False, historical=False, resolve=resolve_resources,
@@ -349,20 +390,19 @@ def ingest(store, force=False, historical=False, resolve=resolve_resources,
             recent_md5 = md5_b64(recent_path)
             if newest and newest[1].md5 == recent_md5:
                 print(f"Recent file unchanged since {newest[0]}; not uploading it.")
+                os.remove(recent_path)  # free the tmpfs during the historical upload
                 recent_path = None
             else:
                 print(f"  {RECENT_NAME}: {rows} rows, valid")
 
         if staged_historical:
             with zipfile.ZipFile(zip_path) as zf:
-                for name, info, md5 in staged_historical:
-                    with zf.open(info) as body:
-                        store.upload(
-                            f"{HISTORICAL_PREFIX}{stamp}/{name}",
-                            body,
-                            md5,
-                            length=info.file_size,
-                        )
+                for name, info, md5, size in staged_historical:
+                    try:
+                        with zf.open(info) as body:
+                            store.upload(f"{HISTORICAL_PREFIX}{stamp}/{name}", body, md5, length=size)
+                    except ZIP_MEMBER_ERRORS as e:
+                        raise DataError(f"historical ZIP member {info.filename} is unreadable: {e}") from e
             os.remove(zip_path)
             store.upload(
                 f"{HISTORICAL_PREFIX}{stamp}/{SUCCESS_MARKER}",

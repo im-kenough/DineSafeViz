@@ -240,6 +240,34 @@ def bulk_insert(conn, rows):
 # ---------------------------------------------------------------------------
 
 
+class EncodingDetector:
+    """Incremental csv_encoding: feed() the bytes in chunks, then call result().
+
+    Lets a caller detect the encoding in the same pass as other work over the
+    bytes, such as a checksum. utf8 turns False at the first invalid byte.
+    """
+
+    def __init__(self):
+        self._decoder = codecs.getincrementaldecoder("utf-8-sig")()
+        self.utf8 = True
+
+    def feed(self, chunk):
+        if self.utf8:
+            try:
+                self._decoder.decode(chunk)
+            except UnicodeDecodeError:
+                self.utf8 = False
+
+    def result(self):
+        """Return utf-8-sig or cp1252. Call once, after the last chunk."""
+        if self.utf8:
+            try:
+                self._decoder.decode(b"", final=True)
+            except UnicodeDecodeError:
+                self.utf8 = False
+        return "utf-8-sig" if self.utf8 else "cp1252"
+
+
 def csv_encoding(source):
     """Return the encoding of a DineSafe CSV file or binary stream: utf-8-sig,
     else cp1252.
@@ -248,18 +276,18 @@ def csv_encoding(source):
     2022 historical files are UTF-8, dinesafe_hist_2023.csv is Windows-1252), so
     try UTF-8 first and fall back to cp1252. utf-8-sig also accepts a BOM.
     Checks the input in chunks, so it never holds the whole file in memory.
+    A stream is consumed (to EOF, or to the first non-UTF-8 byte) and not
+    rewound; the caller must reopen or seek it before reading it again.
     """
     if isinstance(source, (str, os.PathLike)):
         with open(source, "rb") as f:
             return csv_encoding(f)
-    decoder = codecs.getincrementaldecoder("utf-8-sig")()
-    try:
-        for chunk in iter(lambda: source.read(1 << 20), b""):
-            decoder.decode(chunk)
-        decoder.decode(b"", final=True)
-    except UnicodeDecodeError:
-        return "cp1252"
-    return "utf-8-sig"
+    detector = EncodingDetector()
+    for chunk in iter(lambda: source.read(1 << 20), b""):
+        detector.feed(chunk)
+        if not detector.utf8:
+            break  # already decided
+    return detector.result()
 
 
 def open_csv(csv_path, encoding=None):
