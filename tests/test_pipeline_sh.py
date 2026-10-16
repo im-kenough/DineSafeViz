@@ -59,7 +59,7 @@ def test_flags_are_passed_through(vm_repo):
     assert "stdsvprod01" in line
 
 
-# Review focus 4: under cap_drop ALL, root can't read the operator's mode-600 token.
+# Review focus 4: the image's nonroot user (UID 65532) can't read the operator's mode-600 token.
 def test_runs_as_calling_user(vm_repo):
     repo, env, log = vm_repo
     assert pipeline_sh(repo, env, "stg", "load").returncode == 0

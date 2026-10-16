@@ -10,8 +10,8 @@ The source of truth is the code:
 - `src/dsv-db/init.sql`: roles, table, and index.
 - `src/dsv-db/migrations/001_load_log.sql`: the `load_log` table and the
   loader role's final grants.
-- `src/dsv-pipeline/loader.py`: the seed and refresh logic and the column
-  maps.
+- `src/dsv-pipeline/dinesafe_csv.py`: the CSV column maps and encoding helpers.
+- `src/dsv-pipeline/loader.py`: the seed and refresh logic and row transforms.
 - `src/dsv-pipeline/pipeline.py`: chooses seed, refresh, or skip, and commits.
 - `src/dsv-app/app.py` and
   `src/dsv-analytics/provisioning/dashboards/dinesafe.json`: the queries that

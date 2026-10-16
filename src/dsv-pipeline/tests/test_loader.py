@@ -4,6 +4,11 @@ import pytest
 
 from fakes import historical_csv, historical_row, recent_csv, recent_row
 
+from dinesafe_csv import (
+    HISTORICAL_COLUMN_MAP,
+    RECENT_COLUMN_MAP,
+    csv_encoding,
+)
 from loader import (
     normalize,
     normalize_date,
@@ -13,9 +18,6 @@ from loader import (
     exclude_on_or_after,
     drop_old_id_duplicates,
     _read_csv_rows,
-    csv_encoding,
-    HISTORICAL_COLUMN_MAP,
-    RECENT_COLUMN_MAP,
     INSPECTIONS_COLUMNS,
     COPY_BATCH,
     bulk_insert,

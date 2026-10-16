@@ -5,11 +5,12 @@ from unittest.mock import patch, MagicMock
 
 import psycopg2
 
+from db_fakes import fake_conn
+
 
 def _mock_db(rows):
-    mock_conn = MagicMock()
     mock_cur = MagicMock()
-    mock_conn.cursor.return_value = mock_cur
+    mock_conn = fake_conn(mock_cur)
     mock_cur.fetchall.return_value = rows
     return mock_conn
 
