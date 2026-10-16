@@ -80,8 +80,8 @@ if [[ $command != ingest ]]; then
     || die "the database migrations failed. Is the stack running? (scripts/deploy.sh $env_name)"
 fi
 
-# Runs as you: the container drops every capability, so root couldn't read
-# the mode-600 token file you own. Not exec: the EXIT trap deletes the token.
+# Runs as you: the image's nonroot user (UID 65532) can't read the mode-600
+# token file you own. Not exec: the EXIT trap deletes the token.
 docker compose --profile pipeline run --rm "${build[@]}" \
   --user "$(id -u):$(id -g)" \
   -v "$token_dir/token:/run/secrets/storage-token:ro" \
