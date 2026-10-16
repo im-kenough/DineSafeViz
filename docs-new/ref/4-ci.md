@@ -126,9 +126,6 @@ These limits follow from the current workflows.
   the images build and pass the vulnerability gate, not that the tests pass.
   Run them locally before you merge.
 - **No linting.** No workflow lints Python, shell, or Markdown.
-- **One unpinned action.** `release-drafter.yml` uses
-  `release-drafter/release-drafter@v7`, a moving tag. Every action in
-  `images.yml` is pinned to a commit SHA.
 - **amd64 only.** Images are built for `linux/amd64`, the VM's architecture.
 
 ## Out of scope
