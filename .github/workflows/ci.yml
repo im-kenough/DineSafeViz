@@ -1,0 +1,71 @@
+# Pre-merge checks for every pull request and every push to main.
+# lint: Ruff (Python, with Bandit's security rules) and shellcheck (Bash).
+# test: the three pytest suites; the DB tests start the real Postgres image.
+# dependency-review: blocks PRs that add a dependency with a known high or
+# critical vulnerability. SAST (CodeQL) and image scanning (images.yml) run
+# separately.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
+      - run: pip install -r requirements-ci.txt
+      - name: Ruff
+        run: ruff check --output-format github .
+      - name: shellcheck
+        run: git ls-files -z '*.sh' 'tests/fakes/*' | xargs -0 shellcheck
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            src/dsv-app/requirements*.txt
+            src/dsv-pipeline/requirements.txt
+      - run: >-
+          pip install
+          -r src/dsv-app/requirements.txt
+          -r src/dsv-app/requirements-dev.txt
+          -r src/dsv-pipeline/requirements.txt
+      # Separate runs: each suite has its own conftest.py and helper modules.
+      - run: pytest tests
+      - run: pytest src/dsv-app/tests
+      - run: pytest src/dsv-pipeline/tests
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high

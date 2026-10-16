@@ -6,9 +6,10 @@
 version: 2
 
 updates:
-  # Python packages in the webapp and the data pipeline
+  # Python packages in the webapp, the data pipeline, and the CI lint tools
   - package-ecosystem: "pip"
     directories:
+      - "/"
       - "/src/dsv-app"
       - "/src/dsv-pipeline"
     target-branch: "main"

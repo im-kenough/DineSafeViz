@@ -1,5 +1,4 @@
 """pipeline.load() against the real Postgres image, with an in-memory raw zone."""
-import io
 import sys
 
 import psycopg2

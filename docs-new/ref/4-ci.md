@@ -1,30 +1,70 @@
 # Continuous integration
 
-This page gives a high-level view of how DineSafeViz builds, scans, and
-publishes its container images, and how it tracks dependencies and releases.
+This page gives a high-level view of how DineSafeViz checks code before it
+merges, builds, scans, and publishes its container images, and tracks
+dependencies and releases.
 
 ## Overview
 
 The key CI tasks of DineSafeViz are to:
-1. Build and scan the owned images on every pull request
-2. Publish scanned images to GitHub Container Registry (GHCR) for deploys
-3. Rescan published and upstream images for newly disclosed vulnerabilities
-4. Keep dependencies current and draft release notes
+1. Lint, test, and security-check every pull request before it merges
+2. Build and scan the owned images on every pull request
+3. Publish scanned images to GitHub Container Registry (GHCR) for deploys
+4. Rescan published and upstream images for newly disclosed vulnerabilities
+5. Keep dependencies current and draft release notes
 
 CI stops at GHCR. It never deploys. `scripts/deploy.sh` pulls a published tag
 onto a VM, and an operator runs it.
 
 ## Workflows
 
-All automation lives in `.github/`. There are three workflows and one
-Dependabot configuration.
+All automation lives in `.github/`. There are four workflows and one
+Dependabot configuration. CodeQL also runs, through GitHub's default setup,
+so it has no workflow file.
 
 | File                                    | Triggers                                | Does                                                  |
 | --------------------------------------- | --------------------------------------- | ----------------------------------------------------- |
+| `.github/workflows/ci.yml`              | PR, push to `main`                      | Lints, tests, and reviews new dependencies            |
 | `.github/workflows/images.yml`          | PR, push to `main`, `v*` tag, weekly, manual | Builds, scans, and publishes the owned images    |
 | `.github/workflows/release-drafter.yml` | PR, push to `main`                      | Rebuilds the draft release notes                      |
 | `.github/workflows/release.yml`         | `v*` tag                                | Publishes the draft release that matches the tag     |
 | `.github/dependabot.yml`                | Weekly                                  | Opens PRs for outdated dependencies                   |
+
+## Pre-merge checks
+
+Every PR runs a set of free checks. Together they cover linting, tests,
+static analysis (SAST), and dependency scanning (SCA). Each one fails the PR
+when it finds a problem, so it can be a required check on `main`.
+
+| Check               | Where                 | Tool                    | Fails on                                           |
+| ------------------- | --------------------- | ----------------------- | -------------------------------------------------- |
+| `lint`              | `ci.yml`              | Ruff, shellcheck        | Python errors, likely bugs, Bandit security rules, shell bugs |
+| `test`              | `ci.yml`              | pytest                  | Any failing test in the three suites               |
+| `dependency-review` | `ci.yml` (PRs only)   | Dependency review       | A new dependency with a `high` or `critical` advisory |
+| `CodeQL`            | GitHub default setup  | CodeQL                  | Python and Actions alerts, set in the ruleset      |
+| `scan`              | `images.yml`          | Trivy                   | Fixable `CRITICAL` vulnerabilities in an image     |
+
+- **Lint:** `ruff.toml` lists the rules explicitly, so a Ruff upgrade can't
+  change them. Tests are exempt from the Bandit (`S`) rules, because they run
+  local commands and use throwaway passwords. When a finding is a false
+  positive in app code, suppress it on that line with `# noqa: <rule>` and a
+  comment that says why. `.shellcheckrc` lets shellcheck follow the `lib.sh`
+  that the scripts source.
+- **Test:** the three suites run separately, because each has its own
+  `conftest.py` and helper modules. The database tests start the real Postgres
+  image on the runner, the same way they do locally.
+- **Tool versions:** Ruff and shellcheck are pinned in `requirements-ci.txt`,
+  and CI uses Python 3.14 to match the Dockerfiles.
+
+To run the same checks locally:
+
+```bash
+pip install -r requirements-ci.txt -r src/dsv-app/requirements.txt \
+  -r src/dsv-app/requirements-dev.txt -r src/dsv-pipeline/requirements.txt
+ruff check .
+git ls-files -z '*.sh' 'tests/fakes/*' | xargs -0 shellcheck
+pytest tests && pytest src/dsv-app/tests && pytest src/dsv-pipeline/tests
+```
 
 ## Images
 
@@ -105,11 +145,11 @@ Release notes build up automatically, and a tag publishes them.
 ## Dependency updates
 
 Dependabot opens grouped PRs every week, one for minor and patch updates per
-ecosystem. Each PR goes through `images.yml` like any other PR.
+ecosystem. Each PR goes through `ci.yml` and `images.yml` like any other PR.
 
 | Ecosystem        | Location                          | Updates                                       |
 | ---------------- | --------------------------------- | --------------------------------------------- |
-| `pip`            | `src/dsv-app`, `src/dsv-pipeline` | `requirements.txt` packages                   |
+| `pip`            | Root, `src/dsv-app`, `src/dsv-pipeline` | `requirements*.txt` packages, including CI lint tools |
 | `docker`         | `src/dsv-app`, `src/dsv-pipeline` | Dockerfile base images                        |
 | `docker-compose` | Repository root                   | Pinned upstream images in both Compose files  |
 | `github-actions` | `.github/workflows`               | Action SHA pins and their version comments    |
@@ -121,11 +161,8 @@ migration, not just a new tag.
 
 These limits follow from the current workflows.
 
-- **No tests in CI.** The `pytest` suites in `tests/`, `src/dsv-app/tests/`,
-  and `src/dsv-pipeline/tests/` don't run in any workflow. A green check means
-  the images build and pass the vulnerability gate, not that the tests pass.
-  Run them locally before you merge.
-- **No linting.** No workflow lints Python, shell, or Markdown.
+- **No Markdown or Dockerfile linting.** Ruff and shellcheck cover Python and
+  shell only.
 - **amd64 only.** Images are built for `linux/amd64`, the VM's architecture.
 
 ## Out of scope

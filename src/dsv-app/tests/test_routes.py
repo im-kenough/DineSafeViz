@@ -1,5 +1,6 @@
 import re
 from datetime import date
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import psycopg2
@@ -125,7 +126,8 @@ def test_footer_content(client):
     with patch("app._get_home_stats", return_value=_HOME_STATS):
         resp = client.get("/")
     assert b"&copy; 2026 Kenneth Ho" in resp.data
-    assert b"DineSafeViz v0.1.0" in resp.data
+    version = (Path(__file__).resolve().parent.parent / "VERSION.txt").read_text().strip()
+    assert f"DineSafeViz v{version}".encode() in resp.data
 
 
 def _picker(html):

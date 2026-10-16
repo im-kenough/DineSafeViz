@@ -1,6 +1,7 @@
 """Static checks of the merged Compose config (docker compose config)."""
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -88,7 +89,7 @@ def test_vm_uses_published_images(vm):
     services = vm["services"]
     assert services["dsv-app"]["image"] == "ghcr.io/im-kenough/dsv-app:test-version"
     assert services["dsv-pipeline"]["image"] == "ghcr.io/im-kenough/dsv-pipeline:test-version"
-    assert services["dsv-tunnel"]["image"].startswith("cloudflare/cloudflared:2026.10.0@sha256:")
+    assert re.fullmatch(r"cloudflare/cloudflared:[\d.]+@sha256:[0-9a-f]{64}", services["dsv-tunnel"]["image"])
 
 
 @pytest.mark.parametrize("name", LONG_RUNNING)

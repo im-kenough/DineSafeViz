@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2086  # $TAGS is word-split on purpose; see create_tags
 # Setup az prod and stg environments and provision resources
 # (azure-checklist.md steps 1.2 to 4.4)
 #

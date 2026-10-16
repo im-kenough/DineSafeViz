@@ -1,0 +1,11 @@
+# Lint config for every Python file in the repo. Run: ruff check .
+target-version = "py314"  # matches the python:3.14 base images
+
+[lint]
+# Listed explicitly so a Ruff upgrade can't change the rule set on its own.
+# E/F: errors and pyflakes. B: likely bugs. S: Bandit's security rules (SAST).
+select = ["E4", "E7", "E9", "F", "B", "S"]
+
+[lint.per-file-ignores]
+# Tests run local commands, use throwaway passwords, and assert by design.
+"**/tests/**" = ["S"]
