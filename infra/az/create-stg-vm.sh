@@ -1,7 +1,9 @@
 #!/bin/bash
 # Create vm-dsv-stg01 on the existing nic-dsv-stg01 (and its public IP,
 # pip-dsv-stg01), so the VM keeps the same address every time it's rebuilt,
-# and enroll it in the mc-dsv-stg01-vms01 patch schedule.
+# and enroll it in the mc-dsv-stg01-vms01 patch schedule. Then adds
+# "Host vm-dsv-stg01" to your SSH config and installs the repo's read-only
+# deploy key for the admin user, so you can ssh in and git clone over SSH.
 # Pair with delete-stg-vm.sh, which removes the VM and its disks but leaves
 # the NIC and public IP. For other VMs use create-gen-vm.sh.
 #
@@ -33,6 +35,11 @@ STORAGE_SKU=Premium_LRS
 ADMIN_USER=dsv-vm-admin
 SSH_KEY=$HOME/.ssh/id_ed25519_dsv_stg01_az_admin.pub
 TAGS="workload=dsv env=stg owner=dsv-admin01 managed-by=manual"
+
+# read-only deploy key for REPO; it goes to the admin user's ~/.ssh on the VM
+DEPLOY_KEY=$HOME/.ssh/dsv-deploy-key-RO
+REPO=im-kenough/DineSafeViz
+SSH_CONFIG=$HOME/.ssh/config
 
 DRY_RUN=${DRY_RUN:-}
 
@@ -72,6 +79,7 @@ check_prerequisites(){
     az maintenance configuration show -g "$RG" --resource-name "$MC_NAME" -o none \
         || die "maintenance configuration $MC_NAME not found"
     [[ -f $SSH_KEY ]] || die "SSH public key $SSH_KEY not found"
+    [[ -f $DEPLOY_KEY ]] || die "deploy key $DEPLOY_KEY not found"
 
     if az vm show -g "$RG" -n "$VM_NAME" -o none 2>/dev/null; then
         die "VM $VM_NAME already exists in $RG"
@@ -146,6 +154,103 @@ show_vm(){
         -o table
 }
 
+# Adds a "Host $VM_NAME" entry to SSH_CONFIG, unless there's one already, and
+# sets SSH_OPTS for the steps below. SSH_OPTS repeats the entry's settings,
+# so a stale entry you wrote yourself can't send them to the wrong host.
+write_ssh_config(){
+    if [[ -n $DRY_RUN ]]; then
+        echo "[dry run] add Host $VM_NAME to $SSH_CONFIG"
+        return
+    fi
+    local ip
+    ip=$(az vm show -d -g "$RG" -n "$VM_NAME" --query publicIps -o tsv)
+    [[ -n $ip ]] || die "$VM_NAME has no public IP"
+    SSH_OPTS=(-o "HostName=$ip" -o "User=$ADMIN_USER" -i "${SSH_KEY%.pub}"
+        -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new)
+
+    # the VM is new, so any host key known for its IP is from a deleted VM
+    ssh-keygen -R "$ip" >/dev/null 2>&1 || true
+
+    if grep -qE "^Host[[:space:]]+$VM_NAME([[:space:]]|\$)" "$SSH_CONFIG" 2>/dev/null; then
+        local current
+        current=$(ssh -F "$SSH_CONFIG" -G "$VM_NAME" 2>/dev/null | awk '$1 == "hostname" {print $2}')
+        echo "Host $VM_NAME is already in $SSH_CONFIG, leaving it"
+        [[ $current == "$ip" ]] \
+            || echo "WARNING: that entry points at $current, but $VM_NAME is at $ip" >&2
+        return
+    fi
+    echo "Adding Host $VM_NAME ($ip) to $SSH_CONFIG..."
+    cat >> "$SSH_CONFIG" <<CONF
+
+# added by ${0##*/}
+Host $VM_NAME
+    HostName $ip
+    User $ADMIN_USER
+    IdentityFile ${SSH_KEY%.pub}
+    IdentitiesOnly yes
+CONF
+    chmod 600 "$SSH_CONFIG"
+}
+
+upload_deploy_key(){
+    if [[ -n $DRY_RUN ]]; then
+        echo "[dry run] scp $DEPLOY_KEY $VM_NAME:.ssh/"
+        return
+    fi
+    # sshd can lag a little behind the provisioning state
+    echo "Waiting for SSH on $VM_NAME..."
+    local i
+    for i in {1..12}; do
+        ssh "${SSH_OPTS[@]}" -o ConnectTimeout=10 -o BatchMode=yes "$VM_NAME" true 2>/dev/null && break
+        [[ $i -lt 12 ]] || die "no SSH to $VM_NAME after 2 minutes"
+        sleep 10
+    done
+    echo "Uploading deploy key ${DEPLOY_KEY##*/}..."
+    scp -q "${SSH_OPTS[@]}" "$DEPLOY_KEY" "$VM_NAME:.ssh/${DEPLOY_KEY##*/}"
+}
+
+# Locks down the key, points git@github.com at it with GitHub's published host
+# keys, and checks that GitHub accepts it.
+configure_deploy_key(){
+    if [[ -n $DRY_RUN ]]; then
+        echo "[dry run] configure the deploy key on $VM_NAME"
+        return
+    fi
+    echo "Configuring deploy key on $VM_NAME..."
+    local out
+    out=$(ssh "${SSH_OPTS[@]}" "$VM_NAME" bash -s -- "${DEPLOY_KEY##*/}" <<'REMOTE'
+set -euo pipefail
+key=~/.ssh/$1
+chmod 700 ~/.ssh
+chmod 600 "$key"
+
+# from GitHub's API over HTTPS, instead of trusting whatever answers first
+curl -fsS https://api.github.com/meta \
+    | python3 -c 'import json, sys; print("\n".join("github.com " + k for k in json.load(sys.stdin)["ssh_keys"]))' \
+    > ~/.ssh/known_hosts_github
+chmod 600 ~/.ssh/known_hosts_github
+
+if ! grep -qE '^Host[[:space:]]+github\.com([[:space:]]|$)' ~/.ssh/config 2>/dev/null; then
+    cat >> ~/.ssh/config <<CONF
+Host github.com
+    User git
+    IdentityFile $key
+    IdentitiesOnly yes
+    UserKnownHostsFile ~/.ssh/known_hosts_github
+    StrictHostKeyChecking yes
+CONF
+fi
+chmod 600 ~/.ssh/config
+
+# exits 1 even when the key is accepted, since GitHub gives no shell
+ssh -T git@github.com 2>&1 || true
+REMOTE
+    )
+    grep -q "successfully authenticated" <<<"$out" \
+        || die "GitHub didn't accept the deploy key: $out"
+    echo "Deploy key OK. To clone: ssh $VM_NAME, then git clone git@github.com:$REPO.git"
+}
+
 #################################
 # Main
 #################################
@@ -158,6 +263,9 @@ main(){
     wait_until_ready
     enroll_maintenance
     show_vm
+    write_ssh_config
+    upload_deploy_key
+    configure_deploy_key
     echo "Done."
 }
 
