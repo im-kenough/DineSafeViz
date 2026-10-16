@@ -786,7 +786,7 @@ security updates on.
 ### 7.2 Make the packages public (after the first push to main)
 
 GHCR packages are private when first published. Public packages let the VMs
-pull without a token. `images.yml` publishes with `GITHUB_TOKEN`, so the
+pull without a token. `ci.yml` publishes with `GITHUB_TOKEN`, so the
 packages are already linked to the repository.
 
 <!-- prettier-ignore -->

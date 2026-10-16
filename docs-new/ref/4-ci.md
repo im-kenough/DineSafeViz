@@ -18,19 +18,19 @@ onto a VM, and an operator runs it.
 
 ## Workflows
 
-All automation lives in `.github/`. There are five workflows and one
-Dependabot configuration. CodeQL runs from `code-scanning.yml`, so GitHub's
+All automation lives in `.github/`. There are four workflows and one
+Dependabot configuration. Each file name matches its workflow name in the
+Actions tab. CodeQL runs from `code-scanning.yml`, so GitHub's
 CodeQL default setup must stay off. While it's on, GitHub rejects the
 workflow's uploads.
 
-| File                                    | Triggers                                | Does                                                  |
-| --------------------------------------- | --------------------------------------- | ----------------------------------------------------- |
-| `.github/workflows/ci.yml`              | Called by `images.yml`                  | Lints, tests, scans for secrets and critical IaC issues, and reviews new dependencies |
-| `.github/workflows/images.yml`          | PR, push to `main`, `v*` tag            | Runs `ci.yml`, then builds, scans, and publishes the owned images; on a `v*` tag, then publishes the matching draft release |
-| `.github/workflows/code-scanning.yml`   | PR, push to `main`, weekly, manual      | Runs CodeQL and reports every Trivy IaC finding       |
-| `.github/workflows/rescan.yml`          | Weekly, manual                          | Rescans the published and pinned upstream images      |
-| `.github/workflows/release-drafter.yml` | Push to `main`                          | Rebuilds the draft release notes                      |
-| `.github/dependabot.yml`                | Weekly                                  | Opens PRs for outdated dependencies                   |
+| File                                    | Name            | Triggers                           | Does                                                  |
+| --------------------------------------- | --------------- | ---------------------------------- | ----------------------------------------------------- |
+| `.github/workflows/ci.yml`              | CI              | PR, push to `main`, `v*` tag       | Lints, tests, reviews new dependencies, and builds and scans the owned images; on a push, publishes them; on a `v*` tag, then publishes the matching draft release |
+| `.github/workflows/code-scanning.yml`   | Code scanning   | PR, push to `main`, weekly, manual | Runs CodeQL and reports every Trivy IaC finding       |
+| `.github/workflows/rescan-images.yml`   | Rescan images   | Weekly, manual                     | Rescans the published and pinned upstream images      |
+| `.github/workflows/release-drafter.yml` | Release drafter | Push to `main`                     | Rebuilds the draft release notes                      |
+| `.github/dependabot.yml`                | n/a             | Weekly                             | Opens PRs for outdated dependencies                   |
 
 ## Pre-merge checks
 
@@ -38,18 +38,20 @@ Every PR runs a set of free checks. Together they cover linting, tests,
 static analysis (SAST), and dependency scanning (SCA). Each one fails the PR
 when it finds a problem, so it can be a required check on `main`.
 
-`ci.yml` is a reusable workflow. `images.yml` calls it as its `ci` job (shown
-as `CI`), so its checks appear on a PR as `CI / Lint`, `CI / Test`, and
-`CI / Dependency review`. The same call runs on pushes to `main` and on `v*`
-tags, and the `push` job waits for it.
+A PR lists each check as `<workflow> / <job>`, for example `CI / Lint`. The
+ruleset requires the check by its job name alone, so renaming a job in
+`ci.yml` means updating the `force-pr-force-checks` ruleset in the same PR.
+`Lint`, `Test`, `Dependency review`, and both `Build and scan` legs are
+required.
 
-| Check               | Where                 | Tool                    | Fails on                                           |
-| ------------------- | --------------------- | ----------------------- | -------------------------------------------------- |
-| `CI / Lint`         | `ci.yml`              | Ruff, shellcheck, yamllint, actionlint, zizmor, hadolint, gitleaks, Trivy config | Python errors, likely bugs, Bandit security rules, shell bugs, invalid YAML or workflows, insecure workflows, Dockerfile warnings, secrets in git history, `CRITICAL` IaC misconfigurations |
-| `CI / Test`         | `ci.yml`              | pytest                  | Any failing test in the three suites               |
-| `CI / Dependency review` | `ci.yml` (PRs only) | Dependency review     | A new dependency with a `high` or `critical` advisory |
-| `CodeQL (<language>)` | `code-scanning.yml` | CodeQL                  | Python and Actions alerts, set in the ruleset      |
-| `Scan image (<image>)` | `images.yml`       | Trivy                   | Fixable `CRITICAL` vulnerabilities in an image     |
+| Check                         | Where               | Tool                    | Fails on                                           |
+| ----------------------------- | ------------------- | ----------------------- | -------------------------------------------------- |
+| `Lint`                        | `ci.yml`            | Ruff, shellcheck, yamllint, actionlint, zizmor, hadolint, gitleaks, Trivy config | Python errors, likely bugs, Bandit security rules, shell bugs, invalid YAML or workflows, insecure workflows, Dockerfile warnings, secrets in git history, `CRITICAL` IaC misconfigurations |
+| `Test`                        | `ci.yml`            | pytest                  | Any failing test in the three suites               |
+| `Dependency review`           | `ci.yml` (PRs only) | Dependency review       | A new dependency with a `high` or `critical` advisory |
+| `Build and scan (<image>)`    | `ci.yml`            | Docker Buildx, Trivy    | A Dockerfile that doesn't build, or fixable `CRITICAL` vulnerabilities in an image |
+| `CodeQL (<language>)`         | `code-scanning.yml` | CodeQL                  | Python and Actions alerts, set in the ruleset      |
+| `Trivy IaC`                   | `code-scanning.yml` | Trivy config            | Never fails; reports every severity                |
 
 - **Lint:** `ruff.toml` lists the rules explicitly, so a Ruff upgrade can't
   change them. Tests are exempt from the Bandit (`S`) rules, because they run
@@ -63,8 +65,9 @@ tags, and the `push` job waits for it.
   Reviewed false positives are fingerprinted in `.gitleaksignore`. The same
   scan runs as a local pre-commit hook after `pre-commit install`.
 - **Workflows:** zizmor audits the workflows and `dependabot.yml` for
-  security issues. Accepted findings, with reasons, are in
-  `.github/zizmor.yml`.
+  security issues. No findings are accepted. To accept one, add a
+  `.github/zizmor.yml` with the reason. `ci.yml` doesn't use the pip cache,
+  because zizmor flags caches in a workflow that publishes.
 - **IaC:** Trivy config fails on `CRITICAL` Terraform and Dockerfile
   misconfigurations. `code-scanning.yml` reports every severity to
   **Security > Code scanning**.
@@ -99,7 +102,7 @@ pytest tests && pytest src/dsv-app/tests && pytest src/dsv-pipeline/tests
 
 ## Images
 
-`images.yml` builds two images. Upstream images (nginx, Postgres, Grafana, and
+`ci.yml` builds two images. Upstream images (nginx, Postgres, Grafana, and
 cloudflared) are pinned by tag and digest in the Compose files and are never
 rebuilt.
 
@@ -108,20 +111,24 @@ rebuilt.
 | `ghcr.io/im-kenough/dsv-app`      | `src/dsv-app`      |
 | `ghcr.io/im-kenough/dsv-pipeline` | `src/dsv-pipeline` |
 
-`images.yml` has four jobs. Which jobs run depends on the trigger. The
-Actions UI shows the display name in parentheses. The job ID before it is
-what `needs:` refers to:
+`ci.yml` has six jobs. Which jobs run depends on the trigger. The Actions UI
+shows the display name in parentheses. The job ID before it is what `needs:`
+refers to:
 
-| Job           | Runs on                   | Does                                                                 |
-| ------------- | ------------------------- | -------------------------------------------------------------------- |
-| `ci` (CI)     | PR, push                  | Runs `ci.yml`: lint, tests, and dependency review                    |
-| `scan` (Scan image) | PR, push            | Builds each image for `linux/amd64`, scans it with Trivy             |
-| `push` (Publish to GHCR) | Push, after `ci` and `scan` pass | Rebuilds from the `scan` job's layer cache, pushes to GHCR    |
-| `release` (Publish release) | `v*` tag, after every `push` leg passes | Publishes the draft release that matches the tag          |
+| Job                                   | Runs on                                    | Does                                                         |
+| ------------------------------------- | ------------------------------------------ | ------------------------------------------------------------ |
+| `lint` (Lint)                         | PR, push                                   | Runs the linters and security checks                         |
+| `test` (Test)                         | PR, push                                   | Runs the three pytest suites                                 |
+| `dependency-review` (Dependency review) | PR                                       | Reviews new dependencies                                     |
+| `build-scan` (Build and scan)         | PR, push                                   | Builds each image for `linux/amd64`, scans it with Trivy     |
+| `publish-images` (Publish images)     | Push, after `lint`, `test`, and `build-scan` pass | Rebuilds from the `build-scan` layer cache, pushes to GHCR |
+| `publish-release` (Publish release)   | `v*` tag, after both `publish-images` legs pass | Publishes the draft release that matches the tag        |
 
-### Scan: gate every build
+On a PR, the two publish jobs show as skipped.
 
-The `scan` job builds each image locally and runs Trivy against it before
+### Build and scan: gate every build
+
+The `build-scan` job builds each image locally and runs Trivy against it before
 anything is pushed.
 
 - **Gate:** the job fails on `CRITICAL` vulnerabilities that have a fix.
@@ -130,12 +137,12 @@ anything is pushed.
   to **Security > Code scanning**. On PRs, only the gate's table appears, in
   the job log.
 - **Cache:** layers go to the GitHub Actions cache, scoped per image. The
-  `push` job reuses them, so the image it pushes is the one that was scanned.
+  `publish-images` job reuses them, so the image it pushes is the one that was scanned.
 
-### Push: publish deployable tags
+### Publish: push deployable tags
 
-The `push` job runs only on pushes, and only after `ci` passes and `scan`
-passes for both images. A `v*` tag doesn't go through a PR, so this is what
+The `publish-images` job runs only on pushes, and only after `lint`, `test`,
+and `build-scan` pass for both images. A `v*` tag doesn't go through a PR, so this is what
 keeps an unlinted or untested commit out of GHCR. Every deployable tag is
 immutable. There's no `latest`.
 
@@ -147,14 +154,14 @@ immutable. There's no `latest`.
 
 `deploy.sh stg main` resolves `origin/main` to a commit and pulls the matching
 `sha-` tag, never the moving `main` tag. Before it changes anything, it
-checks that both images exist in GHCR. If `images.yml` hasn't finished, the
+checks that both images exist in GHCR. If `ci.yml` hasn't finished, the
 deploy stops.
 
 ### Rescan: catch new vulnerabilities
 
 New vulnerabilities are published after an image is built. Every Monday at
-06:17 UTC, or on demand, `rescan.yml` runs two jobs. `list-images` builds the
-scan list from:
+06:17 UTC, or on demand, `rescan-images.yml` runs two jobs. `list-images`
+builds the scan list from:
 
 - The `main` tag of both owned images
 - The latest published release tag of both owned images
@@ -173,15 +180,15 @@ Release notes build up automatically, and a tag publishes them.
    **Bug Fixes**) and the next version (`breaking` is major, `feature` is
    minor, and `fix` or `infosec` is patch).
 2. To release, push a `v*` tag that matches the draft's version.
-3. The tag starts `images.yml`, which pushes the `X.Y.Z` and `X.Y` images.
-4. Once both images are pushed, its `release` job finds the draft with that
-   tag and publishes it. If CI, the scan, or the push fails, the draft stays
-   a draft. If there's no matching draft, the job fails.
+3. The tag starts `ci.yml`, which pushes the `X.Y.Z` and `X.Y` images.
+4. Once both images are pushed, its `publish-release` job finds the draft
+   with that tag and publishes it. If lint, tests, the scan, or the push
+   fails, the draft stays a draft. If there's no matching draft, the job fails.
 
 ## Dependency updates
 
 Dependabot opens grouped PRs every week, one for minor and patch updates per
-ecosystem. Each PR goes through `ci.yml` and `images.yml` like any other PR.
+ecosystem. Each PR goes through `ci.yml` like any other PR.
 
 | Ecosystem        | Location                          | Updates                                       |
 | ---------------- | --------------------------------- | --------------------------------------------- |

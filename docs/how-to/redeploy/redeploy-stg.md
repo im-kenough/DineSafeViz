@@ -2,14 +2,14 @@
 
 This guide redeploys the app to `https://stg.dinesafeviz.com` after the VM is
 already set up. Stg always deploys the latest commit on `main`, using the
-images that `images.yml` publishes for that commit. For a first-time setup,
+images that `ci.yml` publishes for that commit. For a first-time setup,
 see [Deploy DineSafeViz to stg](../azure-vm/deploy-stg.md).
 
 ## Redeploy
 
 Merge your change to `main`, then follow these steps.
 
-1.  On your workstation, wait for the `images.yml` run on `main` to pass:
+1.  On your workstation, wait for the `ci.yml` run on `main` to pass:
 
     ```bash
     gh run watch
@@ -46,7 +46,7 @@ setup includes Docker, the swap file, `dsv-imds-block.service`, and the
 `dsv-pipeline` timer. These live outside the clone, so deleting it doesn't
 remove them.
 
-1.  On your workstation, wait for the `images.yml` run on `main` to pass, then
+1.  On your workstation, wait for the `ci.yml` run on `main` to pass, then
     connect to the VM, as in steps 1 and 2 of [Redeploy](#redeploy).
 
 2.  On the VM, confirm that the metadata block is active. The deploy fails
@@ -125,7 +125,7 @@ redeploy. For the full list, see
 
 | Error or symptom | Fix |
 | --- | --- |
-| `... isn't published. Wait for images.yml to finish, then rerun.` | `images.yml` is still running or failed. Wait for it, then rerun. |
+| `... isn't published. Wait for the CI workflow (ci.yml) to finish, then rerun.` | `ci.yml` is still running or failed. Wait for it, then rerun. |
 | `deploy/stg.env is missing` | Run step 4 of [Redeploy from a fresh clone](#redeploy-from-a-fresh-clone). |
 | `the data load failed and the site has an empty database` | The first load failed. Read the `pipeline:` error printed just above it, and fix that error as described in the following rows. |
 | `pipeline: recent/ is empty` | The raw zone has no data. Run `./scripts/pipeline.sh stg ingest`, then rerun the deploy. |

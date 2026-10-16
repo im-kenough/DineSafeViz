@@ -7,7 +7,6 @@ the load in load_log and commits once, so the data and its log row land
 together.
 """
 
-import codecs
 import csv
 import io
 import itertools
@@ -16,6 +15,8 @@ import re
 from typing import NamedTuple
 
 import psycopg2
+
+from dinesafe_csv import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP, csv_encoding, open_csv
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -26,8 +27,6 @@ DSV_DB_PORT = os.environ.get("DSV_DB_PORT", "5432")
 DSV_DB_NAME = os.environ.get("DSV_DB_NAME", "dinesafe")
 DSV_DB_USER = os.environ.get("DSV_DB_USER", "dinesafe")
 DSV_DB_PASSWORD = os.environ.get("DSV_DB_PASSWORD", "dinesafe")
-
-RECENT_NAME = "Dinesafe.csv"
 
 # Rows per COPY. Bounds memory; the whole load is still one transaction.
 COPY_BATCH = 10000
@@ -56,49 +55,6 @@ INSPECTIONS_COLUMNS = [
     "unit",
     "postal_code",
 ]
-
-# Maps historical CSV headers → unified inspections column names.
-# "Rec #" is intentionally absent (discarded on import).
-HISTORICAL_COLUMN_MAP = {
-    "Establishment ID": "establishment_id",
-    "Inspection ID": "inspection_id",
-    "Establishment Name": "establishment_name",
-    "Establishment Type": "establishment_type",
-    "Establishment Address": "establishment_address",
-    "Latitude": "latitude",
-    "Longitude": "longitude",
-    "Establishment Status": "establishment_status",
-    "Min. Inspections Per Year": "min_inspections_per_year",
-    "Infraction Details": "infraction_details",
-    "Inspection Date": "inspection_date",
-    "Severity": "severity",
-    "Action": "action",
-    "Outcome": "outcome",
-    "Amount Fined": "amount_fined",
-}
-
-# Maps recent CSV headers → unified inspections column names.
-# "_id", "phone", and "observation" are intentionally absent (discarded on
-# import). "oldEstId" is read only by scan_recent and isn't stored: bulk_insert
-# writes only INSPECTIONS_COLUMNS. The recent feed no longer carries an
-# "actionDesc" column, so `action` stays NULL for recent rows.
-RECENT_COLUMN_MAP = {
-    "estId": "establishment_id",
-    "oldEstId": "old_establishment_id",
-    "estName": "establishment_name",
-    "address": "establishment_address",
-    "typeDesc": "infraction_details",
-    "deficiencyDesc": "infraction_category",
-    "inspectionDate": "inspection_date",
-    "inspectionStatus": "establishment_status",
-    "severity": "severity",
-    "OutcomeDesc": "outcome",
-    "OutcomeDate": "outcome_date",
-    "amountFined": "amount_fined",
-    "latitude": "latitude",
-    "longitude": "longitude",
-    "unique_id": "unique_id",
-}
 
 
 # ---------------------------------------------------------------------------
@@ -238,31 +194,6 @@ def bulk_insert(conn, rows):
 # ---------------------------------------------------------------------------
 # Seed and refresh — called by pipeline.py, which commits
 # ---------------------------------------------------------------------------
-
-
-def csv_encoding(csv_path):
-    """Return the encoding of a DineSafe CSV file: utf-8-sig, else cp1252.
-
-    DineSafe exports mix encodings across files (the recent CSV and the 2001 to
-    2022 historical files are UTF-8, dinesafe_hist_2023.csv is Windows-1252), so
-    try UTF-8 first and fall back to cp1252. utf-8-sig also accepts a BOM.
-    Checks the file in chunks, so it never holds the whole file in memory.
-    """
-    decoder = codecs.getincrementaldecoder("utf-8-sig")()
-    with open(csv_path, "rb") as f:
-        try:
-            for chunk in iter(lambda: f.read(1 << 20), b""):
-                decoder.decode(chunk)
-            decoder.decode(b"", final=True)
-        except UnicodeDecodeError:
-            return "cp1252"
-    return "utf-8-sig"
-
-
-def open_csv(csv_path, encoding=None):
-    """Open a DineSafe CSV file as text for the csv module, in its encoding.
-    Pass encoding when it's already known, to skip csv_encoding's full read."""
-    return open(csv_path, encoding=encoding or csv_encoding(csv_path), newline="")
 
 
 def _read_csv_rows(csv_path, column_map, encoding=None):
