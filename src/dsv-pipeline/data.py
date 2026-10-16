@@ -76,7 +76,7 @@ class DataError(Exception):
 
 def md5_b64(path):
     """Return the base64 MD5 of a file, the encoding Blob uses for Content-MD5."""
-    digest = hashlib.md5()
+    digest = hashlib.md5(usedforsecurity=False)  # integrity checksum, not security
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             digest.update(chunk)
@@ -155,7 +155,8 @@ class BlobStore:
 
     def _request(self, method, url, data=None, headers=None):
         """Send one request. Returns the response, or None on HTTP 404."""
-        req = Request(url, data=data, method=method)
+        # Always https://<account>.blob.core.windows.net, built in __init__.
+        req = Request(url, data=data, method=method)  # noqa: S310
         req.add_header("Authorization", f"Bearer {self.token}")
         req.add_header("x-ms-version", API_VERSION)
         for key, value in (headers or {}).items():
@@ -183,7 +184,9 @@ class BlobStore:
             if resp is None:
                 raise DataError(f"{self.container_url}: container not found")
             with resp:
-                root = ET.fromstring(resp.read())
+                # Authenticated HTTPS response from Azure, and Python's bundled
+                # Expat (2.4.1+) already refuses entity-expansion attacks.
+                root = ET.fromstring(resp.read())  # noqa: S314
             for blob in root.iter("Blob"):
                 meta = blob.find("Metadata")
                 blobs[blob.findtext("Name")] = BlobInfo(

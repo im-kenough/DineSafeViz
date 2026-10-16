@@ -5,8 +5,8 @@ import psycopg2
 
 import app as app_module
 from app import (
-    DATA_START, get_adjacent_quarters, get_data_range, get_quarter_bounds, get_quarter_months, get_valid_quarters,
-    get_valid_years, parse_year_quarter,
+    DATA_START, build_days, get_adjacent_quarters, get_data_range, get_quarter_bounds, get_quarter_months,
+    get_valid_quarters, get_valid_years, parse_year_quarter, sort_rows,
 )
 
 # A DB range narrower than 2001..today: starts mid-Q2 2010, ends in Q1 2025.
@@ -154,9 +154,6 @@ def test_data_range_falls_back_when_db_unreachable_and_does_not_cache():
     with patch("app.psycopg2.connect", side_effect=psycopg2.OperationalError("down")):
         assert get_data_range() == (DATA_START, date.today())
     assert app_module._stats_cache["fetched_at"] is None
-
-
-from app import sort_rows, build_days
 
 
 def test_sort_rows_closed_first():

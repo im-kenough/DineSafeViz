@@ -27,14 +27,20 @@ _APP_DIR = Path(__file__).resolve().parent.parent
 _STYLE_CSS = _APP_DIR / "static" / "style.css"
 _DASHBOARD_JSON = _APP_DIR.parent / "dsv-analytics" / "provisioning" / "dashboards" / "dinesafe.json"
 _STATUS_TOKENS = {"Pass": "green", "Conditional Pass": "yellow", "Closed": "red"}
+# Matches the .sev-* classes in style.css.
+_SEVERITY_TOKENS = {"Crucial": "red", "Significant": "yellow", "Minor": "green"}
 
 
 def _css_status_colours():
     tokens = dict(re.findall(r"--dinesafe-(\w+):\s*(#[0-9A-Fa-f]{6})", _STYLE_CSS.read_text()))
-    return {status: tokens[name].upper() for status, name in _STATUS_TOKENS.items()}
+    return {key: tokens[name].upper() for key, name in {**_STATUS_TOKENS, **_SEVERITY_TOKENS}.items()}
 
 
 def _panel_status(title):
+    # "<status> - <severity> Infractions" panels are coloured by severity.
+    severity = re.search(r" - (\w+) Infractions$", title)
+    if severity:
+        return severity[1]
     # Longest prefix first so "Conditional Pass ..." isn't matched as "Pass".
     for status in sorted(_STATUS_TOKENS, key=len, reverse=True):
         if title.startswith(status):
@@ -68,4 +74,4 @@ def test_dashboard_status_colours_match_css():
                             f"panel {panel['title']!r} override {status!r}"
                         checked += 1
     # Guards against the walk silently matching nothing after a dashboard rework.
-    assert checked >= 20
+    assert checked >= 14

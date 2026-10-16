@@ -221,7 +221,7 @@ def bulk_insert(conn, rows):
     """
     inserted = 0
     with conn.cursor() as cur:
-        for batch in itertools.batched(rows, COPY_BATCH):
+        for batch in itertools.batched(rows, COPY_BATCH, strict=False):
             buf = io.StringIO()
             for row in batch:
                 line = "\t".join(

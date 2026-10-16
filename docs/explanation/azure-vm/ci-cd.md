@@ -18,9 +18,9 @@ VM. The two meet at GHCR.
 
 ```mermaid
 flowchart LR
-    pr[Pull request] -->|build + scan, no push| ci[images.yml]
-    main[Merge to main] -->|build + scan + push| ghcr[(GHCR)]
-    tag[Push tag v*] -->|build + scan + push| ghcr
+    pr[Pull request] -->|lint + test + build + scan, no push| ci[ci.yml + images.yml]
+    main[Merge to main] -->|lint + test + build + scan + push| ghcr[(GHCR)]
+    tag[Push tag v*] -->|lint + test + build + scan + push| ghcr
     ghcr -->|"sha-abc1234"| stg["vm-dsv-stg01<br/>deploy.sh stg main"]
     ghcr -->|"0.5.0"| prod["vm-dsv-prod01<br/>deploy.sh prod v0.5.0"]
 ```
@@ -36,7 +36,8 @@ The repository has these automation pieces:
 
 | File                                  | Trigger                       | What it does                                                    |
 | ------------------------------------- | ----------------------------- | --------------------------------------------------------------- |
-| `.github/workflows/images.yml`        | PR, push to `main`, `v*` tag, weekly | Builds, scans, and (except on PRs) pushes the owned images |
+| `.github/workflows/ci.yml`            | Called by `images.yml`        | Lints, tests, and reviews new dependencies                      |
+| `.github/workflows/images.yml`        | PR, push to `main`, `v*` tag, weekly | Runs `ci.yml`, builds and scans the owned images, and (except on PRs) pushes them once both pass |
 | `.github/workflows/release.yml`       | `v*` tag                      | Publishes the matching draft release                            |
 | `.github/workflows/release-drafter.yml` | Push to `main`, PR          | Keeps the draft release notes up to date                        |
 | `.github/dependabot.yml`              | Weekly schedule               | Opens PRs for outdated dependencies                             |
@@ -74,7 +75,7 @@ Three free tools keep dependencies current and flag known vulnerabilities.
   | `github-actions` | `.github/workflows`               | Action SHA pins and their version comments       |
   | `docker`         | `src/dsv-app`, `src/dsv-pipeline` | Dockerfile base images                           |
   | `docker-compose` | Repository root                   | nginx, Postgres, Grafana, curl, cloudflared tags |
-  | `pip`            | `src/dsv-app`, `src/dsv-pipeline` | `requirements.txt` packages                      |
+  | `pip`            | Root, `src/dsv-app`, `src/dsv-pipeline` | `requirements*.txt` packages             |
 
   Minor and patch updates are grouped into one PR per ecosystem. Major
   Postgres updates are ignored, because moving from 17 to 18 needs a data
@@ -109,9 +110,12 @@ deploy commands run over SSH on the VM.
 
 ### Open a pull request
 
-When you open a PR, `images.yml` builds both images and scans them, but
-doesn't push anything. A red check means a Dockerfile no longer builds or an
-image has a fixable critical vulnerability.
+When you open a PR, `images.yml` runs `ci.yml` to lint and test the code,
+and builds and scans both images, but doesn't push anything. A red check
+means a lint or test failure, a new vulnerable dependency, a Dockerfile that
+no longer builds, or an image with a fixable critical vulnerability. For the
+full list of checks, see
+[Pre-merge checks](../../../docs-new/ref/4-ci.md#pre-merge-checks).
 
 ```bash
 git switch -c fix-map-legend
@@ -178,7 +182,7 @@ If the VM itself is damaged, restore the pre-deploy snapshot instead.
 
 ### Handle a Dependabot PR
 
-Treat a Dependabot PR like any other PR: let `images.yml` build and scan it,
+Treat a Dependabot PR like any other PR: let `ci.yml` and `images.yml` check it,
 check the release notes for breaking changes, then merge and deploy to stg.
 For Grafana and nginx updates, check `/analytics/` and the map on stg before
 the next release. A Grafana update also changes the bundled PostgreSQL plugin.

@@ -1,0 +1,3 @@
+# Follow `source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"` into the sourced file.
+external-sources=true
+source-path=SCRIPTDIR

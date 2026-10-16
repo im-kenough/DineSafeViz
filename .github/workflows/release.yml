@@ -1,6 +1,6 @@
 # Triggers: push of a tag matching `v*`.
-# What it does: Queries the GitHub API for a draft release whose `tag_name` matches the pushed tag. 
-# If found, it PATCHes the release to `draft: false` (publishing it). If no matching draft exists, 
+# What it does: Queries the GitHub API for a draft release whose `tag_name` matches the pushed tag.
+# If found, it PATCHes the release to `draft: false` (publishing it). If no matching draft exists,
 # the workflow fails with an error.
 name: Release
 

@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Helpers shared by the scripts in this directory.
 
 # Prints "<script name>: $*" to stderr and exits 1.

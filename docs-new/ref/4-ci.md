@@ -1,30 +1,86 @@
 # Continuous integration
 
-This page gives a high-level view of how DineSafeViz builds, scans, and
-publishes its container images, and how it tracks dependencies and releases.
+This page gives a high-level view of how DineSafeViz checks code before it
+merges, builds, scans, and publishes its container images, and tracks
+dependencies and releases.
 
 ## Overview
 
 The key CI tasks of DineSafeViz are to:
-1. Build and scan the owned images on every pull request
-2. Publish scanned images to GitHub Container Registry (GHCR) for deploys
-3. Rescan published and upstream images for newly disclosed vulnerabilities
-4. Keep dependencies current and draft release notes
+1. Lint, test, and security-check every pull request before it merges
+2. Build and scan the owned images on every pull request
+3. Publish scanned images to GitHub Container Registry (GHCR) for deploys
+4. Rescan published and upstream images for newly disclosed vulnerabilities
+5. Keep dependencies current and draft release notes
 
 CI stops at GHCR. It never deploys. `scripts/deploy.sh` pulls a published tag
 onto a VM, and an operator runs it.
 
 ## Workflows
 
-All automation lives in `.github/`. There are three workflows and one
-Dependabot configuration.
+All automation lives in `.github/`. There are four workflows and one
+Dependabot configuration. CodeQL also runs, through GitHub's default setup,
+so it has no workflow file.
 
 | File                                    | Triggers                                | Does                                                  |
 | --------------------------------------- | --------------------------------------- | ----------------------------------------------------- |
-| `.github/workflows/images.yml`          | PR, push to `main`, `v*` tag, weekly, manual | Builds, scans, and publishes the owned images    |
+| `.github/workflows/ci.yml`              | Called by `images.yml`                  | Lints, tests, and reviews new dependencies            |
+| `.github/workflows/images.yml`          | PR, push to `main`, `v*` tag, weekly, manual | Runs `ci.yml`, then builds, scans, and publishes the owned images |
 | `.github/workflows/release-drafter.yml` | PR, push to `main`                      | Rebuilds the draft release notes                      |
 | `.github/workflows/release.yml`         | `v*` tag                                | Publishes the draft release that matches the tag     |
 | `.github/dependabot.yml`                | Weekly                                  | Opens PRs for outdated dependencies                   |
+
+## Pre-merge checks
+
+Every PR runs a set of free checks. Together they cover linting, tests,
+static analysis (SAST), and dependency scanning (SCA). Each one fails the PR
+when it finds a problem, so it can be a required check on `main`.
+
+`ci.yml` is a reusable workflow. `images.yml` calls it as its `ci` job, so its
+checks appear on a PR as `ci / lint`, `ci / test`, and
+`ci / dependency-review`. The same call runs on pushes to `main` and on `v*`
+tags, and the `push` job waits for it.
+
+| Check               | Where                 | Tool                    | Fails on                                           |
+| ------------------- | --------------------- | ----------------------- | -------------------------------------------------- |
+| `ci / lint`         | `ci.yml`              | Ruff, shellcheck, yamllint, actionlint, hadolint | Python errors, likely bugs, Bandit security rules, shell bugs, invalid YAML or workflows, Dockerfile warnings |
+| `ci / test`         | `ci.yml`              | pytest                  | Any failing test in the three suites               |
+| `ci / dependency-review` | `ci.yml` (PRs only) | Dependency review     | A new dependency with a `high` or `critical` advisory |
+| `CodeQL`            | GitHub default setup  | CodeQL                  | Python and Actions alerts, set in the ruleset      |
+| `scan`              | `images.yml`          | Trivy                   | Fixable `CRITICAL` vulnerabilities in an image     |
+
+- **Lint:** `ruff.toml` lists the rules explicitly, so a Ruff upgrade can't
+  change them. Tests are exempt from the Bandit (`S`) rules, because they run
+  local commands and use throwaway passwords. When a finding is a false
+  positive in app code, suppress it on that line with `# noqa: <rule>` and a
+  comment that says why. `.shellcheckrc` lets shellcheck follow the `lib.sh`
+  that the scripts source. `.yamllint` turns off the line-length and
+  document-start rules, and skips the Ansible Vault file. hadolint fails on
+  warnings and errors. Its info-level notes only appear in the log.
+- **Test:** the three suites run separately, because each has its own
+  `conftest.py` and helper modules. The database tests start the real Postgres
+  image on the runner, the same way they do locally.
+- **Tool versions:** Ruff, shellcheck, and yamllint are pinned in
+  `requirements-ci.txt`, and CI uses Python 3.14 to match the Dockerfiles.
+  hadolint runs through its official action. actionlint runs from its
+  official image, pinned by digest. Dependabot doesn't update that image, so
+  bump it by hand.
+
+To run the same checks locally:
+
+```bash
+pip install -r requirements-ci.txt -r src/dsv-app/requirements.txt \
+  -r src/dsv-app/requirements-dev.txt -r src/dsv-pipeline/requirements.txt
+ruff check .
+git ls-files -z '*.sh' 'tests/fakes/*' | xargs -0 shellcheck
+yamllint .
+docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12
+for f in src/*/Dockerfile; do
+  docker run --rm -i ghcr.io/hadolint/hadolint:v2.15.1-debian \
+    hadolint --failure-threshold warning - < "$f"
+done
+pytest tests && pytest src/dsv-app/tests && pytest src/dsv-pipeline/tests
+```
 
 ## Images
 
@@ -37,12 +93,13 @@ rebuilt.
 | `ghcr.io/im-kenough/dsv-app`      | `src/dsv-app`      |
 | `ghcr.io/im-kenough/dsv-pipeline` | `src/dsv-pipeline` |
 
-`images.yml` has four jobs. Which jobs run depends on the trigger:
+`images.yml` has five jobs. Which jobs run depends on the trigger:
 
 | Job           | Runs on                   | Does                                                                 |
 | ------------- | ------------------------- | -------------------------------------------------------------------- |
+| `ci`          | PR, push                  | Runs `ci.yml`: lint, tests, and dependency review                    |
 | `scan`        | PR, push                  | Builds each image for `linux/amd64`, scans it with Trivy             |
-| `push`        | Push, after `scan` passes | Rebuilds from the `scan` job's layer cache, pushes to GHCR           |
+| `push`        | Push, after `ci` and `scan` pass | Rebuilds from the `scan` job's layer cache, pushes to GHCR    |
 | `list-images` | Weekly, manual            | Lists the deployed owned tags and the pinned upstream images         |
 | `rescan`      | Weekly, manual            | Scans each listed image and uploads the results                      |
 
@@ -61,8 +118,10 @@ anything is pushed.
 
 ### Push: publish deployable tags
 
-The `push` job runs only on pushes, and only after `scan` passes for both
-images. Every deployable tag is immutable. There's no `latest`.
+The `push` job runs only on pushes, and only after `ci` passes and `scan`
+passes for both images. A `v*` tag doesn't go through a PR, so this is what
+keeps an unlinted or untested commit out of GHCR. Every deployable tag is
+immutable. There's no `latest`.
 
 | Trigger        | Tags pushed           | Deployed with           |
 | -------------- | --------------------- | ----------------------- |
@@ -105,11 +164,11 @@ Release notes build up automatically, and a tag publishes them.
 ## Dependency updates
 
 Dependabot opens grouped PRs every week, one for minor and patch updates per
-ecosystem. Each PR goes through `images.yml` like any other PR.
+ecosystem. Each PR goes through `ci.yml` and `images.yml` like any other PR.
 
 | Ecosystem        | Location                          | Updates                                       |
 | ---------------- | --------------------------------- | --------------------------------------------- |
-| `pip`            | `src/dsv-app`, `src/dsv-pipeline` | `requirements.txt` packages                   |
+| `pip`            | Root, `src/dsv-app`, `src/dsv-pipeline` | `requirements*.txt` packages, including CI lint tools |
 | `docker`         | `src/dsv-app`, `src/dsv-pipeline` | Dockerfile base images                        |
 | `docker-compose` | Repository root                   | Pinned upstream images in both Compose files  |
 | `github-actions` | `.github/workflows`               | Action SHA pins and their version comments    |
@@ -121,11 +180,8 @@ migration, not just a new tag.
 
 These limits follow from the current workflows.
 
-- **No tests in CI.** The `pytest` suites in `tests/`, `src/dsv-app/tests/`,
-  and `src/dsv-pipeline/tests/` don't run in any workflow. A green check means
-  the images build and pass the vulnerability gate, not that the tests pass.
-  Run them locally before you merge.
-- **No linting.** No workflow lints Python, shell, or Markdown.
+- **No Markdown linting.** The linters cover Python, shell, YAML, workflows,
+  and Dockerfiles only.
 - **amd64 only.** Images are built for `linux/amd64`, the VM's architecture.
 
 ## Out of scope
