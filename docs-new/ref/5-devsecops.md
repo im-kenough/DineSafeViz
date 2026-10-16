@@ -63,8 +63,6 @@ scanning rule.
 
 - Trivy config doesn't scan the Packer templates, the Ansible playbooks, or
   the Compose files.
-- `dsv-pipeline` runs as root (Trivy `DS-0002`, `HIGH`). It's reported, not
-  blocked.
 - There's no dynamic testing (DAST) against a running stack.
 
 ## Build
