@@ -1,5 +1,7 @@
-# Pre-merge checks for every pull request and every push to main.
-# lint: Ruff (Python, with Bandit's security rules) and shellcheck (Bash).
+# Pre-merge checks. images.yml calls this workflow on every pull request, push
+# to main, and v* tag, and only pushes images to GHCR after it passes.
+# lint: Ruff (Python, with Bandit's security rules), shellcheck (Bash),
+# yamllint (all YAML), actionlint (workflows), and hadolint (Dockerfiles).
 # test: the three pytest suites; the DB tests start the real Postgres image.
 # dependency-review: blocks PRs that add a dependency with a known high or
 # critical vulnerability. SAST (CodeQL) and image scanning (images.yml) run
@@ -7,16 +9,10 @@
 name: CI
 
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_call:
 
 permissions:
   contents: read
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:
@@ -35,6 +31,20 @@ jobs:
         run: ruff check --output-format github .
       - name: shellcheck
         run: git ls-files -z '*.sh' 'tests/fakes/*' | xargs -0 shellcheck
+      - name: yamllint
+        run: yamllint --format github .
+      # Official image, pinned by digest. Dependabot only updates action refs,
+      # not docker:// images, so bump this one by hand.
+      - name: actionlint
+        uses: docker://rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: -color
+      - name: hadolint
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+        with:
+          recursive: true
+          # Info-level notes print in the log but don't fail the job.
+          failure-threshold: warning
 
   test:
     runs-on: ubuntu-latest

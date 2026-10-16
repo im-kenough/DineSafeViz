@@ -24,8 +24,8 @@ so it has no workflow file.
 
 | File                                    | Triggers                                | Does                                                  |
 | --------------------------------------- | --------------------------------------- | ----------------------------------------------------- |
-| `.github/workflows/ci.yml`              | PR, push to `main`                      | Lints, tests, and reviews new dependencies            |
-| `.github/workflows/images.yml`          | PR, push to `main`, `v*` tag, weekly, manual | Builds, scans, and publishes the owned images    |
+| `.github/workflows/ci.yml`              | Called by `images.yml`                  | Lints, tests, and reviews new dependencies            |
+| `.github/workflows/images.yml`          | PR, push to `main`, `v*` tag, weekly, manual | Runs `ci.yml`, then builds, scans, and publishes the owned images |
 | `.github/workflows/release-drafter.yml` | PR, push to `main`                      | Rebuilds the draft release notes                      |
 | `.github/workflows/release.yml`         | `v*` tag                                | Publishes the draft release that matches the tag     |
 | `.github/dependabot.yml`                | Weekly                                  | Opens PRs for outdated dependencies                   |
@@ -36,11 +36,16 @@ Every PR runs a set of free checks. Together they cover linting, tests,
 static analysis (SAST), and dependency scanning (SCA). Each one fails the PR
 when it finds a problem, so it can be a required check on `main`.
 
+`ci.yml` is a reusable workflow. `images.yml` calls it as its `ci` job, so its
+checks appear on a PR as `ci / lint`, `ci / test`, and
+`ci / dependency-review`. The same call runs on pushes to `main` and on `v*`
+tags, and the `push` job waits for it.
+
 | Check               | Where                 | Tool                    | Fails on                                           |
 | ------------------- | --------------------- | ----------------------- | -------------------------------------------------- |
-| `lint`              | `ci.yml`              | Ruff, shellcheck        | Python errors, likely bugs, Bandit security rules, shell bugs |
-| `test`              | `ci.yml`              | pytest                  | Any failing test in the three suites               |
-| `dependency-review` | `ci.yml` (PRs only)   | Dependency review       | A new dependency with a `high` or `critical` advisory |
+| `ci / lint`         | `ci.yml`              | Ruff, shellcheck, yamllint, actionlint, hadolint | Python errors, likely bugs, Bandit security rules, shell bugs, invalid YAML or workflows, Dockerfile warnings |
+| `ci / test`         | `ci.yml`              | pytest                  | Any failing test in the three suites               |
+| `ci / dependency-review` | `ci.yml` (PRs only) | Dependency review     | A new dependency with a `high` or `critical` advisory |
 | `CodeQL`            | GitHub default setup  | CodeQL                  | Python and Actions alerts, set in the ruleset      |
 | `scan`              | `images.yml`          | Trivy                   | Fixable `CRITICAL` vulnerabilities in an image     |
 
@@ -49,12 +54,17 @@ when it finds a problem, so it can be a required check on `main`.
   local commands and use throwaway passwords. When a finding is a false
   positive in app code, suppress it on that line with `# noqa: <rule>` and a
   comment that says why. `.shellcheckrc` lets shellcheck follow the `lib.sh`
-  that the scripts source.
+  that the scripts source. `.yamllint` turns off the line-length and
+  document-start rules, and skips the Ansible Vault file. hadolint fails on
+  warnings and errors. Its info-level notes only appear in the log.
 - **Test:** the three suites run separately, because each has its own
   `conftest.py` and helper modules. The database tests start the real Postgres
   image on the runner, the same way they do locally.
-- **Tool versions:** Ruff and shellcheck are pinned in `requirements-ci.txt`,
-  and CI uses Python 3.14 to match the Dockerfiles.
+- **Tool versions:** Ruff, shellcheck, and yamllint are pinned in
+  `requirements-ci.txt`, and CI uses Python 3.14 to match the Dockerfiles.
+  hadolint runs through its official action. actionlint runs from its
+  official image, pinned by digest. Dependabot doesn't update that image, so
+  bump it by hand.
 
 To run the same checks locally:
 
@@ -63,6 +73,12 @@ pip install -r requirements-ci.txt -r src/dsv-app/requirements.txt \
   -r src/dsv-app/requirements-dev.txt -r src/dsv-pipeline/requirements.txt
 ruff check .
 git ls-files -z '*.sh' 'tests/fakes/*' | xargs -0 shellcheck
+yamllint .
+docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12
+for f in src/*/Dockerfile; do
+  docker run --rm -i ghcr.io/hadolint/hadolint:v2.15.1-debian \
+    hadolint --failure-threshold warning - < "$f"
+done
 pytest tests && pytest src/dsv-app/tests && pytest src/dsv-pipeline/tests
 ```
 
@@ -77,12 +93,13 @@ rebuilt.
 | `ghcr.io/im-kenough/dsv-app`      | `src/dsv-app`      |
 | `ghcr.io/im-kenough/dsv-pipeline` | `src/dsv-pipeline` |
 
-`images.yml` has four jobs. Which jobs run depends on the trigger:
+`images.yml` has five jobs. Which jobs run depends on the trigger:
 
 | Job           | Runs on                   | Does                                                                 |
 | ------------- | ------------------------- | -------------------------------------------------------------------- |
+| `ci`          | PR, push                  | Runs `ci.yml`: lint, tests, and dependency review                    |
 | `scan`        | PR, push                  | Builds each image for `linux/amd64`, scans it with Trivy             |
-| `push`        | Push, after `scan` passes | Rebuilds from the `scan` job's layer cache, pushes to GHCR           |
+| `push`        | Push, after `ci` and `scan` pass | Rebuilds from the `scan` job's layer cache, pushes to GHCR    |
 | `list-images` | Weekly, manual            | Lists the deployed owned tags and the pinned upstream images         |
 | `rescan`      | Weekly, manual            | Scans each listed image and uploads the results                      |
 
@@ -101,8 +118,10 @@ anything is pushed.
 
 ### Push: publish deployable tags
 
-The `push` job runs only on pushes, and only after `scan` passes for both
-images. Every deployable tag is immutable. There's no `latest`.
+The `push` job runs only on pushes, and only after `ci` passes and `scan`
+passes for both images. A `v*` tag doesn't go through a PR, so this is what
+keeps an unlinted or untested commit out of GHCR. Every deployable tag is
+immutable. There's no `latest`.
 
 | Trigger        | Tags pushed           | Deployed with           |
 | -------------- | --------------------- | ----------------------- |
@@ -161,8 +180,8 @@ migration, not just a new tag.
 
 These limits follow from the current workflows.
 
-- **No Markdown or Dockerfile linting.** Ruff and shellcheck cover Python and
-  shell only.
+- **No Markdown linting.** The linters cover Python, shell, YAML, workflows,
+  and Dockerfiles only.
 - **amd64 only.** Images are built for `linux/amd64`, the VM's architecture.
 
 ## Out of scope

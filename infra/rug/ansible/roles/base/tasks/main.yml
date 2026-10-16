@@ -193,5 +193,3 @@
 
 - name: Flush handlers to apply changes before cleanup
   meta: flush_handlers
-
-

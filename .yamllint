@@ -1,0 +1,21 @@
+# YAML lint config. Run: yamllint .
+# Catches broken YAML, duplicate keys, bad indentation, and trailing spaces.
+# Style rules that only add noise here are relaxed.
+extends: default
+
+# Local agent scratch dirs (gitignored) and Ansible Vault ciphertext.
+ignore: |
+  .claude/
+  .superpowers/
+  infra/rug/ansible/vault/secrets.yml
+
+rules:
+  # Pinned action SHAs and Compose image digests make long lines unavoidable.
+  line-length: disable
+  # A leading --- is optional, and most files here don't have one.
+  document-start: disable
+  # GitHub Actions' `on:` key is read as a boolean in YAML 1.1.
+  truthy:
+    check-keys: false
+  comments:
+    min-spaces-from-content: 1

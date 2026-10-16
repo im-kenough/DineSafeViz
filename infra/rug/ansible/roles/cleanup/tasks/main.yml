@@ -23,7 +23,7 @@
   copy:
     content: ""
     dest: /etc/machine-id
-  # machine-id is usually regenerated if empty on boot
+    # machine-id is usually regenerated if empty on boot
 
 - name: Clean apt cache
   command: apt-get clean

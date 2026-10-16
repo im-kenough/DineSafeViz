@@ -49,7 +49,7 @@ categories:
       - 'refactor'
       - 'chore'
 
-  # Dependabot creats a lot of noise, keep it at the bottom    
+  # Dependabot creats a lot of noise, keep it at the bottom
   - title: '🪜 Dependencies'
     labels:
       # - 'build'
@@ -60,7 +60,7 @@ categories:
 
 # Format for each changelog entry
 change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
-change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.      
+change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.
 
 # Maps labels to semver bump priority (major > minor > patch)
 # Per semantic versioning, major increments 1.x.x, minor increments x.1.x, patch increments x.x.1
