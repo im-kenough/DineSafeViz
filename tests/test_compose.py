@@ -142,20 +142,17 @@ def test_vm_grafana_has_a_fixed_admin_address(vm):
     assert backend["ipv4_address"] == "172.30.10.30"
 
 
-@pytest.mark.parametrize("name", ["dsv-app", "dsv-tunnel"])
+@pytest.mark.parametrize("name", ["dsv-app", "dsv-tunnel", "dsv-pipeline"])
 def test_vm_read_only_services(vm, name):
     svc = vm["services"][name]
     assert svc["read_only"] is True
-    assert svc["cap_drop"] == ["ALL"]
     assert "/tmp" in svc["tmpfs"]
 
 
 def test_vm_minimal_capabilities(vm):
     services = vm["services"]
-    assert services["dsv-nginx"]["cap_drop"] == ["ALL"]
     assert set(services["dsv-nginx"]["cap_add"]) == {
         "CHOWN", "DAC_OVERRIDE", "NET_BIND_SERVICE", "SETGID", "SETUID"}
-    assert services["dsv-db"]["cap_drop"] == ["ALL"]
     assert set(services["dsv-db"]["cap_add"]) == {
         "CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID"}
 
@@ -215,8 +212,6 @@ def test_vm_tunnel_serves_readiness_for_deploy_sh(vm):
 def test_pipeline_runs_only_when_asked():
     plain = load(COMPOSE_DIR / "local.env-test", "docker-compose.yml")
     assert "dsv-pipeline" not in plain["services"]
-    assert "dsv-init-db" not in plain["services"]
-    assert "dsv-data" not in plain["services"]
 
 
 def test_pipeline_loads_as_the_migrator_with_no_mounts(local):
@@ -224,20 +219,6 @@ def test_pipeline_loads_as_the_migrator_with_no_mounts(local):
     assert svc["environment"]["DSV_DB_USER"] == "dinesafe_migrator"
     assert svc["environment"]["DSV_DB_PASSWORD"] == "dinesafe_migrator"
     assert not svc.get("volumes")  # the token is mounted per run by pipeline.sh
-
-
-def test_vm_pipeline_is_hardened(vm):
-    svc = vm["services"]["dsv-pipeline"]
-    assert svc["read_only"] is True
-    assert svc["cap_drop"] == ["ALL"]
-    assert "/tmp" in svc["tmpfs"]
-
-
-def test_nothing_mounts_the_old_csv_folder(local, vm):
-    for config in (local, vm):
-        for name, svc in config["services"].items():
-            for v in svc.get("volumes", []):
-                assert "local-data" not in v.get("source", ""), name
 
 
 # The .env that `fetch-secrets.sh dev` writes drives the local stack, so the

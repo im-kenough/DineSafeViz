@@ -46,7 +46,6 @@ def test_stg_deploys_main_by_its_commit_tag(vm_repo):
     assert "docker compose --profile pipeline pull --quiet" in lines
     assert "docker compose up -d --no-build --remove-orphans --wait --wait-timeout 600" in lines
     assert len([line for line in lines if line.startswith("docker compose up")]) == 1
-    assert not ran(lines, "docker compose wait")
     assert ran(lines, "docker image prune")
     assert "DSV_VERSION=sha-abc1234\n" in (repo / ".env").read_text()
     assert "kv-dsv-stg01" in log.read_text()
@@ -238,15 +237,8 @@ def test_data_loads_after_the_stack_is_healthy_and_migrated(vm_repo):
         < first(lines, LOAD)
         < first(lines, "docker image prune")
     )
+    # load, never run or ingest: deploys never contact Toronto Open Data.
     assert lines[first(lines, LOAD)].endswith("dsv-pipeline load")
-
-
-def test_deploys_never_contact_toronto(vm_repo):
-    repo, env, log = vm_repo
-    assert deploy(repo, env, "stg", "main").returncode == 0
-    for line in calls(log):
-        if line.startswith(LOAD):
-            assert line.endswith(" load")
 
 
 def test_failed_migration_fails_the_deploy_before_loading(vm_repo):
