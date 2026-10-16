@@ -25,15 +25,9 @@ REPO_ROOT=$(cd "$SCRIPT_DIR/../.." && pwd)
 INIT_SCRIPT="$SCRIPT_DIR/init-setup-vm.sh"
 HARDEN_SCRIPT="$SCRIPT_DIR/harden-vm.sh"
 
-if [[ ! -f "$INIT_SCRIPT" ]]; then
-    echo "ERROR: Initial setup script not found: $INIT_SCRIPT" >&2
-    exit 1
-fi
-
-if [[ ! -f "$HARDEN_SCRIPT" ]]; then
-    echo "ERROR: Hardening script not found: $HARDEN_SCRIPT" >&2
-    exit 1
-fi
+for script in "$INIT_SCRIPT" "$HARDEN_SCRIPT"; do
+    [[ -f $script ]] || { echo "ERROR: script not found: $script" >&2; exit 1; }
+done
 
 # Switch to the repo root so relative paths (e.g., deploy/systemd) resolve properly
 cd "$REPO_ROOT"
@@ -41,13 +35,13 @@ cd "$REPO_ROOT"
 echo "=========================================="
 echo "Step 1: Running initial VM setup"
 echo "=========================================="
-bash "$INIT_SCRIPT" "$@"
+bash "$INIT_SCRIPT"
 
 echo ""
 echo "=========================================="
 echo "Step 2: Running VM hardening"
 echo "=========================================="
-sudo bash "$HARDEN_SCRIPT" "$@"
+sudo bash "$HARDEN_SCRIPT"
 
 echo ""
 echo "=========================================="

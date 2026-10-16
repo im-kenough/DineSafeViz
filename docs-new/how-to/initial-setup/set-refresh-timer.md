@@ -7,7 +7,7 @@ This document explains how to set the database refresh timer. When it runs, it c
 ## Setting up the refresh timer
 
 ### Automatic
-The time is automatically when `init-setup-vm.sh` runs
+The timer is set up automatically when `init-setup-vm.sh` runs (through `setup-vm.sh`)
 
 ### Manual
 

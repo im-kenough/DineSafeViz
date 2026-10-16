@@ -36,46 +36,20 @@ NIC_ID=""
 PIP_ID=""
 VM_IP=""
 
-#################################
-# Helpers
-#################################
-die(){
-    echo "ERROR: $*" >&2
-    exit 1
-}
-
-# Runs "az <args>", or only prints it when DRY_RUN is set.
-run_az(){
-    if [[ -n $DRY_RUN ]]; then
-        echo "[dry run] az $*"
-    else
-        az "$@"
-    fi
-}
-
-# True if SSH_CONFIG has a "Host $VM_NAME" block.
-has_ssh_config_entry(){
-    grep -qiE "^Host[[:space:]]+${VM_NAME}[[:space:]]*\$" "$SSH_CONFIG" 2>/dev/null
-}
+# shellcheck source=infra/az/vm-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/vm-lib.sh"
 
 #################################
 # Steps
 #################################
-select_subscription(){
-    # by ID: both the admin and ops accounts cache subs with the same names
-    az account show -o none 2>/dev/null || die "not signed in; run 'az login' first"
-    az account set --subscription "$SUB_ID"
-    echo "Signed in as $(az account show --query user.name -o tsv)," \
-        "subscription $(az account show --query name -o tsv)"
-}
-
 find_resources(){
     # follow the links VM -> NIC -> public IP, so names don't have to match
-    VM_ID=$(az vm show -g "$RG" -n "$VM_NAME" --query id -o tsv 2>/dev/null || true)
-    if [[ -n $VM_ID ]]; then
-        NIC_ID=$(az vm show --ids "$VM_ID" \
-            --query "networkProfile.networkInterfaces[0].id" -o tsv)
-    else
+    local vm
+    mapfile -t vm < <(az vm show -g "$RG" -n "$VM_NAME" \
+        --query "[id, networkProfile.networkInterfaces[0].id]" -o tsv 2>/dev/null || true)
+    VM_ID=${vm[0]:-}
+    NIC_ID=${vm[1]:-}
+    if [[ -z $VM_ID ]]; then
         NIC_ID=$(az network nic show -g "$RG" -n "$NIC_NAME" --query id -o tsv 2>/dev/null || true)
     fi
     if [[ -n $NIC_ID ]]; then
@@ -92,9 +66,11 @@ show_plan(){
     echo "About to delete from $RG:"
     if [[ -n $VM_ID ]]; then
         echo "  VM:        $VM_NAME"
-        local disk option
-        disk=$(az vm show --ids "$VM_ID" --query storageProfile.osDisk.name -o tsv)
-        option=$(az vm show --ids "$VM_ID" --query storageProfile.osDisk.deleteOption -o tsv)
+        local os_disk disk option
+        mapfile -t os_disk < <(az vm show --ids "$VM_ID" \
+            --query "[storageProfile.osDisk.name, storageProfile.osDisk.deleteOption]" -o tsv)
+        disk=${os_disk[0]}
+        option=${os_disk[1]}
         if [[ $option == Delete ]]; then
             echo "  OS disk:   $disk"
         else
@@ -109,13 +85,6 @@ show_plan(){
     if has_ssh_config_entry; then
         echo "Removing Host $VM_NAME from $SSH_CONFIG"
     fi
-}
-
-confirm(){
-    [[ -n $YES || -n $DRY_RUN ]] && return
-    local answer
-    read -r -p "Type the VM name to confirm: " answer
-    [[ $answer == "$VM_NAME" ]] || die "confirmation didn't match, nothing deleted"
 }
 
 delete_resources(){
@@ -133,51 +102,6 @@ delete_resources(){
         echo "Deleting public IP ${PIP_ID##*/}..."
         run_az network public-ip delete --ids "$PIP_ID"
     fi
-}
-
-forget_host_key(){
-    # the next VM on this IP has a new host key, so the saved one is useless
-    [[ -n $VM_IP ]] || return 0
-    if [[ -n $DRY_RUN ]]; then
-        echo "[dry run] ssh-keygen -R $VM_IP"
-        return
-    fi
-    echo "Removing $VM_IP from ~/.ssh/known_hosts..."
-    ssh-keygen -R "$VM_IP" >/dev/null 2>&1 || true
-}
-
-# Removes the "Host $VM_NAME" block that create-*-vm.sh added (or one you
-# wrote) from SSH_CONFIG, with the comments and blank lines just above it.
-# The next create adds a fresh one.
-forget_ssh_config(){
-    has_ssh_config_entry || return 0
-    if [[ -n $DRY_RUN ]]; then
-        echo "[dry run] remove Host $VM_NAME from $SSH_CONFIG"
-        return
-    fi
-    echo "Removing Host $VM_NAME from $SSH_CONFIG (old copy in $SSH_CONFIG.old)..."
-    local tmp
-    tmp=$(mktemp)
-    awk -v host="$VM_NAME" '
-        /^[[:space:]]*$/ || /^#/ { held = held $0 "\n"; next }
-        tolower($1) == "host" || tolower($1) == "match" {
-            skip = tolower($1) == "host" && NF == 2 && $2 == host
-            if (skip) { held = ""; next }
-            printf "%s", held; held = ""; print; next
-        }
-        skip { held = ""; next }
-        { printf "%s", held; held = ""; print }
-        END { if (!skip) printf "%s", held }
-    ' "$SSH_CONFIG" > "$tmp"
-    cp -p "$SSH_CONFIG" "$SSH_CONFIG.old"
-    cat "$tmp" > "$SSH_CONFIG"   # in place, so its mode and any symlink are kept
-    rm -f "$tmp"
-}
-
-show_remaining(){
-    [[ -n $DRY_RUN ]] && return
-    echo "Resources left in $RG:"
-    az resource list -g "$RG" --query "[].{name:name, type:type}" -o table
 }
 
 #################################

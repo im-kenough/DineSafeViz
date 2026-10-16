@@ -11,6 +11,7 @@ bash infra/az/create-gen-vm.sh
 ```
 This provisions the VM, storage, public IP and NIC
 The VM's ssh admin key and a github deploy key will be uploaded
+Run it from your clone; it loads shared helpers from `infra/az/vm-lib.sh`
 
 ## 2. Connect to the VM
 
@@ -33,10 +34,16 @@ cd DineSafeViz
 Run the setup wrapper script which runs
 - init-setup-vm.sh: installs required apps & performs VM configurations
 - harden-vm.sh: performs basic hardening
-- 
+
+Run it as the admin user, not with `sudo`; it calls `sudo` as needed.
+
 ```bash
 bash infra/az/setup-vm.sh
 ```
+
+When it finishes, open a new SSH session before closing this one. The new
+login confirms the hardened SSH settings work and picks up your `docker` group
+membership, which the scripts in step 5 need.
 
 ## 5. Configure application
 

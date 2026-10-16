@@ -1,5 +1,7 @@
 #!/bin/bash
 set -euo pipefail
+# shellcheck source=scripts/lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/lib.sh"
 
 
 ##########################
@@ -8,7 +10,6 @@ install_docker(){
     echo ""
     echo "Installing Docker..." 
     # Add Docker's official GPG key:
-    # sudo apt update
     sudo apt install -y ca-certificates curl
     sudo install -m 0755 -d /etc/apt/keyrings
     sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
@@ -29,9 +30,7 @@ EOF
     sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
     echo "Configuring docker to start on boot with systemd"
-    sudo systemctl enable docker.service
-    sudo systemctl enable containerd.service
-    sudo docker run hello-world
+    sudo systemctl enable docker.service containerd.service
 
     #make docker nonroot
     # docker-ce creates the docker group; -f makes this a no-op if it exists.
@@ -77,13 +76,11 @@ add_swap_file(){
 }
 
 verify_az_kv_access(){
-    TOKEN=$(curl -s -H Metadata:true \
-    "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fvault.azure.net" \
-    | jq -r '.access_token')
-    curl -s -H "Authorization: Bearer $TOKEN" \
+    local token
+    token=$(imds_token https%3A%2F%2Fvault.azure.net)
+    curl -s -H "Authorization: Bearer $token" \
     "https://kv-dsv-stg01.vault.azure.net/secrets?api-version=7.4" \
     | jq -r '.value[].id | split("/") | last'
-    unset TOKEN
 }
 
 ########################
