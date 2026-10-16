@@ -28,11 +28,43 @@ cd DineSafeViz
 
 ## Configure VM
 
-Perform initial app setup
+### Perform initial setup
 
-run updates
-install docker, jq
+Install required apps and perform VM configurations
+```bash
+bash infra/az/init-setup-vm.sh
+```
+
+### Harden VM
+
+Perform basic vm hardening
+```bash
+bash infra/az/harden-vm.sh
+```
+
 
 ## Configure application
 
+Configure the env file
+```bash
 cp deploy/stg.env-example deploy/stg.env
+```
+
+### Initial blob storage ingestion
+
+Only required for brand new environments, otherwise can be skipped.
+
+On a brand-new environment, Blob Storage is empty, so the deploy stops with
+`the data load failed and the site has an empty database`. Fill Blob Storage
+from Toronto Open Data, then rerun the deploy:
+
+```bash
+./scripts/pipeline.sh stg ingest
+```
+
+### Deploy application
+
+```bash
+./scripts/deploy.sh stg main
+docker compose ps
+```

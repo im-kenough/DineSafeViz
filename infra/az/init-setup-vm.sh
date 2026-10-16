@@ -51,7 +51,7 @@ install_applications(){
     echo ""
     echo "Installing other required apps"
     sudo apt install -y jq
-    
+
     sudo apt autoremove -y && sudo apt clean
 }
 #########################
@@ -112,6 +112,18 @@ secure_imds(){
     verify_host_access_to_imds
 }
 
+########################
+# Application configuration - Setup data refresh timer
+
+setup_data_refresh_timer(){
+    for f in dsv-pipeline.service dsv-pipeline.timer; do
+        sed -e "s|@ADMIN_USER@|$USER|" -e "s|@REPO_DIR@|$PWD|" -e "s|@ENV@|stg|" \
+        "deploy/systemd/$f" | sudo tee "/etc/systemd/system/$f" >/dev/null
+    done
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now dsv-pipeline.timer    
+}
+
 #####################
 # Main function
 
@@ -121,6 +133,7 @@ main(){
     
     secure_imds
     verify_az_kv_access
+    setup_data_refresh_timer
     echo "Done."
 }
 
