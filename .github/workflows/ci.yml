@@ -1,11 +1,13 @@
 # Pre-merge checks. images.yml calls this workflow on every pull request, push
 # to main, and v* tag, and only pushes images to GHCR after it passes.
 # lint: Ruff (Python, with Bandit's security rules), shellcheck (Bash),
-# yamllint (all YAML), actionlint (workflows), and hadolint (Dockerfiles).
+# yamllint (all YAML), actionlint and zizmor (workflows), hadolint
+# (Dockerfiles), gitleaks (secrets in git history), and a Trivy gate on
+# critical IaC misconfigurations.
 # test: the three pytest suites; the DB tests start the real Postgres image.
 # dependency-review: blocks PRs that add a dependency with a known high or
-# critical vulnerability. SAST (CodeQL) and image scanning (images.yml) run
-# separately.
+# critical vulnerability. CodeQL and the full Trivy IaC report
+# (code-scanning.yml) and image scanning (images.yml) run separately.
 name: CI
 
 on:
@@ -23,6 +25,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # Full history for gitleaks, so a secret added and then deleted in
+          # a later commit is still caught.
+          fetch-depth: 0
       - name: Set up Python 3.14
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -39,6 +44,29 @@ jobs:
         run: yamllint --format github .
       - name: actionlint (GitHub workflows)
         run: actionlint -color
+      # Security audit of the workflows and dependabot.yml: template injection,
+      # over-broad permissions, persisted credentials, unpinned actions. The
+      # token turns on the online audits (impostor commits, known-vulnerable
+      # actions). Accepted findings live in .github/zizmor.yml.
+      - name: zizmor (GitHub workflow security)
+        run: zizmor --format github .
+        env:
+          GH_TOKEN: ${{ github.token }}
+      # Same digest pinning as hadolint below. Accepted false positives are
+      # fingerprinted in .gitleaksignore.
+      - name: gitleaks (secrets in git history)
+        uses: docker://ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+        with:
+          args: git --redact --no-banner --verbose .
+      # Terraform and Dockerfile misconfigurations. Only CRITICAL blocks the
+      # merge (and so the image push); code-scanning.yml reports everything.
+      - name: Trivy gate - fail on CRITICAL IaC misconfigurations
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: CRITICAL
+          exit-code: "1"
       # Official prebuilt image, pinned by digest. It has no entrypoint, so the
       # binary is named in args. Dependabot only updates action refs, not
       # docker:// images, so bump this one by hand. Info-level notes print in

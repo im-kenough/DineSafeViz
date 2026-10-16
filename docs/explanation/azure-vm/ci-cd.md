@@ -39,6 +39,7 @@ The repository has these automation pieces:
 | `.github/workflows/ci.yml`            | Called by `images.yml`        | Lints, tests, and reviews new dependencies                      |
 | `.github/workflows/images.yml`        | PR, push to `main`, `v*` tag  | Runs `ci.yml`, builds and scans the owned images, (except on PRs) pushes them once both pass, and on a `v*` tag publishes the matching draft release after the push |
 | `.github/workflows/rescan.yml`        | Weekly, manual                | Rescans the published and pinned upstream images                |
+| `.github/workflows/code-scanning.yml` | PR, push to `main`, weekly    | Runs CodeQL and reports Trivy IaC findings                      |
 | `.github/workflows/release-drafter.yml` | Push to `main`              | Keeps the draft release notes up to date                        |
 | `.github/dependabot.yml`              | Weekly schedule               | Opens PRs for outdated dependencies                             |
 

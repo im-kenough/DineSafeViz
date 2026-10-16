@@ -1,0 +1,15 @@
+# gitleaks findings reviewed and accepted, one fingerprint per line
+# (commit:file:rule:line). Add a new one only after confirming it isn't a
+# real secret; rotate and remove anything real instead.
+
+# Fake Key Vault values in the fetch-secrets test fixtures.
+4715d25b262c4c2ab1b98648f99912be3fcb9d39:tests/helpers.py:generic-api-key:19
+4715d25b262c4c2ab1b98648f99912be3fcb9d39:tests/test_fetch_secrets.py:generic-api-key:34
+
+# Placeholder deploy keys (REPLACE_WITH_... / CHANGE_ME) in old docs.
+5e2e7d95a14d47e2caaea229f13c6181c01c044a:docs/how-to/1-install/4-setup-app.md:private-key:29
+eea8eb61e00a882d05a0477db00ab1bdbf25901f:docs/superpowers/plans/2026-05-10-iac.md:private-key:1990
+
+# Packer seed VM's build-time SSH password. Still in HEAD at
+# infra/rug/packer/ubuntu-seed.pkr.hcl; this entry only covers the old commit.
+eea8eb61e00a882d05a0477db00ab1bdbf25901f:infra/packer/ubuntu-seed.pkr.hcl:hashicorp-tf-password:91
