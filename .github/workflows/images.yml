@@ -1,7 +1,8 @@
 # Builds, scans, and publishes the images the Azure VMs run.
 # Pull requests: lint, test, build, and scan only. main: push `main` and `sha-<7>`.
-# v* tags: push `X.Y.Z` and `X.Y`. Weekly (or manual): rescan the deployed
-# tags and the pinned upstream images for newly published vulnerabilities.
+# v* tags: push `X.Y.Z` and `X.Y`, then publish the matching draft release.
+# Weekly (or manual): rescan the deployed tags and the pinned upstream images
+# for newly published vulnerabilities.
 # Details: docs/explanation/azure-vm/ci-cd.md
 name: CI & Images
 
@@ -135,6 +136,23 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.image }}
 
+  release:
+    name: Publish release
+    # Waits for every push leg, so a public release always has its images.
+    needs: push
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # Finds the draft by tag name; fails if no matching release exists.
+      - name: Publish draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: gh release edit "$TAG" --draft=false
+
   list-images:
     name: Rescan - list deployed images
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -157,7 +175,8 @@ jobs:
             sed -nE 's/^\s+image:\s*([^$[:space:]]+)\s*$/\1/p' docker-compose.yml docker-compose.vm.yml
             for image in dsv-app dsv-pipeline; do
               echo "$REGISTRY/$image:main"
-              # Releases cut before this workflow existed have no image.
+              # v0.4.0 predates this workflow and has no images. Once a later
+              # release is published, make a missing image fail this job.
               if [ -n "$release" ]; then
                 ref="$REGISTRY/$image:${release#v}"
                 if docker manifest inspect "$ref" >/dev/null 2>&1; then

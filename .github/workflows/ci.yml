@@ -37,18 +37,18 @@ jobs:
         run: git ls-files -z '*.sh' 'tests/fakes/*' | xargs -0 shellcheck
       - name: yamllint (all YAML)
         run: yamllint --format github .
-      # Official image, pinned by digest. Dependabot only updates action refs,
-      # not docker:// images, so bump this one by hand.
       - name: actionlint (GitHub workflows)
-        uses: docker://rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
-        with:
-          args: -color
+        run: actionlint -color
+      # Official prebuilt image, pinned by digest. It has no entrypoint, so the
+      # binary is named in args. Dependabot only updates action refs, not
+      # docker:// images, so bump this one by hand. Info-level notes print in
+      # the log but don't fail the job.
       - name: hadolint (Dockerfiles)
-        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+        uses: docker://ghcr.io/hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d
         with:
-          recursive: true
-          # Info-level notes print in the log but don't fail the job.
-          failure-threshold: warning
+          args: >-
+            /bin/hadolint --failure-threshold warning
+            src/dsv-app/Dockerfile src/dsv-pipeline/Dockerfile
 
   test:
     name: Test

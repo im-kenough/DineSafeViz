@@ -37,8 +37,7 @@ The repository has these automation pieces:
 | File                                  | Trigger                       | What it does                                                    |
 | ------------------------------------- | ----------------------------- | --------------------------------------------------------------- |
 | `.github/workflows/ci.yml`            | Called by `images.yml`        | Lints, tests, and reviews new dependencies                      |
-| `.github/workflows/images.yml`        | PR, push to `main`, `v*` tag, weekly | Runs `ci.yml`, builds and scans the owned images, and (except on PRs) pushes them once both pass |
-| `.github/workflows/release.yml`       | `v*` tag                      | Publishes the matching draft release                            |
+| `.github/workflows/images.yml`        | PR, push to `main`, `v*` tag, weekly | Runs `ci.yml`, builds and scans the owned images, (except on PRs) pushes them once both pass, and on a `v*` tag publishes the matching draft release after the push |
 | `.github/workflows/release-drafter.yml` | Push to `main`              | Keeps the draft release notes up to date                        |
 | `.github/dependabot.yml`              | Weekly schedule               | Opens PRs for outdated dependencies                             |
 
@@ -141,7 +140,8 @@ doesn't exist yet.
 ### Release to prod
 
 A release is a `v*` tag on a commit that's already been checked on stg.
-Pushing the tag publishes the draft release and builds the `0.5.0` images.
+Pushing the tag builds the `0.5.0` images, then publishes the draft release
+once both are in GHCR. If lint, tests, or the scan fail, the draft stays a draft.
 
 ```bash
 git switch main && git pull

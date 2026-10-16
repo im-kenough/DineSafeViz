@@ -25,9 +25,8 @@ so it has no workflow file.
 | File                                    | Triggers                                | Does                                                  |
 | --------------------------------------- | --------------------------------------- | ----------------------------------------------------- |
 | `.github/workflows/ci.yml`              | Called by `images.yml`                  | Lints, tests, and reviews new dependencies            |
-| `.github/workflows/images.yml`          | PR, push to `main`, `v*` tag, weekly, manual | Runs `ci.yml`, then builds, scans, and publishes the owned images |
-| `.github/workflows/release-drafter.yml` | PR, push to `main`                      | Rebuilds the draft release notes                      |
-| `.github/workflows/release.yml`         | `v*` tag                                | Publishes the draft release that matches the tag     |
+| `.github/workflows/images.yml`          | PR, push to `main`, `v*` tag, weekly, manual | Runs `ci.yml`, then builds, scans, and publishes the owned images; on a `v*` tag, then publishes the matching draft release |
+| `.github/workflows/release-drafter.yml` | Push to `main`                          | Rebuilds the draft release notes                      |
 | `.github/dependabot.yml`                | Weekly                                  | Opens PRs for outdated dependencies                   |
 
 ## Pre-merge checks
@@ -153,15 +152,15 @@ fails the run. Read the findings in **Security > Code scanning**.
 
 Release notes build up automatically, and a tag publishes them.
 
-1. On every PR and every push to `main`, `release-drafter.yml` regenerates
+1. On every push to `main`, `release-drafter.yml` regenerates
    one draft release. PR labels set the section (for example, `fix` goes to
    **Bug Fixes**) and the next version (`breaking` is major, `feature` is
    minor, and `fix` or `infosec` is patch).
 2. To release, push a `v*` tag that matches the draft's version.
-3. `release.yml` finds the draft with that tag and publishes it. If there's
-   no matching draft, it fails.
-4. The same tag starts `images.yml`, which pushes the `X.Y.Z` and `X.Y`
-   images.
+3. The tag starts `images.yml`, which pushes the `X.Y.Z` and `X.Y` images.
+4. Once both images are pushed, its `release` job finds the draft with that
+   tag and publishes it. If CI, the scan, or the push fails, the draft stays
+   a draft. If there's no matching draft, the job fails.
 
 ## Dependency updates
 
