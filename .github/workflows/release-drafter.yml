@@ -1,9 +1,9 @@
-# Triggers: push to `main`.
-# What it does: Runs the https://github.com/release-drafter/release-drafter action.
-# On each trigger it rebuilds a single draft release containing categorized notes for all PRs merged since the
-# last published tag. The draft's version, title, body, and tag are all regenerated from the template on every run.
-# No pull_request trigger: on PR refs the action only does a dry run, and there's no autolabeler config.
-
+# On every push to main, rebuilds the single draft release with categorized
+# notes for all PRs merged since the last published tag. Version, title, tag,
+# and body all come from .github/release-drafter.yml; images.yml publishes
+# the draft when the matching v* tag is pushed.
+# No pull_request trigger: on PR refs the action only does a dry run, and
+# there's no autolabeler config.
 name: Release Drafter
 
 on:
