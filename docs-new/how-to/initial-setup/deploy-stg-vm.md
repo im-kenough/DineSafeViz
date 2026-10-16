@@ -68,3 +68,13 @@ from Toronto Open Data, then rerun the deploy:
 ./scripts/deploy.sh stg main
 docker compose ps
 ```
+
+### Reboot and validate
+
+reboot the VM and confirm the stack comes back up and operates normally
+
+```bash
+sudo reboot now
+```
+
+to do: implement PIV script https://github.com/im-kenough/DineSafeViz/issues/298
