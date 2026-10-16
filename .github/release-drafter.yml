@@ -4,82 +4,84 @@
 name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
 
-# Maps PR labels → section headings in the release body
+# Maps PR labels → section headings in the release body and semver bump priority (major > minor > patch)
+# Per semantic versioning, major increments 1.x.x, minor increments x.1.x, patch increments x.x.1
 categories:
   - title: '🔒 Security'
-    labels:
-      - 'infosec'
+    semver-increment: 'patch'
+    when:
+      labels:
+        - 'infosec'
 
   - title: '🚀 Features'
-    labels:
-      - 'feature'
-      - 'enhancement'
+    semver-increment: 'minor'
+    when:
+      labels:
+        - 'feature'
+        - 'enhancement'
 
   - title: '🎨 UI'
-    labels:
-      - 'ui'
+    when:
+      labels:
+        - 'ui'
 
   - title: '🐛 Bug Fixes'
-    labels:
-      - 'bug'
-      - 'fix'
+    semver-increment: 'patch'
+    when:
+      labels:
+        - 'bug'
+        - 'fix'
+
   - title: '🏎️ Performance'
-    labels:
-      - 'perf'
+    when:
+      labels:
+        - 'perf'
 
   - title: '🏗️ Infrastructure'
-    labels:
-      - 'infra'
-      - 'iac'
-      - 'ops'
-      - 'dr'
-      - 'db'
+    when:
+      labels:
+        - 'infra'
+        - 'iac'
+        - 'ops'
+        - 'dr'
+        - 'db'
 
   - title: '⚙️ CI/CD'
-    labels:
-      - 'ci-cd'
-      - 'github_actions'
+    when:
+      labels:
+        - 'ci-cd'
+        - 'github_actions'
 
   - title: '📚 Documentation'
-    labels:
-      - 'documentation'
+    when:
+      labels:
+        - 'documentation'
 
   - title: '🔧 Maintenance'
-    labels:
-      - 'refactor'
-      - 'chore'
+    when:
+      labels:
+        - 'refactor'
+        - 'chore'
 
-  # Dependabot creats a lot of noise, keep it at the bottom
+  # Dependabot creates a lot of noise, keep it at the bottom
   - title: '🪜 Dependencies'
-    labels:
-      # - 'build'
-      - 'dependencies'
-      - 'python'
-      - 'docker'
+    when:
+      labels:
+        # - 'build'
+        - 'dependencies'
+        - 'python'
+        - 'docker'
 
+  - type: 'version-resolver'
+    semver-increment: 'major'
+    when:
+      labels:
+        - 'major'
+        - 'breaking'
 
 # Format for each changelog entry
 change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
 change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.
-
-# Maps labels to semver bump priority (major > minor > patch)
-# Per semantic versioning, major increments 1.x.x, minor increments x.1.x, patch increments x.x.1
-# So make sure a PR has t least a label of type minor (feature, enhancement) to increment x.1.x
-# and at least a label of type patch (bug, fix, infosec) to increment x.x.1
-version-resolver:
-  major:
-    labels:
-      - 'major'
-      - 'breaking'
-  minor:
-    labels:
-      - 'feature'
-      - 'enhancement'
-  patch:
-    labels:
-      - 'bug'
-      - 'fix'
-      - 'infosec'
 
 # The full Markdown body template including deployment notes, PIV, and rollback sections
 template: |
