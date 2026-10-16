@@ -1,0 +1,11 @@
+# Local git hooks (https://pre-commit.com). Install once per clone:
+#   pipx install pre-commit && pre-commit install
+# gitleaks blocks a commit that stages a secret. CI rescans the full history
+# (ci.yml), so skipping the hook with --no-verify only moves the failure to the
+# PR. Known false positives are fingerprinted in .gitleaksignore.
+# Pinned by SHA; bump with: pre-commit autoupdate --freeze
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e # frozen: v8.30.1
+    hooks:
+      - id: gitleaks

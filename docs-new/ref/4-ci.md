@@ -18,14 +18,16 @@ onto a VM, and an operator runs it.
 
 ## Workflows
 
-All automation lives in `.github/`. There are four workflows and one
-Dependabot configuration. CodeQL also runs, through GitHub's default setup,
-so it has no workflow file.
+All automation lives in `.github/`. There are five workflows and one
+Dependabot configuration. CodeQL runs from `code-scanning.yml`, so GitHub's
+CodeQL default setup must stay off. While it's on, GitHub rejects the
+workflow's uploads.
 
 | File                                    | Triggers                                | Does                                                  |
 | --------------------------------------- | --------------------------------------- | ----------------------------------------------------- |
-| `.github/workflows/ci.yml`              | Called by `images.yml`                  | Lints, tests, and reviews new dependencies            |
+| `.github/workflows/ci.yml`              | Called by `images.yml`                  | Lints, tests, scans for secrets and critical IaC issues, and reviews new dependencies |
 | `.github/workflows/images.yml`          | PR, push to `main`, `v*` tag            | Runs `ci.yml`, then builds, scans, and publishes the owned images; on a `v*` tag, then publishes the matching draft release |
+| `.github/workflows/code-scanning.yml`   | PR, push to `main`, weekly, manual      | Runs CodeQL and reports every Trivy IaC finding       |
 | `.github/workflows/rescan.yml`          | Weekly, manual                          | Rescans the published and pinned upstream images      |
 | `.github/workflows/release-drafter.yml` | Push to `main`                          | Rebuilds the draft release notes                      |
 | `.github/dependabot.yml`                | Weekly                                  | Opens PRs for outdated dependencies                   |
@@ -43,10 +45,10 @@ tags, and the `push` job waits for it.
 
 | Check               | Where                 | Tool                    | Fails on                                           |
 | ------------------- | --------------------- | ----------------------- | -------------------------------------------------- |
-| `CI / Lint`         | `ci.yml`              | Ruff, shellcheck, yamllint, actionlint, hadolint | Python errors, likely bugs, Bandit security rules, shell bugs, invalid YAML or workflows, Dockerfile warnings |
+| `CI / Lint`         | `ci.yml`              | Ruff, shellcheck, yamllint, actionlint, zizmor, hadolint, gitleaks, Trivy config | Python errors, likely bugs, Bandit security rules, shell bugs, invalid YAML or workflows, insecure workflows, Dockerfile warnings, secrets in git history, `CRITICAL` IaC misconfigurations |
 | `CI / Test`         | `ci.yml`              | pytest                  | Any failing test in the three suites               |
 | `CI / Dependency review` | `ci.yml` (PRs only) | Dependency review     | A new dependency with a `high` or `critical` advisory |
-| `CodeQL`            | GitHub default setup  | CodeQL                  | Python and Actions alerts, set in the ruleset      |
+| `CodeQL (<language>)` | `code-scanning.yml` | CodeQL                  | Python and Actions alerts, set in the ruleset      |
 | `Scan image (<image>)` | `images.yml`       | Trivy                   | Fixable `CRITICAL` vulnerabilities in an image     |
 
 - **Lint:** `ruff.toml` lists the rules explicitly, so a Ruff upgrade can't
@@ -57,14 +59,22 @@ tags, and the `push` job waits for it.
   that the scripts source. `.yamllint` turns off the line-length and
   document-start rules, and skips the Ansible Vault file. hadolint fails on
   warnings and errors. Its info-level notes only appear in the log.
+- **Secrets:** gitleaks scans the full git history, not just the PR's diff.
+  Reviewed false positives are fingerprinted in `.gitleaksignore`. The same
+  scan runs as a local pre-commit hook after `pre-commit install`.
+- **Workflows:** zizmor audits the workflows and `dependabot.yml` for
+  security issues. Accepted findings, with reasons, are in
+  `.github/zizmor.yml`.
+- **IaC:** Trivy config fails on `CRITICAL` Terraform and Dockerfile
+  misconfigurations. `code-scanning.yml` reports every severity to
+  **Security > Code scanning**.
 - **Test:** the three suites run separately, because each has its own
   `conftest.py` and helper modules. The database tests start the real Postgres
   image on the runner, the same way they do locally.
-- **Tool versions:** Ruff, shellcheck, and yamllint are pinned in
-  `requirements-ci.txt`, and CI uses Python 3.14 to match the Dockerfiles.
-  hadolint runs through its official action. actionlint runs from its
-  official image, pinned by digest. Dependabot doesn't update that image, so
-  bump it by hand.
+- **Tool versions:** Ruff, shellcheck, yamllint, actionlint, and zizmor are
+  pinned in `requirements-ci.txt`, and CI uses Python 3.14 to match the
+  Dockerfiles. hadolint and gitleaks run from their official images, pinned
+  by digest. Dependabot doesn't update those images, so bump them by hand.
 
 To run the same checks locally:
 
@@ -74,7 +84,12 @@ pip install -r requirements-ci.txt -r src/dsv-app/requirements.txt \
 ruff check .
 git ls-files -z '*.sh' 'tests/fakes/*' | xargs -0 shellcheck
 yamllint .
-docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12
+actionlint
+zizmor .
+docker run --rm -v "$PWD:/repo" -w /repo ghcr.io/gitleaks/gitleaks:v8.30.1 \
+  git --redact .
+docker run --rm -v "$PWD:/repo" -w /repo aquasec/trivy:0.76.0 \
+  config --severity CRITICAL --exit-code 1 .
 for f in src/*/Dockerfile; do
   docker run --rm -i ghcr.io/hadolint/hadolint:v2.15.1-debian \
     hadolint --failure-threshold warning - < "$f"
@@ -178,6 +193,10 @@ ecosystem. Each PR goes through `ci.yml` and `images.yml` like any other PR.
 Major Postgres updates are ignored. Moving to a new major version needs a data
 migration, not just a new tag.
 
+Every ecosystem has a 7-day cooldown: Dependabot waits a week after a release
+before proposing it, so a hijacked version is likely pulled first. Security
+updates ignore the cooldown.
+
 ## Known limits
 
 These limits follow from the current workflows.
@@ -191,3 +210,4 @@ These limits follow from the current workflows.
 Continuous deployment isn't covered. Deploys are manual: an operator runs
 `scripts/deploy.sh` on the VM. For the deploy flow, see
 [CI and CD for the Azure VM deployment](../../docs/explanation/azure-vm/ci-cd.md).
+For the security controls at each stage, see [DevSecOps](5-devsecops.md).

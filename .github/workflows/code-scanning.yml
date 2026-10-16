@@ -1,0 +1,89 @@
+# Static analysis that reports to Security > Code scanning.
+# codeql: SAST for the Python code and the GitHub workflows. Replaces CodeQL
+# default setup, which must stay disabled in the repository settings or
+# GitHub rejects these uploads.
+# trivy-config: every Terraform and Dockerfile misconfiguration, at all
+# severities. The blocking CRITICAL gate is in ci.yml.
+# Image scanning lives in images.yml and rescan.yml.
+name: Code scanning
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "29 6 * * 1" # Run at 6:29am on Mondays, after rescan.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: code-scanning-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, python]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Neither language needs a build, and the default query suite matches
+      # what default setup ran.
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+      # Same category names default setup used.
+      - name: Analyze and upload to Security > Code scanning
+        uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          category: /language:${{ matrix.language }}
+
+  trivy-config:
+    name: Trivy config (IaC)
+    # Reports only, like the image scan in images.yml: PRs print a table, and
+    # pushes and the weekly run upload SARIF.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Trivy table, all severities (pull requests)
+        if: github.event_name == 'pull_request'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          format: table
+          exit-code: "0"
+      - name: Trivy report, all severities
+        if: github.event_name != 'pull_request'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          format: sarif
+          output: trivy-config.sarif
+          exit-code: "0"
+      - name: Upload report to Security > Code scanning
+        if: github.event_name != 'pull_request'
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          sarif_file: trivy-config.sarif
+          category: trivy-config
