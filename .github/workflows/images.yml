@@ -144,8 +144,14 @@ jobs:
               | awk '{print $2}'
             for image in dsv-app dsv-pipeline; do
               echo "ghcr.io/im-kenough/$image:main"
+              # Releases cut before this workflow existed have no image.
               if [ -n "$release" ]; then
-                echo "ghcr.io/im-kenough/$image:${release#v}"
+                ref="ghcr.io/im-kenough/$image:${release#v}"
+                if docker manifest inspect "$ref" >/dev/null 2>&1; then
+                  echo "$ref"
+                else
+                  echo "::warning::$ref not found in GHCR; skipping rescan" >&2
+                fi
               fi
             done
           } | sort -u | jq -R . | jq -cs . | sed 's/^/images=/' >> "$GITHUB_OUTPUT"
