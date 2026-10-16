@@ -16,7 +16,7 @@ from data import (
     folders, http_download, ingest, md5_b64, newest_historical, newest_recent,
     prune_recent, resolve_resources, validate_csv,
 )
-from loader import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP
+from dinesafe_csv import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP
 
 LIST = "?restype=container&comp=list&prefix=recent%2F&include=metadata"
 

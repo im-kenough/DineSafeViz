@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # vendors (urllib3, msgpack, setuptools) carried HIGH CVEs in image scans.
 RUN python -m pip uninstall -y pip
 
-COPY loader.py data.py pipeline.py ./
+COPY dinesafe_csv.py loader.py data.py pipeline.py ./
 
 # scripts/pipeline.sh passes the subcommand: ingest, load, or run.
 ENTRYPOINT ["python3", "pipeline.py"]

@@ -20,6 +20,7 @@ import psycopg2
 import data
 import loader
 from data import BlobStore, DataError
+from dinesafe_csv import RECENT_NAME
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +88,7 @@ def load(store, conn, force=False):
         )
 
     with tempfile.TemporaryDirectory() as tmp:
-        recent_csv = os.path.join(tmp, loader.RECENT_NAME)
+        recent_csv = os.path.join(tmp, RECENT_NAME)
         store.download_to(recent_path, recent_csv)
         if action == "seed":
             print(f"Seeding from {historical_path} and {recent_path} ...")
