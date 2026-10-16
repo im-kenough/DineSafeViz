@@ -4,10 +4,10 @@ Placeholder until real IAC is introduced
 
 ## 1. Configure and deploy VM
 
-On your workstation, configure and run `infra/az/create-gen-vm.sh`
+On your workstation, configure and run `infra/az/create-stg-vm.sh`
 
 ```bash
-bash infra/az/create-gen-vm.sh
+bash infra/az/create-stg-vm.sh
 ```
 This provisions the VM, storage, public IP and NIC
 The VM's ssh admin key and a github deploy key will be uploaded
@@ -18,7 +18,7 @@ Run it from your clone; it loads shared helpers from `infra/az/vm-lib.sh`
 The script will add the VM to the workstation's SSH config file
 
 ```bash
-ssh dsv-vm-admin@vm02-dsv-stg01
+ssh dsv-vm-admin@vm01-dsv-stg01
 ```
 ## 3. Clone Repo
 

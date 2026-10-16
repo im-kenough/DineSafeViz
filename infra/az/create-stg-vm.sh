@@ -20,10 +20,10 @@ SUB_ID=53db2ec0-9b36-42d0-aa0d-7745f6dafe9a   # sub-dsv-stg01
 LOC=canadacentral
 RG=rg-dsv-stg01
 
-VM_NAME=vm-dsv-stg01
+VM_NAME=vm01-dsv-stg01
 NIC_NAME=nic-dsv-stg01
 MI_NAME=id-dsv-stg01-vm
-OS_DISK_NAME=osdisk-dsv-stg01
+OS_DISK_NAME=osdisk-vm01-dsv-stg01
 MC_NAME=mc-dsv-stg01-vms01
 MC_ASSIGNMENT_NAME=${MC_NAME}assignment   # the name the portal gave it
 
@@ -51,11 +51,13 @@ source "$(dirname "${BASH_SOURCE[0]}")/vm-lib.sh"
 #################################
 check_prerequisites(){
     echo "Checking prerequisites in $RG..."
+    
     # kept for create_vm
     MI_ID=$(az identity show -g "$RG" -n "$MI_NAME" --query id -o tsv) \
         || die "identity $MI_NAME not found"
     az extension show -n maintenance -o none 2>/dev/null \
         || die "az maintenance extension missing; run 'az extension add -n maintenance'"
+    
     # kept for enroll_maintenance
     MC_ID=$(az maintenance configuration show -g "$RG" --resource-name "$MC_NAME" --query id -o tsv) \
         || die "maintenance configuration $MC_NAME not found"
@@ -65,6 +67,7 @@ check_prerequisites(){
     if az vm show -g "$RG" -n "$VM_NAME" -o none 2>/dev/null; then
         die "VM $VM_NAME already exists in $RG"
     fi
+    
     if az disk show -g "$RG" -n "$OS_DISK_NAME" -o none 2>/dev/null; then
         die "disk $OS_DISK_NAME already exists in $RG"
     fi
