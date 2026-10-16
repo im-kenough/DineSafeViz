@@ -1,10 +1,10 @@
 # On every push to main, rebuilds the single draft release with categorized
 # notes for all PRs merged since the last published tag. Version, title, tag,
-# and body all come from .github/release-drafter.yml; images.yml publishes
+# and body all come from .github/release-drafter.yml; ci.yml publishes
 # the draft when the matching v* tag is pushed.
 # No pull_request trigger: on PR refs the action only does a dry run, and
 # there's no autolabeler config.
-name: Release Drafter
+name: Release drafter
 
 on:
   push:
@@ -14,11 +14,13 @@ permissions:
   contents: read
 
 jobs:
-  update_release_draft:
+  update-draft:
+    name: Update draft release
     permissions:
       contents: write
       pull-requests: read
     runs-on: ubuntu-latest
     steps:
       # The action's `token` input defaults to github.token.
-      - uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0
+      - name: Rebuild draft release notes
+        uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0

@@ -24,13 +24,13 @@ you start:
   infra/az/setup-az-vms.sh infra` creates them.
 - The `tun-dsv-stg01` tunnel routes `stg.dinesafeviz.com` to
   `http://dsv-nginx:80` (checklist step 5.2).
-- The latest `images.yml` run on `main` is green, and the `dsv-app` and
+- The latest `ci.yml` run on `main` is green, and the `dsv-app` and
   `dsv-pipeline` GHCR packages are public (checklist step 7.2).
 
 To check the last two items from your workstation, run:
 
 ```bash
-gh run list --workflow images.yml --branch main -L 1
+gh run list --workflow ci.yml --branch main -L 1
 docker logout ghcr.io
 docker manifest inspect ghcr.io/im-kenough/dsv-app:main >/dev/null && echo public
 docker manifest inspect ghcr.io/im-kenough/dsv-pipeline:main >/dev/null && echo public
@@ -218,18 +218,18 @@ Optional: reboot once and confirm that everything comes back, as described in
 
 ## Redeploy after a merge to main
 
-Each merge to `main` publishes new `sha-<commit>` images. When `images.yml`
+Each merge to `main` publishes new `sha-<commit>` images. When `ci.yml`
 is green, rerun the same command on the VM:
 
 ```bash
-gh run watch                     # on your workstation: wait for images.yml
+gh run watch                     # on your workstation: wait for ci.yml
 ssh dsv-vm-admin@vm-dsv-stg01
 cd ~/DineSafeViz && ./scripts/deploy.sh stg main
 ```
 
 You don't need to update the clone first: `deploy.sh` fetches and checks out
-the new commit itself. If `images.yml` hasn't finished, the script exits with
-`... isn't published. Wait for images.yml to finish, then rerun.`
+the new commit itself. If `ci.yml` hasn't finished, the script exits with
+`... isn't published. Wait for the CI workflow (ci.yml) to finish, then rerun.`
 
 ## Troubleshoot a failed deploy
 
@@ -240,7 +240,7 @@ errors you're most likely to see on a first stg deploy.
 | --- | --- |
 | `deploy/stg.env is missing` | Run step 3.2. |
 | `the checkout has local changes` | Run `git status`, then commit, stash, or discard the changes. |
-| `ghcr.io/im-kenough/...:sha-... isn't published` | `images.yml` is still running or failed, or the package is private. |
+| `ghcr.io/im-kenough/...:sha-... isn't published` | `ci.yml` is still running or failed, or the package is private. |
 | `can't get a token from IMDS` | The identity isn't attached to the VM, or you ran the script inside a container. |
 | `can't read ... from kv-dsv-stg01: ForbiddenByFirewall` | The vault firewall doesn't allow the VM's subnet. See checklist step 4.2. |
 | `can't read ... from kv-dsv-stg01: ForbiddenByRbac` | `id-dsv-stg01-vm` lacks Key Vault Secrets User, or the role was just assigned. Wait a few minutes. |

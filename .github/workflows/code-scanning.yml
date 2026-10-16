@@ -4,7 +4,7 @@
 # GitHub rejects these uploads.
 # trivy-config: every Terraform and Dockerfile misconfiguration, at all
 # severities. The blocking CRITICAL gate is in ci.yml.
-# Image scanning lives in images.yml and rescan.yml.
+# Image scanning lives in ci.yml and rescan-images.yml.
 name: Code scanning
 
 on:
@@ -12,7 +12,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: "29 6 * * 1" # Run at 6:29am on Mondays, after rescan.yml
+    - cron: "29 6 * * 1" # Run at 6:29am on Mondays, after rescan-images.yml
   workflow_dispatch:
 
 permissions:
@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   codeql:
-    name: CodeQL (${{ matrix.language }})
+    name: CodeQL
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -52,9 +52,10 @@ jobs:
           category: /language:${{ matrix.language }}
 
   trivy-config:
-    name: Trivy config (IaC)
-    # Reports only, like the image scan in images.yml: PRs print a table, and
-    # pushes and the weekly run upload SARIF.
+    name: Trivy IaC
+    # Reports only: PRs print a table in the job log, and pushes and the weekly
+    # run upload SARIF. Job ID and category stay trivy-config so existing
+    # alerts keep tracking.
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -64,7 +65,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Trivy table, all severities (pull requests)
+      - name: List all IaC misconfigurations (Trivy)
         if: github.event_name == 'pull_request'
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -72,7 +73,7 @@ jobs:
           scan-ref: .
           format: table
           exit-code: "0"
-      - name: Trivy report, all severities
+      - name: Report all IaC misconfigurations (Trivy)
         if: github.event_name != 'pull_request'
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:

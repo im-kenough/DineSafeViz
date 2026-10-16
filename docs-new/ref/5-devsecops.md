@@ -43,9 +43,9 @@ Controls that run on your machine and on the repository itself, before CI.
 
 ## Pull request
 
-Every PR runs these checks. The ones in `CI / *` and `Scan image (*)` are
-required by the ruleset, and CodeQL results are required through its code
-scanning rule.
+Every PR runs these checks. The `CI` workflow's `Lint`, `Test`,
+`Dependency review`, and `Build and scan` checks are required by the
+ruleset, and CodeQL results are required through its code scanning rule.
 
 | Practice         | Tool                                  | Blocks on                                     |
 | ---------------- | ------------------------------------- | --------------------------------------------- |
@@ -55,7 +55,7 @@ scanning rule.
 | SCA              | Dependency review                     | A new `high` or `critical` dependency         |
 | IaC              | Trivy config (Terraform, Dockerfiles) | `CRITICAL` (all severities reported on push)  |
 | Dockerfiles      | hadolint                              | Warnings and errors                           |
-| Workflows        | actionlint, zizmor                    | Any finding not in `.github/zizmor.yml`       |
+| Workflows        | actionlint, zizmor                    | Any finding                                   |
 | Shell, YAML      | shellcheck, yamllint                  | Any finding                                   |
 | Tests            | pytest                                | Any failure                                   |
 
@@ -69,7 +69,7 @@ scanning rule.
 
 ## Build
 
-`images.yml` builds each owned image, scans it, and pushes only the scanned
+`ci.yml` builds each owned image, scans it, and pushes only the scanned
 build.
 
 | Practice              | Tool                                      | Blocks on                       |
@@ -93,7 +93,7 @@ went through a PR.
 
 | Practice           | Tool                                  |
 | ------------------ | ------------------------------------- |
-| Gated publish      | `images.yml` `push` needs `ci` + `scan` |
+| Gated publish      | `ci.yml` `publish-images` needs `lint`, `test`, and `build-scan` |
 | Immutable tags     | `X.Y.Z`, `sha-<7>`, no `latest`       |
 | Release notes      | Release Drafter                       |
 
@@ -120,7 +120,7 @@ Controls that keep running after a release.
 
 | Practice                   | Tool                                               |
 | -------------------------- | -------------------------------------------------- |
-| New CVEs in shipped images | `rescan.yml`, weekly Trivy rescans to code scanning |
+| New CVEs in shipped images | `rescan-images.yml`, weekly Trivy rescans to code scanning |
 | New CVEs in dependencies   | Dependabot alerts and security updates             |
 | Dependency freshness       | Dependabot version updates, 7-day cooldown         |
 | Recurring SAST, IaC        | `code-scanning.yml`, weekly                        |
