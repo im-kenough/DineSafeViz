@@ -4,6 +4,9 @@ WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+# Security remediation: pip isn't used at runtime, and the packages it
+# vendors (urllib3, msgpack, setuptools) carried HIGH CVEs in image scans.
+RUN python -m pip uninstall -y pip
 
 COPY loader.py data.py pipeline.py ./
 
