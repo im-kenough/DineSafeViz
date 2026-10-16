@@ -34,10 +34,12 @@ EOF
     sudo docker run hello-world
 
     #make docker nonroot
-    sudo groupadd docker
-    sudo usermod -aG docker $USER
-    newgrp docker
-    docker run hello-world
+    # docker-ce creates the docker group; -f makes this a no-op if it exists.
+    # Membership applies on next login, so use sg for docker calls in this run.
+    sudo groupadd -f docker
+    sudo usermod -aG docker "$USER"
+    sg docker -c "docker run hello-world"
+    echo "Docker installed"
 
 }
 
@@ -59,10 +61,16 @@ install_applications(){
 add_swap_file(){
     echo ""
     echo "Adding swap file"
-    sudo fallocate -l 2G /swapfile
-    sudo chmod 600 /swapfile
-    sudo mkswap /swapfile && sudo swapon /swapfile
-    echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+    # Skip creation if the swap file is already active so reruns don't fail.
+    if swapon --show=NAME --noheadings | grep -qx /swapfile; then
+        echo "/swapfile already active, skipping creation"
+    else
+        sudo fallocate -l 2G /swapfile
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile && sudo swapon /swapfile
+    fi
+    grep -q '^/swapfile ' /etc/fstab \
+        || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
     echo 'vm.swappiness=10' | sudo tee /etc/sysctl.d/99-dsv-swap.conf
     sudo sysctl --system >/dev/null
     swapon --show
@@ -93,9 +101,9 @@ block_imds_from_containers(){
 verify_block_imds(){
     echo ""
     echo "Verify containers are blocked from IMDS service"
-    docker run --rm curlimages/curl -s -m 3 -H Metadata:true \
+    sudo docker run --rm curlimages/curl -s -m 3 -H Metadata:true \
       "http://169.254.169.254/metadata/instance?api-version=2021-02-01" \
-      && echo "NOT BLOCKED" || echo "Blocked"    
+      && echo "NOT BLOCKED" || echo "Blocked"
 }
 
 verify_host_access_to_imds(){
