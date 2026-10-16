@@ -699,7 +699,6 @@ for prod, where step 6.5 gives operators the role.
   ssh -i "${SSH_KEY%.pub}" "$ADMIN_USER@$(az vm show -d -g $RG -n vm-dsv-$ENV --query publicIps -o tsv)"
   sudo passwd "$USER"        # store it in your password manager, not Key Vault
   sudo sshd -T | grep -Ei '^(passwordauthentication|kbdinteractiveauthentication)'
-  echo 'export TMOUT=600' >> ~/.profile   # optional: idle console sessions time out
   ```
 
   Both `sshd` settings show `no`.
