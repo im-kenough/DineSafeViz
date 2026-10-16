@@ -1,6 +1,7 @@
 #!/bin/bash
 # Create vm-dsv-stg01 on the existing nic-dsv-stg01 (and its public IP,
-# pip-dsv-stg01), so the VM keeps the same address every time it's rebuilt.
+# pip-dsv-stg01), so the VM keeps the same address every time it's rebuilt,
+# and enroll it in the mc-dsv-stg01-vms01 patch schedule.
 # Pair with delete-stg-vm.sh, which removes the VM and its disks but leaves
 # the NIC and public IP. For other VMs use create-gen-vm.sh.
 #
@@ -21,6 +22,8 @@ VM_NAME=vm-dsv-stg01
 NIC_NAME=nic-dsv-stg01
 MI_NAME=id-dsv-stg01-vm
 OS_DISK_NAME=osdisk-dsv-stg01
+MC_NAME=mc-dsv-stg01-vms01
+MC_ASSIGNMENT_NAME=${MC_NAME}assignment   # the name the portal gave it
 
 SIZE=Standard_B2als_v2
 IMAGE=Canonical:ubuntu-24_04-lts:server:latest
@@ -64,6 +67,10 @@ select_subscription(){
 check_prerequisites(){
     echo "Checking prerequisites in $RG..."
     az identity show -g "$RG" -n "$MI_NAME" -o none || die "identity $MI_NAME not found"
+    az extension show -n maintenance -o none 2>/dev/null \
+        || die "az maintenance extension missing; run 'az extension add -n maintenance'"
+    az maintenance configuration show -g "$RG" --resource-name "$MC_NAME" -o none \
+        || die "maintenance configuration $MC_NAME not found"
     [[ -f $SSH_KEY ]] || die "SSH public key $SSH_KEY not found"
 
     if az vm show -g "$RG" -n "$VM_NAME" -o none 2>/dev/null; then
@@ -116,6 +123,22 @@ enable_boot_diagnostics(){
     run_az vm boot-diagnostics enable -g "$RG" -n "$VM_NAME" -o none
 }
 
+wait_until_ready(){
+    # the patch settings update must finish before the VM can be enrolled
+    echo "Waiting for $VM_NAME to finish provisioning..."
+    run_az vm wait -g "$RG" -n "$VM_NAME" --updated
+}
+
+enroll_maintenance(){
+    # the enrollment goes with the VM when it's deleted, so redo it each build
+    echo "Enrolling $VM_NAME in $MC_NAME..."
+    local mc_id
+    mc_id=$(az maintenance configuration show -g "$RG" --resource-name "$MC_NAME" --query id -o tsv)
+    run_az maintenance assignment create -g "$RG" -n "$MC_ASSIGNMENT_NAME" -l "$LOC" \
+        --provider-name Microsoft.Compute --resource-type virtualMachines \
+        --resource-name "$VM_NAME" --maintenance-configuration-id "$mc_id" -o none
+}
+
 show_vm(){
     [[ -n $DRY_RUN ]] && return
     az vm show -d -g "$RG" -n "$VM_NAME" \
@@ -132,6 +155,8 @@ main(){
     create_vm
     configure_patching
     enable_boot_diagnostics
+    wait_until_ready
+    enroll_maintenance
     show_vm
     echo "Done."
 }
