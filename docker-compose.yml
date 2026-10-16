@@ -16,8 +16,7 @@ x-db-app-env: &db-app-env
 
 services:
   dsv-nginx:
-    # linux/amd64
-    image: nginx:1.31.0-alpine-slim@sha256:241b0d0fe06250e026e7a35a008d022c9a1d3bec19442d65cc33b84d0b5dd64d
+    image: nginx:1.31.7-alpine-slim@sha256:ebd058041a732a2b2dc0b606e34572dd8e0034de6a4aa4d50d8c13a240ac6005
     ports:
       - "8080:80"
     volumes:
@@ -45,8 +44,7 @@ services:
         condition: service_healthy
 
   dsv-db:
-    #linux/amd64
-    image: postgres:18.6-alpine3.24@sha256:d8703cd7fba306b9fec9268ecedfa8a966846c053036a60e3635791957eb2f66
+    image: postgres:18.6-alpine3.24@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
     environment:
       POSTGRES_USER: ${DSV_DB_USER}
       POSTGRES_PASSWORD: ${DSV_DB_PASSWORD}
@@ -86,10 +84,9 @@ services:
     restart: "no"
 
   dsv-analytics:
-    # grafana/grafana:13.2.3 linux/amd64. Bundles the PostgreSQL plugin
-    # (13.0.3); the -slim variant doesn't. See
-    # docs/explanation/grafana-postgres-plugin.md.
-    image: grafana/grafana:13.2.3@sha256:d84563330dc9d2fd2bc096d0fb96021b5319c75bf6ed555566709998e823dec4
+    # Bundles the PostgreSQL plugin (13.0.4); the -slim variant doesn't.
+    # See docs/ref/app-notes.md.
+    image: grafana/grafana:13.2.4@sha256:dbbc38ea21103cefb50396340cd88afec779c7e070b0a7bf5a75b4ce46651d3f
     ports:
       - "3000:3000"
     environment:
