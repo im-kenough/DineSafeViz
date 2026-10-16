@@ -99,7 +99,7 @@ def test_missing_image_stops_before_changing_anything(vm_repo):
     result = deploy(repo, env | {"FAKE_MISSING_IMAGES": "dsv-pipeline:sha-abc1234"}, "stg", "main")
     assert result.returncode == 1
     assert "dsv-pipeline:sha-abc1234" in result.stderr
-    assert "images.yml" in result.stderr
+    assert "ci.yml" in result.stderr
     lines = calls(log)
     assert not ran(lines, "git checkout")
     assert not ran(lines, "curl")

@@ -1,20 +1,29 @@
-# Pre-merge checks. images.yml calls this workflow on every pull request, push
-# to main, and v* tag, and only pushes images to GHCR after it passes.
-# lint: Ruff (Python, with Bandit's security rules), shellcheck (Bash),
-# yamllint (all YAML), actionlint and zizmor (workflows), hadolint
-# (Dockerfiles), gitleaks (secrets in git history), and a Trivy gate on
-# critical IaC misconfigurations.
-# test: the three pytest suites; the DB tests start the real Postgres image.
-# dependency-review: blocks PRs that add a dependency with a known high or
-# critical vulnerability. CodeQL and the full Trivy IaC report
-# (code-scanning.yml) and image scanning (images.yml) run separately.
+# Checks, builds, and publishes the two owned images (dsv-app, dsv-pipeline).
+# Every pull request, push to main, and v* tag runs lint, tests, and an image
+# build and scan. Pushes also publish to GHCR once all of those pass, and a v*
+# tag then publishes the matching draft release.
+# Tags: main gets `main` and `sha-<7>`; v* tags get `X.Y.Z` and `X.Y`.
+# CodeQL and the full Trivy IaC report are in code-scanning.yml, and the weekly
+# rescan of published images is in rescan-images.yml.
+# Details: docs/explanation/azure-vm/ci-cd.md
 name: CI
 
 on:
-  workflow_call:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
 
 permissions:
   contents: read
+
+env:
+  # GHCR names must be lowercase, so the owner is spelled out.
+  REGISTRY: ghcr.io/im-kenough
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:
@@ -28,27 +37,28 @@ jobs:
           # Full history for gitleaks, so a secret added and then deleted in
           # a later commit is still caught.
           fetch-depth: 0
+      # No pip cache: this workflow publishes images, and a poisoned cache
+      # could pass checks that gate the push. Installs take seconds anyway.
       - name: Set up Python 3.14
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
-          cache: pip
-          cache-dependency-path: requirements-ci.txt
       - name: Install lint tools
         run: pip install -r requirements-ci.txt
-      - name: Ruff (Python + Bandit security rules)
+      - name: Lint Python (Ruff, with Bandit security rules)
         run: ruff check --output-format github .
-      - name: shellcheck (shell scripts)
+      - name: Lint shell scripts (shellcheck)
         run: git ls-files -z '*.sh' 'tests/fakes/*' | xargs -0 shellcheck
-      - name: yamllint (all YAML)
+      - name: Lint YAML (yamllint)
         run: yamllint --format github .
-      - name: actionlint (GitHub workflows)
+      - name: Lint workflows (actionlint)
         run: actionlint -color
       # Security audit of the workflows and dependabot.yml: template injection,
       # over-broad permissions, persisted credentials, unpinned actions. The
       # token turns on the online audits (impostor commits, known-vulnerable
-      # actions). Accepted findings live in .github/zizmor.yml.
-      - name: zizmor (GitHub workflow security)
+      # actions). To accept a finding, add a .github/zizmor.yml
+      # (https://docs.zizmor.sh/configuration/).
+      - name: Audit workflow security (zizmor)
         run: zizmor --format github .
         env:
           GH_TOKEN: ${{ github.token }}
@@ -57,7 +67,7 @@ jobs:
       # the image's /root/.gitconfig is ignored and git refuses the
       # runner-owned checkout; without safe.directory it scans 0 commits and
       # still passes.
-      - name: gitleaks (secrets in git history)
+      - name: Scan git history for secrets (gitleaks)
         uses: docker://ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
         env:
           GIT_CONFIG_COUNT: "1"
@@ -67,7 +77,7 @@ jobs:
           args: git --redact --no-banner --verbose .
       # Terraform and Dockerfile misconfigurations. Only CRITICAL blocks the
       # merge (and so the image push); code-scanning.yml reports everything.
-      - name: Trivy gate - fail on CRITICAL IaC misconfigurations
+      - name: Fail on CRITICAL IaC misconfigurations (Trivy)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: config
@@ -78,7 +88,7 @@ jobs:
       # binary is named in args. Dependabot only updates action refs, not
       # docker:// images, so bump this one by hand. Info-level notes print in
       # the log but don't fail the job.
-      - name: hadolint (Dockerfiles)
+      - name: Lint Dockerfiles (hadolint)
         uses: docker://ghcr.io/hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d
         with:
           args: >-
@@ -97,10 +107,6 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
-          cache: pip
-          cache-dependency-path: |
-            src/dsv-app/requirements*.txt
-            src/dsv-pipeline/requirements.txt
       - name: Install app, pipeline, and test dependencies
         run: >-
           pip install
@@ -108,11 +114,12 @@ jobs:
           -r src/dsv-app/requirements-dev.txt
           -r src/dsv-pipeline/requirements.txt
       # Separate runs: each suite has its own conftest.py and helper modules.
-      - name: Tests - deploy, Compose, and DB (tests/)
+      # The DB tests start the real Postgres image.
+      - name: Test deploy, Compose, and DB (tests/)
         run: pytest tests
-      - name: Tests - dsv-app
+      - name: Test dsv-app
         run: pytest src/dsv-app/tests
-      - name: Tests - dsv-pipeline
+      - name: Test dsv-pipeline
         run: pytest src/dsv-pipeline/tests
 
   dependency-review:
@@ -124,7 +131,125 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Block new high/critical vulnerable dependencies
+      - name: Fail on new high or critical vulnerable dependencies
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
+
+  build-scan:
+    name: Build and scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [dsv-app, dsv-pipeline]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      # publish-images pushes from this layer cache, so it ships the image
+      # scanned here rather than a fresh build.
+      - name: Build ${{ matrix.image }}
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: src/${{ matrix.image }}
+          platforms: linux/amd64
+          load: true
+          tags: scan/${{ matrix.image }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+      # Pull requests skip the report; the gate below prints a table instead.
+      - name: Report all vulnerabilities (Trivy)
+        if: github.event_name != 'pull_request'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: scan/${{ matrix.image }}:${{ github.sha }}
+          format: sarif
+          output: trivy-${{ matrix.image }}.sarif
+          exit-code: "0"
+      - name: Upload report to Security > Code scanning
+        if: github.event_name != 'pull_request'
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          sarif_file: trivy-${{ matrix.image }}.sarif
+          category: image-${{ matrix.image }}
+      - name: Fail on fixable CRITICAL vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: scan/${{ matrix.image }}:${{ github.sha }}
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+  publish-images:
+    name: Publish images
+    # Nothing reaches GHCR unless lint, tests, and both image scans pass, even
+    # for a v* tag on a commit that never went through a PR.
+    needs: [lint, test, build-scan]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [dsv-app, dsv-pipeline]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Compute image tags
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ matrix.image }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=main,enable={{is_default_branch}}
+            type=sha,prefix=sha-,format=short,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push ${{ matrix.image }} (from the build-scan cache)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: src/${{ matrix.image }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+
+  publish-release:
+    name: Publish release
+    # Waits for both images, so a public release always has them. A separate
+    # job keeps contents: write away from the image builds.
+    needs: publish-images
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # Finds the draft by tag name; fails if no matching release exists.
+      - name: Publish draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: gh release edit "$TAG" --draft=false

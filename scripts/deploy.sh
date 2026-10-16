@@ -119,7 +119,7 @@ $dirty"
   local image
   for image in dsv-app dsv-pipeline; do
     docker manifest inspect "ghcr.io/im-kenough/$image:$tag" >/dev/null 2>&1 \
-      || die "ghcr.io/im-kenough/$image:$tag isn't published. Wait for images.yml to finish, then rerun."
+      || die "ghcr.io/im-kenough/$image:$tag isn't published. Wait for the CI workflow (ci.yml) to finish, then rerun."
   done
 
   # 3. Check out the code that matches the images.
