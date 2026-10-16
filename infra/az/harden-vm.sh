@@ -36,8 +36,10 @@ MaxStartups 10:30:60
 X11Forwarding no
 AllowAgentForwarding no
 PermitTunnel no
-ClientAliveInterval 300
-ClientAliveCountMax 2
+# Under the public IP's 4 min TCP idle timeout, or Azure drops idle sessions
+# silently and the client hangs. Dead peers are cut after 120s x 3 = 6 min.
+ClientAliveInterval 120
+ClientAliveCountMax 3
 CONF
 chmod 644 "$SSHD_DROPIN"
 if sshd -t; then
@@ -111,12 +113,23 @@ CONF
 systemctl restart systemd-journald
 
 #################################
-# 6. Verify
+# 6. Log out idle shells after 30 min
+#################################
+# bash prints "timed out waiting for input: auto-logout" and closes the
+# session, instead of leaving it open forever. Only fires at the prompt.
+cat > /etc/profile.d/90-dsv-tmout.sh <<'CONF'
+TMOUT=1800
+export TMOUT
+CONF
+
+#################################
+# 7. Verify
 #################################
 echo; echo "== Effective sshd settings"
-sshd -T | grep -Ei '^(permitrootlogin|passwordauthentication|kbdinteractiveauthentication|authenticationmethods|allowusers|maxauthtries|x11forwarding|allowagentforwarding) '
+sshd -T | grep -Ei '^(permitrootlogin|passwordauthentication|kbdinteractiveauthentication|authenticationmethods|allowusers|maxauthtries|x11forwarding|allowagentforwarding|clientaliveinterval|clientalivecountmax) '
 echo; echo "== Firewall"; ufw status verbose
 echo; echo "== Root account"; passwd -S root
+echo; echo "== Shell idle timeout"; cat /etc/profile.d/90-dsv-tmout.sh
 echo; echo "== Sample sysctls"
 sysctl net.ipv4.conf.all.accept_redirects kernel.kptr_restrict fs.suid_dumpable net.ipv4.ip_forward
 echo; echo "Done. Keep this session open and test a NEW ssh login before you disconnect."

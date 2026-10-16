@@ -20,7 +20,7 @@ SUB_ID=${SUB_ID:-53db2ec0-9b36-42d0-aa0d-7745f6dafe9a}   # sub-dsv-stg01
 ENV=${ENV:-stg01}
 SHORT=${SHORT:-stg}
 LOC=${LOC:-canadacentral}
-VM_NUM=${VM_NUM:-01}
+VM_NUM=${VM_NUM:-02}
 
 # shared by every VM in the environment
 RG=${RG:-rg-dsv-$ENV}
