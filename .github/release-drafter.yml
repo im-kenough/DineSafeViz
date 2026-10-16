@@ -23,6 +23,9 @@ categories:
     labels:
       - 'bug'
       - 'fix'
+  - title: '🏎️ Performance'
+    labels:
+      - 'perf'
 
   - title: '🏗️ Infrastructure'
     labels:
