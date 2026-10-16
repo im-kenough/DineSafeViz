@@ -1,15 +1,14 @@
-# Triggers: push to `main`, pull request opened/reopened/synchronized.
+# Triggers: push to `main`.
 # What it does: Runs the https://github.com/release-drafter/release-drafter action.
 # On each trigger it rebuilds a single draft release containing categorized notes for all PRs merged since the
 # last published tag. The draft's version, title, body, and tag are all regenerated from the template on every run.
+# No pull_request trigger: on PR refs the action only does a dry run, and there's no autolabeler config.
 
 name: Release Drafter
 
 on:
   push:
     branches: [main]
-  pull_request:
-    types: [opened, reopened, synchronize]
 
 permissions:
   contents: read
@@ -21,6 +20,5 @@ jobs:
       pull-requests: read
     runs-on: ubuntu-latest
     steps:
+      # The action's `token` input defaults to github.token.
       - uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

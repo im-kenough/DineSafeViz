@@ -17,6 +17,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # GHCR names must be lowercase, so the owner is spelled out.
+  REGISTRY: ghcr.io/im-kenough
+
 concurrency:
   group: images-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -38,11 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - image: dsv-app
-            context: src/dsv-app
-          - image: dsv-pipeline
-            context: src/dsv-pipeline
+        image: [dsv-app, dsv-pipeline]
     steps:
       - name: Check out code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -54,7 +54,7 @@ jobs:
       - name: Build ${{ matrix.image }} for scanning
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
-          context: ${{ matrix.context }}
+          context: src/${{ matrix.image }}
           platforms: linux/amd64
           load: true
           tags: scan/${{ matrix.image }}:${{ github.sha }}
@@ -99,11 +99,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - image: dsv-app
-            context: src/dsv-app
-          - image: dsv-pipeline
-            context: src/dsv-pipeline
+        image: [dsv-app, dsv-pipeline]
     steps:
       - name: Check out code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -115,8 +111,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
-          # GHCR names must be lowercase, so the owner is spelled out.
-          images: ghcr.io/im-kenough/${{ matrix.image }}
+          images: ${{ env.REGISTRY }}/${{ matrix.image }}
           flavor: latest=false
           tags: |
             type=raw,value=main,enable={{is_default_branch}}
@@ -133,7 +128,7 @@ jobs:
       - name: Build and push ${{ matrix.image }} (from scan cache)
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
-          context: ${{ matrix.context }}
+          context: src/${{ matrix.image }}
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -159,13 +154,12 @@ jobs:
           release=$(gh release view --json tagName --jq .tagName 2>/dev/null || true)
           {
             # Pinned upstream images; lines with ${...} are the owned images.
-            grep -hE '^\s+image:\s*[^$[:space:]]+\s*$' docker-compose.yml docker-compose.vm.yml \
-              | awk '{print $2}'
+            sed -nE 's/^\s+image:\s*([^$[:space:]]+)\s*$/\1/p' docker-compose.yml docker-compose.vm.yml
             for image in dsv-app dsv-pipeline; do
-              echo "ghcr.io/im-kenough/$image:main"
+              echo "$REGISTRY/$image:main"
               # Releases cut before this workflow existed have no image.
               if [ -n "$release" ]; then
-                ref="ghcr.io/im-kenough/$image:${release#v}"
+                ref="$REGISTRY/$image:${release#v}"
                 if docker manifest inspect "$ref" >/dev/null 2>&1; then
                   echo "$ref"
                 else
@@ -173,7 +167,7 @@ jobs:
                 fi
               fi
             done
-          } | sort -u | jq -R . | jq -cs . | sed 's/^/images=/' >> "$GITHUB_OUTPUT"
+          } | sort -u | jq -Rnc '"images=" + ([inputs] | tojson)' -r >> "$GITHUB_OUTPUT"
 
   rescan:
     name: Rescan (${{ matrix.image }})

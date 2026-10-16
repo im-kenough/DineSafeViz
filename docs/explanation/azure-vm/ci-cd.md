@@ -39,7 +39,7 @@ The repository has these automation pieces:
 | `.github/workflows/ci.yml`            | Called by `images.yml`        | Lints, tests, and reviews new dependencies                      |
 | `.github/workflows/images.yml`        | PR, push to `main`, `v*` tag, weekly | Runs `ci.yml`, builds and scans the owned images, and (except on PRs) pushes them once both pass |
 | `.github/workflows/release.yml`       | `v*` tag                      | Publishes the matching draft release                            |
-| `.github/workflows/release-drafter.yml` | Push to `main`, PR          | Keeps the draft release notes up to date                        |
+| `.github/workflows/release-drafter.yml` | Push to `main`              | Keeps the draft release notes up to date                        |
 | `.github/dependabot.yml`              | Weekly schedule               | Opens PRs for outdated dependencies                             |
 
 `images.yml` builds two images. Upstream images (nginx, Postgres, Grafana,
