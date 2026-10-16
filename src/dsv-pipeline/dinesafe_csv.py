@@ -26,9 +26,9 @@ HISTORICAL_COLUMN_MAP = {
 
 # Maps recent CSV headers → unified inspections column names.
 # "_id", "phone", and "observation" are intentionally absent (discarded on
-# import). "oldEstId" is read only by scan_recent and isn't stored: bulk_insert
-# writes only INSPECTIONS_COLUMNS. The recent feed no longer carries an
-# "actionDesc" column, so `action` stays NULL for recent rows.
+# import). "oldEstId" is read only by loader.scan_recent and isn't stored:
+# loader.bulk_insert writes only INSPECTIONS_COLUMNS. The recent feed no
+# longer carries an "actionDesc" column, so `action` stays NULL for recent rows.
 RECENT_COLUMN_MAP = {
     "estId": "establishment_id",
     "oldEstId": "old_establishment_id",
