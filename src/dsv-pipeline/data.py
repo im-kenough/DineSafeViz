@@ -7,11 +7,12 @@ Blobs are never overwritten. The newest folder is the last in sorted order,
 because the folder names are UTC timestamps.
 """
 
+import base64
 import collections
 import csv
 import datetime
 import hashlib
-import base64
+import io
 import json
 import os
 import shutil
@@ -22,7 +23,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
-from loader import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP, RECENT_NAME, open_csv
+from loader import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP, RECENT_NAME, csv_encoding, open_csv
 
 
 # ---------------------------------------------------------------------------
@@ -74,26 +75,32 @@ class DataError(Exception):
 # HTTP and file utilities
 # ---------------------------------------------------------------------------
 
-def md5_b64(path):
-    """Return the base64 MD5 of a file, the encoding Blob uses for Content-MD5."""
+def md5_b64(source):
+    """Return the base64 MD5 of a file or binary stream, the encoding Blob uses
+    for Content-MD5."""
+    if isinstance(source, (str, os.PathLike)):
+        with open(source, "rb") as f:
+            return md5_b64(f)
     digest = hashlib.md5(usedforsecurity=False)  # integrity checksum, not security
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            digest.update(chunk)
+    for chunk in iter(lambda: source.read(1 << 20), b""):
+        digest.update(chunk)
     return base64.b64encode(digest.digest()).decode()
 
 
-def validate_csv(path, column_map, min_rows):
-    """Check headers and row count; return the row count or raise DataError."""
-    name = os.path.basename(path)
+def validate_csv(source, column_map, min_rows, name=None):
+    """Check headers and row count of a CSV path or text stream; return the row
+    count or raise DataError."""
+    if isinstance(source, (str, os.PathLike)):
+        with open_csv(source) as f:
+            return validate_csv(f, column_map, min_rows, name or os.path.basename(source))
+    name = name or os.path.basename(getattr(source, "name", "<stream>"))
     try:
-        with open_csv(path) as f:
-            reader = csv.reader(f)
-            header = next(reader, [])
-            missing = [c for c in column_map if c not in header]
-            if missing:
-                raise DataError(f"{name}: missing columns {', '.join(missing)}")
-            rows = sum(1 for _ in reader)
+        reader = csv.reader(source)
+        header = next(reader, [])
+        missing = [c for c in column_map if c not in header]
+        if missing:
+            raise DataError(f"{name}: missing columns {', '.join(missing)}")
+        rows = sum(1 for _ in reader)
     except UnicodeDecodeError as e:
         raise DataError(f"{name}: not UTF-8 or cp1252 ({e})") from e
     if rows < min_rows:
@@ -204,15 +211,18 @@ class BlobStore:
         with resp, open(path, "wb") as out:
             shutil.copyfileobj(resp, out)
 
-    def upload(self, name, path, md5, metadata=None):
-        # Streams the file. Put Blob needs Content-Length; without it, urllib
-        # would send the file chunked.
+    def upload(self, name, source, md5, metadata=None, length=None):
+        # Streams a file path or binary stream. Put Blob needs Content-Length;
+        # without it, urllib would send the body chunked.
+        if isinstance(source, (str, os.PathLike)):
+            with open(source, "rb") as body:
+                self.upload(name, body, md5, metadata=metadata, length=os.path.getsize(source))
+            return
         headers = {"x-ms-blob-type": "BlockBlob", "Content-MD5": md5, "Content-Type": "text/csv",
-                   "Content-Length": str(os.path.getsize(path))}
+                   "Content-Length": str(length)}
         for key, value in (metadata or {}).items():
             headers[f"x-ms-meta-{key}"] = value
-        with open(path, "rb") as body:
-            resp = self._request("PUT", self._blob_url(name), data=body, headers=headers)
+        resp = self._request("PUT", self._blob_url(name), data=source, headers=headers)
         if resp is None:
             raise DataError(f"PUT {name}: container not found")
         resp.close()
@@ -273,8 +283,8 @@ def newest_historical(store):
 # ---------------------------------------------------------------------------
 
 def _download_historical(url, tmp, download):
-    """Download the historical ZIP into tmp and validate every CSV in it.
-    Returns [(file name, local path)]."""
+    """Download the historical ZIP into tmp and validate every CSV member in
+    place, without extracting. Returns (zip_path, [(file name, ZipInfo, md5)])."""
     zip_path = os.path.join(tmp, "historical.zip")
     print(f"Downloading {url} ...")
     download(url, zip_path)
@@ -282,23 +292,22 @@ def _download_historical(url, tmp, download):
         zf = zipfile.ZipFile(zip_path)
     except zipfile.BadZipFile as e:
         raise DataError(f"historical download isn't a ZIP file: {e}") from e
-    out_dir = os.path.join(tmp, "historical")
-    os.makedirs(out_dir)
     staged = []
     with zf:
-        for member in zf.namelist():
-            base = os.path.basename(member)
+        for info in zf.infolist():
+            base = os.path.basename(info.filename)
             if not base.endswith(".csv"):
                 continue
-            path = os.path.join(out_dir, base)
-            with zf.open(member) as src, open(path, "wb") as out:
-                shutil.copyfileobj(src, out)
-            validate_csv(path, HISTORICAL_COLUMN_MAP, MIN_HISTORICAL_ROWS)
-            staged.append((base, path))
-    os.remove(zip_path)
+            with zf.open(info) as raw:
+                encoding = csv_encoding(raw)
+            with zf.open(info) as raw, io.TextIOWrapper(raw, encoding=encoding, newline="") as text:
+                validate_csv(text, HISTORICAL_COLUMN_MAP, MIN_HISTORICAL_ROWS, name=base)
+            with zf.open(info) as raw:
+                md5 = md5_b64(raw)
+            staged.append((base, info, md5))
     if not staged:
         raise DataError("the historical ZIP has no CSV files")
-    return sorted(staged)
+    return zip_path, sorted(staged, key=lambda m: m[0])
 
 
 def ingest(store, force=False, historical=False, resolve=resolve_resources,
@@ -326,9 +335,11 @@ def ingest(store, force=False, historical=False, resolve=resolve_resources,
         return None
 
     with tempfile.TemporaryDirectory() as tmp:
-        staged_historical = []
+        zip_path, staged_historical = None, []
         if need_historical:
-            staged_historical = _download_historical(resources["historical"]["url"], tmp, download)
+            zip_path, staged_historical = _download_historical(
+                resources["historical"]["url"], tmp, download
+            )
         recent_path = None
         if need_recent:
             recent_path = os.path.join(tmp, RECENT_NAME)
@@ -342,12 +353,23 @@ def ingest(store, force=False, historical=False, resolve=resolve_resources,
             else:
                 print(f"  {RECENT_NAME}: {rows} rows, valid")
 
-        for name, path in staged_historical:
-            store.upload(f"{HISTORICAL_PREFIX}{stamp}/{name}", path, md5_b64(path))
         if staged_historical:
-            marker = os.path.join(tmp, SUCCESS_MARKER)
-            open(marker, "wb").close()
-            store.upload(f"{HISTORICAL_PREFIX}{stamp}/{SUCCESS_MARKER}", marker, md5_b64(marker))
+            with zipfile.ZipFile(zip_path) as zf:
+                for name, info, md5 in staged_historical:
+                    with zf.open(info) as body:
+                        store.upload(
+                            f"{HISTORICAL_PREFIX}{stamp}/{name}",
+                            body,
+                            md5,
+                            length=info.file_size,
+                        )
+            os.remove(zip_path)
+            store.upload(
+                f"{HISTORICAL_PREFIX}{stamp}/{SUCCESS_MARKER}",
+                io.BytesIO(b""),
+                md5_b64(io.BytesIO(b"")),
+                length=0,
+            )
             print(f"Uploaded {len(staged_historical)} historical files to {HISTORICAL_PREFIX}{stamp}/")
 
         if recent_path is None:

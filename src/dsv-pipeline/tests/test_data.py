@@ -41,6 +41,9 @@ class TestMd5:
         p.write_bytes(b"hello")
         assert md5_b64(str(p)) == b64md5(b"hello")
 
+    def test_accepts_a_binary_stream(self):
+        assert md5_b64(io.BytesIO(b"hello")) == b64md5(b"hello")
+
 
 class TestValidateCsv:
     def test_valid_recent_returns_row_count(self, tmp_path):
@@ -50,6 +53,10 @@ class TestValidateCsv:
     def test_valid_cp1252_historical(self, tmp_path):
         p = write_csv(tmp_path / "h.csv", HIST_HEADER + ",caf\xe9", 2, "cp1252")
         assert validate_csv(str(p), HISTORICAL_COLUMN_MAP, min_rows=1) == 2
+
+    def test_valid_text_stream(self):
+        stream = io.StringIO(f"{HIST_HEADER}\n" + "x," * 15 + "x\n")
+        assert validate_csv(stream, HISTORICAL_COLUMN_MAP, min_rows=1, name="h.csv") == 1
 
     def test_missing_column_names_it(self, tmp_path):
         p = write_csv(tmp_path / "r.csv", RECENT_HEADER.replace("severity", "sev"), 3)
@@ -177,6 +184,13 @@ class TestBlobStore:
         assert req.get_header("X-ms-blob-type") == "BlockBlob"
         assert req.get_header("Content-md5") == b64md5(b"data")
         assert req.get_header("X-ms-meta-source_last_modified") == "2026-10-11T08:18:39"
+        assert req.get_header("Content-length") == "4"
+        assert req.body == b"data"
+
+    def test_upload_streams_body_with_explicit_length(self):
+        store, opener = self.store({("PUT", "/historical/t/2001.csv"): FakeResponse()})
+        store.upload("historical/t/2001.csv", io.BytesIO(b"data"), b64md5(b"data"), length=4)
+        req = opener.requests[0]
         assert req.get_header("Content-length") == "4"
         assert req.body == b"data"
 
@@ -352,6 +366,36 @@ class TestIngest:
         with pytest.raises(DataError, match="ZIP"):
             ingest(store, resolve=resolver(), download=download, now=NOW)
         assert store.uploads == []
+
+    def test_historical_never_writes_member_files_to_tmp(self, tmp_path, monkeypatch):
+        store = seeded(tmp_path)
+        dl = downloader(tmp_path)
+        tmp_dirs = []
+        seen_files = []
+
+        def snapshot():
+            seen_files.extend(p.name for p in tmp_dirs[-1].rglob("*") if p.is_file())
+
+        def download(url, path):
+            tmp_dirs.append(tmp_path.__class__(path).parent)
+            dl(url, path)
+
+        orig_validate = validate_csv
+
+        def check_validate(*args, **kwargs):
+            snapshot()
+            return orig_validate(*args, **kwargs)
+
+        orig_upload = store.upload
+
+        def check_upload(*args, **kwargs):
+            snapshot()
+            return orig_upload(*args, **kwargs)
+
+        monkeypatch.setattr("data.validate_csv", check_validate)
+        store.upload = check_upload
+        ingest(store, historical=True, resolve=resolver("2026-10-09T08:00:00"), download=download, now=NOW)
+        assert set(seen_files) == {"historical.zip"}
 
 
 class TestPrune:
