@@ -12,7 +12,6 @@ updates:
       - "/"
       - "/src/dsv-app"
       - "/src/dsv-pipeline"
-    target-branch: "main"
     schedule:
       interval: "weekly"
     groups:
@@ -24,7 +23,6 @@ updates:
     directories:
       - "/src/dsv-app"
       - "/src/dsv-pipeline"
-    target-branch: "main"
     schedule:
       interval: "weekly"
     groups:
@@ -35,7 +33,6 @@ updates:
   # a data migration, not just a new tag, so they're ignored.
   - package-ecosystem: "docker-compose"
     directory: "/"
-    target-branch: "main"
     schedule:
       interval: "weekly"
     groups:
@@ -48,7 +45,6 @@ updates:
   # Update GitHub Actions versions in workflows files
   - package-ecosystem: "github-actions"
     directory: "/"
-    target-branch: "main"
     schedule:
       interval: "weekly"
     groups:

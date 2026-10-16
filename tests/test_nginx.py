@@ -11,9 +11,9 @@ import uuid
 
 import pytest
 
-from helpers import ROOT
+from helpers import ROOT, compose_image
 
-IMAGE = "nginx:1.31.3-alpine"  # keep in sync with docker-compose.yml
+IMAGE = compose_image("nginx")
 # --mount fails on a missing source; -v would create a root-owned dir.
 CONF = ["--mount", f"type=bind,src={ROOT}/src/dsv-nginx/nginx.conf,dst=/etc/nginx/nginx.conf,readonly"]
 SNIPPETS = ["--mount", f"type=bind,src={ROOT}/src/dsv-nginx/snippets,dst=/etc/nginx/snippets,readonly"]

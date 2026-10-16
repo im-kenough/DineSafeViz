@@ -50,7 +50,6 @@ categories:
     when:
       labels:
         - 'ci-cd'
-        - 'github_actions'
 
   - title: '📚 Documentation'
     when:
@@ -67,10 +66,7 @@ categories:
   - title: '🪜 Dependencies'
     when:
       labels:
-        # - 'build'
         - 'dependencies'
-        - 'python'
-        - 'docker'
 
   - type: 'version-resolver'
     semver-increment: 'major'
@@ -83,7 +79,7 @@ categories:
 change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
 change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.
 
-# The full Markdown body template including deployment notes, PIV, and rollback sections
+# Release body template
 template: |
   ## What's Changed
 

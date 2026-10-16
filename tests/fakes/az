@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Test double for az, used by tests/test_data_sh.py (local mode).
+# Test double for az, used through PATH by tests/test_pipeline_sh.py and
+# tests/test_deploy.py (dev mode).
 echo "az $*" >> "${FAKE_LOG:-/dev/null}"
 if [[ -n ${FAKE_AZ_LOGGED_OUT:-} ]]; then
   echo "ERROR: Please run 'az login' to setup account." >&2

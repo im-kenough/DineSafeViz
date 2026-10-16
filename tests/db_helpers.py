@@ -4,9 +4,9 @@ import subprocess
 import time
 import uuid
 
-from helpers import ROOT
+from helpers import ROOT, compose_image
 
-IMAGE = "postgres:18.6-alpine3.24"  # keep in sync with docker-compose.yml
+IMAGE = compose_image("postgres")
 DB_DIR = ROOT / "src" / "dsv-db"
 # The same mounts, in the same name order, as dsv-db in docker-compose.yml.
 INIT_FILES = {

@@ -1,7 +1,7 @@
 # Builds, scans, and publishes the images the Azure VMs run.
 # Pull requests: lint, test, build, and scan only. main: push `main` and `sha-<7>`.
-# v* tags: push `X.Y.Z` and `X.Y`. Weekly (or manual): rescan the deployed
-# tags and the pinned upstream images for newly published vulnerabilities.
+# v* tags: push `X.Y.Z` and `X.Y`, then publish the matching draft release.
+# Weekly rescans of the published images live in rescan.yml.
 # Details: docs/explanation/azure-vm/ci-cd.md
 name: CI & Images
 
@@ -10,12 +10,13 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
-  schedule:
-    - cron: "17 6 * * 1" # Run at 6:17am on Mondays
-  workflow_dispatch:
 
 permissions:
   contents: read
+
+env:
+  # GHCR names must be lowercase, so the owner is spelled out.
+  REGISTRY: ghcr.io/im-kenough
 
 concurrency:
   group: images-${{ github.ref }}
@@ -25,12 +26,10 @@ jobs:
   # Lint, tests, and dependency review (ci.yml). Runs alongside scan.
   ci:
     name: CI
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
     uses: ./.github/workflows/ci.yml
 
   scan:
     name: Scan image (${{ matrix.image }})
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -38,11 +37,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - image: dsv-app
-            context: src/dsv-app
-          - image: dsv-pipeline
-            context: src/dsv-pipeline
+        image: [dsv-app, dsv-pipeline]
     steps:
       - name: Check out code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -54,7 +49,7 @@ jobs:
       - name: Build ${{ matrix.image }} for scanning
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
-          context: ${{ matrix.context }}
+          context: src/${{ matrix.image }}
           platforms: linux/amd64
           load: true
           tags: scan/${{ matrix.image }}:${{ github.sha }}
@@ -99,11 +94,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - image: dsv-app
-            context: src/dsv-app
-          - image: dsv-pipeline
-            context: src/dsv-pipeline
+        image: [dsv-app, dsv-pipeline]
     steps:
       - name: Check out code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -115,8 +106,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
-          # GHCR names must be lowercase, so the owner is spelled out.
-          images: ghcr.io/im-kenough/${{ matrix.image }}
+          images: ${{ env.REGISTRY }}/${{ matrix.image }}
           flavor: latest=false
           tags: |
             type=raw,value=main,enable={{is_default_branch}}
@@ -133,84 +123,26 @@ jobs:
       - name: Build and push ${{ matrix.image }} (from scan cache)
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
-          context: ${{ matrix.context }}
+          context: src/${{ matrix.image }}
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.image }}
 
-  list-images:
-    name: Rescan - list deployed images
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    outputs:
-      images: ${{ steps.list.outputs.images }}
-    steps:
-      - name: Check out code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: List owned tags and pinned upstream images
-        id: list
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          release=$(gh release view --json tagName --jq .tagName 2>/dev/null || true)
-          {
-            # Pinned upstream images; lines with ${...} are the owned images.
-            grep -hE '^\s+image:\s*[^$[:space:]]+\s*$' docker-compose.yml docker-compose.vm.yml \
-              | awk '{print $2}'
-            for image in dsv-app dsv-pipeline; do
-              echo "ghcr.io/im-kenough/$image:main"
-              # Releases cut before this workflow existed have no image.
-              if [ -n "$release" ]; then
-                ref="ghcr.io/im-kenough/$image:${release#v}"
-                if docker manifest inspect "$ref" >/dev/null 2>&1; then
-                  echo "$ref"
-                else
-                  echo "::warning::$ref not found in GHCR; skipping rescan" >&2
-                fi
-              fi
-            done
-          } | sort -u | jq -R . | jq -cs . | sed 's/^/images=/' >> "$GITHUB_OUTPUT"
-
-  rescan:
-    name: Rescan (${{ matrix.image }})
-    needs: list-images
+  release:
+    name: Publish release
+    # Waits for every push leg, so a public release always has its images.
+    needs: push
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      security-events: write
-    strategy:
-      fail-fast: false
-      matrix:
-        image: ${{ fromJSON(needs.list-images.outputs.images) }}
+      contents: write
     steps:
-      - name: Check out code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      # The category must survive pin bumps, or each new tag/digest opens a
-      # fresh category and the previous pin's alerts are never closed.
-      - name: Derive code scanning category
-        id: name
+      # Finds the draft by tag name; fails if no matching release exists.
+      - name: Publish draft release
         env:
-          IMAGE: ${{ matrix.image }}
-        run: |
-          ref=${IMAGE%@*}
-          repo=${ref%:*}
-          [ "${ref##*:}" = main ] && repo+=-main
-          echo "slug=${repo//[\/:]/-}" >> "$GITHUB_OUTPUT"
-      - name: Trivy report, all severities
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: ${{ matrix.image }}
-          format: sarif
-          output: trivy.sarif
-          exit-code: "0"
-      - name: Upload report to Security > Code scanning
-        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
-        with:
-          sarif_file: trivy.sarif
-          category: rescan-${{ steps.name.outputs.slug }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: gh release edit "$TAG" --draft=false

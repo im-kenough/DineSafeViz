@@ -4,11 +4,18 @@ These tests cover the Azure VM deployment files: the deploy scripts, the
 Compose override, the nginx config, and the database init scripts. App and
 data-loader unit tests stay in src/dsv-app/tests and src/dsv-pipeline/tests.
 """
+import re
 import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 FAKES = Path(__file__).resolve().parent / "fakes"
+
+
+def compose_image(repo):
+    """The image docker-compose.yml runs for repo (e.g. "nginx"), digest
+    included, so tests follow Dependabot's bumps."""
+    return re.search(rf"image: ({repo}:\S+)", (ROOT / "docker-compose.yml").read_text())[1]
 
 # Values the fake Key Vault returns, keyed by secret name.
 SECRETS = {

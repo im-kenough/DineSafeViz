@@ -25,9 +25,9 @@ so it has no workflow file.
 | File                                    | Triggers                                | Does                                                  |
 | --------------------------------------- | --------------------------------------- | ----------------------------------------------------- |
 | `.github/workflows/ci.yml`              | Called by `images.yml`                  | Lints, tests, and reviews new dependencies            |
-| `.github/workflows/images.yml`          | PR, push to `main`, `v*` tag, weekly, manual | Runs `ci.yml`, then builds, scans, and publishes the owned images |
-| `.github/workflows/release-drafter.yml` | PR, push to `main`                      | Rebuilds the draft release notes                      |
-| `.github/workflows/release.yml`         | `v*` tag                                | Publishes the draft release that matches the tag     |
+| `.github/workflows/images.yml`          | PR, push to `main`, `v*` tag            | Runs `ci.yml`, then builds, scans, and publishes the owned images; on a `v*` tag, then publishes the matching draft release |
+| `.github/workflows/rescan.yml`          | Weekly, manual                          | Rescans the published and pinned upstream images      |
+| `.github/workflows/release-drafter.yml` | Push to `main`                          | Rebuilds the draft release notes                      |
 | `.github/dependabot.yml`                | Weekly                                  | Opens PRs for outdated dependencies                   |
 
 ## Pre-merge checks
@@ -93,7 +93,7 @@ rebuilt.
 | `ghcr.io/im-kenough/dsv-app`      | `src/dsv-app`      |
 | `ghcr.io/im-kenough/dsv-pipeline` | `src/dsv-pipeline` |
 
-`images.yml` has five jobs. Which jobs run depends on the trigger. The
+`images.yml` has four jobs. Which jobs run depends on the trigger. The
 Actions UI shows the display name in parentheses. The job ID before it is
 what `needs:` refers to:
 
@@ -102,8 +102,7 @@ what `needs:` refers to:
 | `ci` (CI)     | PR, push                  | Runs `ci.yml`: lint, tests, and dependency review                    |
 | `scan` (Scan image) | PR, push            | Builds each image for `linux/amd64`, scans it with Trivy             |
 | `push` (Publish to GHCR) | Push, after `ci` and `scan` pass | Rebuilds from the `scan` job's layer cache, pushes to GHCR    |
-| `list-images` (Rescan - list deployed images) | Weekly, manual | Lists the deployed owned tags and the pinned upstream images         |
-| `rescan` (Rescan) | Weekly, manual          | Scans each listed image and uploads the results                      |
+| `release` (Publish release) | `v*` tag, after every `push` leg passes | Publishes the draft release that matches the tag          |
 
 ### Scan: gate every build
 
@@ -139,7 +138,8 @@ deploy stops.
 ### Rescan: catch new vulnerabilities
 
 New vulnerabilities are published after an image is built. Every Monday at
-06:17 UTC, or on demand, `list-images` builds the scan list from:
+06:17 UTC, or on demand, `rescan.yml` runs two jobs. `list-images` builds the
+scan list from:
 
 - The `main` tag of both owned images
 - The latest published release tag of both owned images
@@ -153,15 +153,15 @@ fails the run. Read the findings in **Security > Code scanning**.
 
 Release notes build up automatically, and a tag publishes them.
 
-1. On every PR and every push to `main`, `release-drafter.yml` regenerates
+1. On every push to `main`, `release-drafter.yml` regenerates
    one draft release. PR labels set the section (for example, `fix` goes to
    **Bug Fixes**) and the next version (`breaking` is major, `feature` is
    minor, and `fix` or `infosec` is patch).
 2. To release, push a `v*` tag that matches the draft's version.
-3. `release.yml` finds the draft with that tag and publishes it. If there's
-   no matching draft, it fails.
-4. The same tag starts `images.yml`, which pushes the `X.Y.Z` and `X.Y`
-   images.
+3. The tag starts `images.yml`, which pushes the `X.Y.Z` and `X.Y` images.
+4. Once both images are pushed, its `release` job finds the draft with that
+   tag and publishes it. If CI, the scan, or the push fails, the draft stays
+   a draft. If there's no matching draft, the job fails.
 
 ## Dependency updates
 
