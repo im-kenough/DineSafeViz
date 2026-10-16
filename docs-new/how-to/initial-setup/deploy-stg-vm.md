@@ -10,30 +10,29 @@ On your workstation, configure and run `infra/az/create-gen-vm.sh`
 bash infra/az/create-gen-vm.sh
 ```
 This provisions the VM, storage, public IP and NIC
+The VM's ssh admin key and a github deploy key will be uploaded
 
-## Configure workstation ssh config
+## Connect to the VM
 
-Edit the ssh config
+The script will add the VM to the workstation's SSH config file
 
 ```bash
-nano ~/.ssh/config
+ssh dsv-vm-admin@vm02-dsv-stg01
 ```
-
-Insert the VM's host information
+## Clone Repo
 
 ```bash
-Host vm02-dsv-stg01
-  HostName real-ip-goes-here
-  User dsv-vm-admin
-  IdentityFile ~/.ssh/id_ed25519_dsv_stg01_az_admin
-  IdentitiesOnly yes
+git clone git@github.com:im-kenough/DineSafeViz.git
+cd DineSafeViz
 ```
 
 ## Configure VM
 
-Clone the repo using the PAT
+Perform initial app setup
 
-```bash
+run updates
+install docker, jq
 
-```
+## Configure application
 
+cp deploy/stg.env-example deploy/stg.env

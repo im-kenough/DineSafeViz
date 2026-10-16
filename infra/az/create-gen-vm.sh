@@ -175,9 +175,9 @@ show_vm(){
         -o table
 }
 
-# Adds a "Host $VM_NAME" entry to SSH_CONFIG, unless there's one already, and
-# sets SSH_OPTS for the steps below. SSH_OPTS repeats the entry's settings,
-# so a stale entry you wrote yourself can't send them to the wrong host.
+# Adds a "Host $VM_NAME" entry to SSH_CONFIG, or points an existing one at the
+# VM's IP, and sets SSH_OPTS for the steps below. SSH_OPTS repeats the entry's
+# settings, so the steps reach the new VM even if the config update fails.
 write_ssh_config(){
     if [[ -n $DRY_RUN ]]; then
         echo "[dry run] add Host $VM_NAME to $SSH_CONFIG"
@@ -195,9 +195,25 @@ write_ssh_config(){
     if grep -qE "^Host[[:space:]]+$VM_NAME([[:space:]]|\$)" "$SSH_CONFIG" 2>/dev/null; then
         local current
         current=$(ssh -F "$SSH_CONFIG" -G "$VM_NAME" 2>/dev/null | awk '$1 == "hostname" {print $2}')
-        echo "Host $VM_NAME is already in $SSH_CONFIG, leaving it"
+        if [[ $current == "$ip" ]]; then
+            echo "Host $VM_NAME is already in $SSH_CONFIG, leaving it"
+            return
+        fi
+        # rewrite HostName in that block only; a .bak keeps the old file
+        echo "Host $VM_NAME in $SSH_CONFIG points at $current, changing it to $ip..."
+        cp -p "$SSH_CONFIG" "$SSH_CONFIG.bak"
+        awk -v host="$VM_NAME" -v ip="$ip" '
+            tolower($1) == "host" || tolower($1) == "match" {
+                in_block = 0
+                if (tolower($1) == "host")
+                    for (i = 2; i <= NF; i++) if ($i == host) in_block = 1
+            }
+            in_block && tolower($1) == "hostname" { sub(/[^[:space:]]+[[:space:]]*$/, ip) }
+            { print }
+        ' "$SSH_CONFIG.bak" > "$SSH_CONFIG"
+        current=$(ssh -F "$SSH_CONFIG" -G "$VM_NAME" 2>/dev/null | awk '$1 == "hostname" {print $2}')
         [[ $current == "$ip" ]] \
-            || echo "WARNING: that entry points at $current, but $VM_NAME is at $ip" >&2
+            || echo "WARNING: couldn't update it (no HostName line?); fix Host $VM_NAME by hand" >&2
         return
     fi
     echo "Adding Host $VM_NAME ($ip) to $SSH_CONFIG..."
