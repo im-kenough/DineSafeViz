@@ -2,7 +2,9 @@
 # Delete a DineSafeViz VM that create-gen-vm.sh made, plus its NIC and public IP.
 # The OS disk goes with the VM or stays, depending on its delete option.
 # If the VM is gone (e.g. a failed create), the NIC and public IP named for
-# VM_NUM are cleaned up instead. A stopgap until real IaC.
+# VM_NUM are cleaned up instead. Also removes the public IP from
+# ~/.ssh/known_hosts and the VM's Host entry from ~/.ssh/config.
+# A stopgap until real IaC.
 #
 # Usage:
 #   ./delete-gen-vm.sh                # delete vm01-dsv-stg01, after a prompt
@@ -17,12 +19,13 @@ set -euo pipefail
 #################################
 SUB_ID=${SUB_ID:-53db2ec0-9b36-42d0-aa0d-7745f6dafe9a}   # sub-dsv-stg01
 ENV=${ENV:-stg01}
-VM_NUM=${VM_NUM:-01}
+VM_NUM=${VM_NUM:-02}
 
 RG=${RG:-rg-dsv-$ENV}
 VM_NAME=${VM_NAME:-vm$VM_NUM-dsv-$ENV}
 # only used when the VM no longer exists
 NIC_NAME=${NIC_NAME:-nic$VM_NUM-dsv-$ENV}
+SSH_CONFIG=${SSH_CONFIG:-$HOME/.ssh/config}
 
 DRY_RUN=${DRY_RUN:-}
 YES=${YES:-}
@@ -31,6 +34,7 @@ YES=${YES:-}
 VM_ID=""
 NIC_ID=""
 PIP_ID=""
+VM_IP=""
 
 #################################
 # Helpers
@@ -47,6 +51,11 @@ run_az(){
     else
         az "$@"
     fi
+}
+
+# True if SSH_CONFIG has a "Host $VM_NAME" block.
+has_ssh_config_entry(){
+    grep -qiE "^Host[[:space:]]+${VM_NAME}[[:space:]]*\$" "$SSH_CONFIG" 2>/dev/null
 }
 
 #################################
@@ -73,6 +82,9 @@ find_resources(){
         PIP_ID=$(az network nic show --ids "$NIC_ID" \
             --query "ipConfigurations[0].publicIPAddress.id" -o tsv)
     fi
+    if [[ -n $PIP_ID ]]; then
+        VM_IP=$(az network public-ip show --ids "$PIP_ID" --query ipAddress -o tsv)
+    fi
     [[ -n $VM_ID || -n $NIC_ID ]] || die "neither VM $VM_NAME nor NIC $NIC_NAME found in $RG"
 }
 
@@ -93,6 +105,10 @@ show_plan(){
     fi
     echo "  NIC:       ${NIC_ID##*/}"
     echo "  Public IP: ${PIP_ID##*/}"
+    [[ -z $VM_IP ]] || echo "Removing $VM_IP from ~/.ssh/known_hosts"
+    if has_ssh_config_entry; then
+        echo "Removing Host $VM_NAME from $SSH_CONFIG"
+    fi
 }
 
 confirm(){
@@ -119,6 +135,45 @@ delete_resources(){
     fi
 }
 
+forget_host_key(){
+    # the next VM on this IP has a new host key, so the saved one is useless
+    [[ -n $VM_IP ]] || return 0
+    if [[ -n $DRY_RUN ]]; then
+        echo "[dry run] ssh-keygen -R $VM_IP"
+        return
+    fi
+    echo "Removing $VM_IP from ~/.ssh/known_hosts..."
+    ssh-keygen -R "$VM_IP" >/dev/null 2>&1 || true
+}
+
+# Removes the "Host $VM_NAME" block that create-*-vm.sh added (or one you
+# wrote) from SSH_CONFIG, with the comments and blank lines just above it.
+# The next create adds a fresh one.
+forget_ssh_config(){
+    has_ssh_config_entry || return 0
+    if [[ -n $DRY_RUN ]]; then
+        echo "[dry run] remove Host $VM_NAME from $SSH_CONFIG"
+        return
+    fi
+    echo "Removing Host $VM_NAME from $SSH_CONFIG (old copy in $SSH_CONFIG.old)..."
+    local tmp
+    tmp=$(mktemp)
+    awk -v host="$VM_NAME" '
+        /^[[:space:]]*$/ || /^#/ { held = held $0 "\n"; next }
+        tolower($1) == "host" || tolower($1) == "match" {
+            skip = tolower($1) == "host" && NF == 2 && $2 == host
+            if (skip) { held = ""; next }
+            printf "%s", held; held = ""; print; next
+        }
+        skip { held = ""; next }
+        { printf "%s", held; held = ""; print }
+        END { if (!skip) printf "%s", held }
+    ' "$SSH_CONFIG" > "$tmp"
+    cp -p "$SSH_CONFIG" "$SSH_CONFIG.old"
+    cat "$tmp" > "$SSH_CONFIG"   # in place, so its mode and any symlink are kept
+    rm -f "$tmp"
+}
+
 show_remaining(){
     [[ -n $DRY_RUN ]] && return
     echo "Resources left in $RG:"
@@ -134,6 +189,8 @@ main(){
     show_plan
     confirm
     delete_resources
+    forget_host_key
+    forget_ssh_config
     show_remaining
     echo "Done."
 }
