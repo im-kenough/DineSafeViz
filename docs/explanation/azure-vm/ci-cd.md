@@ -37,7 +37,8 @@ The repository has these automation pieces:
 | File                                  | Trigger                       | What it does                                                    |
 | ------------------------------------- | ----------------------------- | --------------------------------------------------------------- |
 | `.github/workflows/ci.yml`            | Called by `images.yml`        | Lints, tests, and reviews new dependencies                      |
-| `.github/workflows/images.yml`        | PR, push to `main`, `v*` tag, weekly | Runs `ci.yml`, builds and scans the owned images, (except on PRs) pushes them once both pass, and on a `v*` tag publishes the matching draft release after the push |
+| `.github/workflows/images.yml`        | PR, push to `main`, `v*` tag  | Runs `ci.yml`, builds and scans the owned images, (except on PRs) pushes them once both pass, and on a `v*` tag publishes the matching draft release after the push |
+| `.github/workflows/rescan.yml`        | Weekly, manual                | Rescans the published and pinned upstream images                |
 | `.github/workflows/release-drafter.yml` | Push to `main`              | Keeps the draft release notes up to date                        |
 | `.github/dependabot.yml`              | Weekly schedule               | Opens PRs for outdated dependencies                             |
 
@@ -91,7 +92,7 @@ Three free tools keep dependencies current and flag known vulnerabilities.
   locally, scanned, and only pushed if the scan passes. On pushes, results go
   to the repository's **Security > Code scanning** page as SARIF; on pull
   requests, the scan prints a table in the job log. A weekly scheduled
-  run rescans the deployed tags and the pinned upstream images, because new
+  run of `rescan.yml` rescans the deployed tags and the pinned upstream images, because new
   vulnerabilities are published after an image is built.
 
   | Setting          | Value                                       |

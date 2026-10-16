@@ -50,7 +50,6 @@ categories:
     when:
       labels:
         - 'ci-cd'
-        - 'github_actions'
 
   - title: '📚 Documentation'
     when:
@@ -68,8 +67,6 @@ categories:
     when:
       labels:
         - 'dependencies'
-        - 'python'
-        - 'docker'
 
   - type: 'version-resolver'
     semver-increment: 'major'
