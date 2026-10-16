@@ -16,30 +16,34 @@ permissions:
 
 jobs:
   lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - name: Set up Python 3.14
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
           cache: pip
           cache-dependency-path: requirements-ci.txt
-      - run: pip install -r requirements-ci.txt
-      - name: Ruff
+      - name: Install lint tools
+        run: pip install -r requirements-ci.txt
+      - name: Ruff (Python + Bandit security rules)
         run: ruff check --output-format github .
-      - name: shellcheck
+      - name: shellcheck (shell scripts)
         run: git ls-files -z '*.sh' 'tests/fakes/*' | xargs -0 shellcheck
-      - name: yamllint
+      - name: yamllint (all YAML)
         run: yamllint --format github .
       # Official image, pinned by digest. Dependabot only updates action refs,
       # not docker:// images, so bump this one by hand.
-      - name: actionlint
+      - name: actionlint (GitHub workflows)
         uses: docker://rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
         with:
           args: -color
-      - name: hadolint
+      - name: hadolint (Dockerfiles)
         uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
         with:
           recursive: true
@@ -47,35 +51,45 @@ jobs:
           failure-threshold: warning
 
   test:
+    name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - name: Set up Python 3.14
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
           cache: pip
           cache-dependency-path: |
             src/dsv-app/requirements*.txt
             src/dsv-pipeline/requirements.txt
-      - run: >-
+      - name: Install app, pipeline, and test dependencies
+        run: >-
           pip install
           -r src/dsv-app/requirements.txt
           -r src/dsv-app/requirements-dev.txt
           -r src/dsv-pipeline/requirements.txt
       # Separate runs: each suite has its own conftest.py and helper modules.
-      - run: pytest tests
-      - run: pytest src/dsv-app/tests
-      - run: pytest src/dsv-pipeline/tests
+      - name: Tests - deploy, Compose, and DB (tests/)
+        run: pytest tests
+      - name: Tests - dsv-app
+        run: pytest src/dsv-app/tests
+      - name: Tests - dsv-pipeline
+        run: pytest src/dsv-pipeline/tests
 
   dependency-review:
+    name: Dependency review
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+      - name: Block new high/critical vulnerable dependencies
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high

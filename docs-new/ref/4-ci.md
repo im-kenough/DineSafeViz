@@ -36,18 +36,18 @@ Every PR runs a set of free checks. Together they cover linting, tests,
 static analysis (SAST), and dependency scanning (SCA). Each one fails the PR
 when it finds a problem, so it can be a required check on `main`.
 
-`ci.yml` is a reusable workflow. `images.yml` calls it as its `ci` job, so its
-checks appear on a PR as `ci / lint`, `ci / test`, and
-`ci / dependency-review`. The same call runs on pushes to `main` and on `v*`
+`ci.yml` is a reusable workflow. `images.yml` calls it as its `ci` job (shown
+as `CI`), so its checks appear on a PR as `CI / Lint`, `CI / Test`, and
+`CI / Dependency review`. The same call runs on pushes to `main` and on `v*`
 tags, and the `push` job waits for it.
 
 | Check               | Where                 | Tool                    | Fails on                                           |
 | ------------------- | --------------------- | ----------------------- | -------------------------------------------------- |
-| `ci / lint`         | `ci.yml`              | Ruff, shellcheck, yamllint, actionlint, hadolint | Python errors, likely bugs, Bandit security rules, shell bugs, invalid YAML or workflows, Dockerfile warnings |
-| `ci / test`         | `ci.yml`              | pytest                  | Any failing test in the three suites               |
-| `ci / dependency-review` | `ci.yml` (PRs only) | Dependency review     | A new dependency with a `high` or `critical` advisory |
+| `CI / Lint`         | `ci.yml`              | Ruff, shellcheck, yamllint, actionlint, hadolint | Python errors, likely bugs, Bandit security rules, shell bugs, invalid YAML or workflows, Dockerfile warnings |
+| `CI / Test`         | `ci.yml`              | pytest                  | Any failing test in the three suites               |
+| `CI / Dependency review` | `ci.yml` (PRs only) | Dependency review     | A new dependency with a `high` or `critical` advisory |
 | `CodeQL`            | GitHub default setup  | CodeQL                  | Python and Actions alerts, set in the ruleset      |
-| `scan`              | `images.yml`          | Trivy                   | Fixable `CRITICAL` vulnerabilities in an image     |
+| `Scan image (<image>)` | `images.yml`       | Trivy                   | Fixable `CRITICAL` vulnerabilities in an image     |
 
 - **Lint:** `ruff.toml` lists the rules explicitly, so a Ruff upgrade can't
   change them. Tests are exempt from the Bandit (`S`) rules, because they run
@@ -93,15 +93,17 @@ rebuilt.
 | `ghcr.io/im-kenough/dsv-app`      | `src/dsv-app`      |
 | `ghcr.io/im-kenough/dsv-pipeline` | `src/dsv-pipeline` |
 
-`images.yml` has five jobs. Which jobs run depends on the trigger:
+`images.yml` has five jobs. Which jobs run depends on the trigger. The
+Actions UI shows the display name in parentheses. The job ID before it is
+what `needs:` refers to:
 
 | Job           | Runs on                   | Does                                                                 |
 | ------------- | ------------------------- | -------------------------------------------------------------------- |
-| `ci`          | PR, push                  | Runs `ci.yml`: lint, tests, and dependency review                    |
-| `scan`        | PR, push                  | Builds each image for `linux/amd64`, scans it with Trivy             |
-| `push`        | Push, after `ci` and `scan` pass | Rebuilds from the `scan` job's layer cache, pushes to GHCR    |
-| `list-images` | Weekly, manual            | Lists the deployed owned tags and the pinned upstream images         |
-| `rescan`      | Weekly, manual            | Scans each listed image and uploads the results                      |
+| `ci` (CI)     | PR, push                  | Runs `ci.yml`: lint, tests, and dependency review                    |
+| `scan` (Scan image) | PR, push            | Builds each image for `linux/amd64`, scans it with Trivy             |
+| `push` (Publish to GHCR) | Push, after `ci` and `scan` pass | Rebuilds from the `scan` job's layer cache, pushes to GHCR    |
+| `list-images` (Rescan - list deployed images) | Weekly, manual | Lists the deployed owned tags and the pinned upstream images         |
+| `rescan` (Rescan) | Weekly, manual          | Scans each listed image and uploads the results                      |
 
 ### Scan: gate every build
 
