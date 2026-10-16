@@ -22,11 +22,13 @@ from dinesafe_csv import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP, csv_encoding,
 # Configuration
 # ---------------------------------------------------------------------------
 
-DSV_DB_HOST = os.environ.get("DSV_DB_HOST", "dsv-db")
-DSV_DB_PORT = os.environ.get("DSV_DB_PORT", "5432")
-DSV_DB_NAME = os.environ.get("DSV_DB_NAME", "dinesafe")
-DSV_DB_USER = os.environ.get("DSV_DB_USER", "dinesafe")
-DSV_DB_PASSWORD = os.environ.get("DSV_DB_PASSWORD", "dinesafe")
+DB_CONFIG = {
+    "host": os.environ.get("DSV_DB_HOST", "dsv-db"),
+    "port": os.environ.get("DSV_DB_PORT", "5432"),
+    "dbname": os.environ.get("DSV_DB_NAME", "dinesafe"),
+    "user": os.environ.get("DSV_DB_USER", "dinesafe"),
+    "password": os.environ.get("DSV_DB_PASSWORD", "dinesafe"),
+}
 
 # Rows per COPY. Bounds memory; the whole load is still one transaction.
 COPY_BATCH = 10000
@@ -141,14 +143,8 @@ def map_row(row, column_map):
 
 
 def get_connection():
-    """Return a psycopg2 connection using the module-level config."""
-    return psycopg2.connect(
-        host=DSV_DB_HOST,
-        port=DSV_DB_PORT,
-        dbname=DSV_DB_NAME,
-        user=DSV_DB_USER,
-        password=DSV_DB_PASSWORD,
-    )
+    """Return a psycopg2 connection using DB_CONFIG."""
+    return psycopg2.connect(**DB_CONFIG)
 
 
 def is_empty(conn):
@@ -218,38 +214,45 @@ def _insert_historical_csv(conn, csv_path, cutoff):
 
 class RecentScan(NamedTuple):
     """What the insert pass over the recent CSV needs from the first pass."""
-    path: str
     encoding: str
     cutoff: str   # earliest inspection_date
     keys: set     # (old ID, date) pairs that drop_old_id_duplicates drops
     total: int    # row count
 
 
+# The recent CSV's header for each column scan_recent reads.
+_RECENT_HEADER = {db_col: csv_col for csv_col, db_col in RECENT_COLUMN_MAP.items()}
+
+
 def scan_recent(csv_path):
-    """First pass over the recent CSV, so the insert pass can stream."""
+    """First pass over the recent CSV, so the insert pass can stream. Reads
+    only the four columns it needs, rather than mapping whole rows."""
     print(f"Reading recent data from {csv_path} ...")
     encoding = csv_encoding(csv_path)
+    est_col, old_col, date_col, address_col = (_RECENT_HEADER[c] for c in (
+        "establishment_id", "old_establishment_id", "inspection_date", "establishment_address"))
     cutoff, keys, total, unparsed = None, set(), 0, 0
-    for r in _read_csv_rows(csv_path, RECENT_COLUMN_MAP, encoding):
-        total += 1
-        date = r["inspection_date"]
-        if date is not None and (cutoff is None or date < cutoff):
-            cutoff = date
-        old_id = r["old_establishment_id"]
-        if old_id and old_id != r["establishment_id"]:
-            keys.add((old_id, date))
-        address = r["establishment_address"]
-        unparsed += bool(address) and not _POSTAL_RE.match(address)
+    with open_csv(csv_path, encoding) as f:
+        for r in csv.DictReader(f):
+            total += 1
+            date = normalize_date(normalize(r.get(date_col)))
+            if date is not None and (cutoff is None or date < cutoff):
+                cutoff = date
+            old_id = normalize(r.get(old_col))
+            if old_id and old_id != normalize(r.get(est_col)):
+                keys.add((old_id, date))
+            address = normalize(r.get(address_col))
+            unparsed += bool(address) and not _POSTAL_RE.match(address)
     if cutoff is None:
         raise ValueError(f"{csv_path} has no inspection dates")
     # Non-zero means the upstream address format changed; the raw address is kept in street.
     print(f"  Unparsed recent addresses: {unparsed}")
-    return RecentScan(csv_path, encoding, cutoff, keys, total)
+    return RecentScan(encoding, cutoff, keys, total)
 
 
-def _insert_recent(conn, scan):
+def _insert_recent(conn, csv_path, scan):
     """Stream the recent CSV into inspections, without old-ID duplicates."""
-    rows = _read_csv_rows(scan.path, RECENT_COLUMN_MAP, scan.encoding)
+    rows = _read_csv_rows(csv_path, RECENT_COLUMN_MAP, scan.encoding)
     inserted = bulk_insert(conn, drop_old_id_duplicates(rows, scan.keys))
     print(f"  Dropped old-ID duplicate rows: {scan.total - inserted}")
     print(f"  Loaded recent CSV: {inserted} rows")
@@ -268,7 +271,7 @@ def seed(conn, recent_csv, historical_csvs):
         cur.execute("DELETE FROM inspections")
         deleted = cur.rowcount
     inserted = sum(_insert_historical_csv(conn, path, scan.cutoff) for path in historical_csvs)
-    inserted += _insert_recent(conn, scan)
+    inserted += _insert_recent(conn, recent_csv, scan)
     return deleted, inserted
 
 
@@ -283,7 +286,7 @@ def refresh(conn, recent_csv):
     with conn.cursor() as cur:
         cur.execute("DELETE FROM inspections WHERE inspection_date >= %s", (scan.cutoff,))
         deleted = cur.rowcount
-    return deleted, _insert_recent(conn, scan)
+    return deleted, _insert_recent(conn, recent_csv, scan)
 
 
 # ---------------------------------------------------------------------------

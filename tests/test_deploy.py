@@ -1,25 +1,13 @@
 """scripts/deploy.sh with fake git, docker, and curl (tests/fakes)."""
 import pytest
 
-from helpers import run
+from helpers import MIGRATE, calls, first, ran, run
 
 SHA = "abc1234def5678900000000000000000000000000"
 
 
 def deploy(repo, env, *args):
     return run([repo / "scripts" / "deploy.sh", *args], env)
-
-
-def calls(log):
-    return log.read_text().splitlines()
-
-
-def first(lines, prefix):
-    return next(i for i, line in enumerate(lines) if line.startswith(prefix))
-
-
-def ran(lines, prefix):
-    return any(line.startswith(prefix) for line in lines)
 
 
 @pytest.mark.parametrize("args", [
@@ -212,7 +200,7 @@ def test_dev_builds_and_starts_the_working_tree(vm_repo):
     assert not ran(lines, "docker image prune")  # not on a workstation
     assert (
         first(lines, "docker compose up -d --build --remove-orphans --wait")
-        < first(lines, "docker compose exec -T dsv-db sh -c psql -q -v ON_ERROR_STOP=1")
+        < first(lines, MIGRATE)
         < first(lines, "az account get-access-token")
         < first(lines, "docker compose --profile pipeline run")
     )
@@ -222,7 +210,6 @@ def test_dev_builds_and_starts_the_working_tree(vm_repo):
     assert "http://localhost:8080" in result.stdout
 
 
-MIGRATE = "docker compose exec -T dsv-db sh -c psql -q -v ON_ERROR_STOP=1"
 LOAD = "docker compose --profile pipeline run"
 
 

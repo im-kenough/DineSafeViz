@@ -30,8 +30,7 @@ if [[ $env_name != stg && $env_name != prod && $env_name != dev ]]; then
   exit 2
 fi
 
-repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-settings="$repo_dir/deploy/$env_name.env"
+settings="$REPO_DIR/deploy/$env_name.env"
 require_settings "$settings" "$env_name"
 # read_secret VAR NAME prints the secret that .env calls VAR and Key Vault
 # calls NAME; secret_label VAR NAME names it in errors.
@@ -82,12 +81,12 @@ for pair in "${SECRETS[@]}"; do
 done
 
 version=${DSV_VERSION:-}
-if [[ -z $version && -f $repo_dir/.env ]]; then
-  version=$(setting "$repo_dir/.env" DSV_VERSION)
+if [[ -z $version && -f $REPO_DIR/.env ]]; then
+  version=$(setting "$REPO_DIR/.env" DSV_VERSION)
 fi
 
 umask 077
-tmp=$(mktemp "$repo_dir/.env.XXXXXX")
+tmp=$(mktemp "$REPO_DIR/.env.XXXXXX")
 trap 'rm -f "$tmp"' EXIT
 {
   echo "# Written by scripts/fetch-secrets.sh $env_name. Don't edit; rerun the script."
@@ -99,6 +98,6 @@ trap 'rm -f "$tmp"' EXIT
     echo "DSV_VERSION=$version"
   fi
 } >"$tmp"
-mv "$tmp" "$repo_dir/.env"
+mv "$tmp" "$REPO_DIR/.env"
 trap - EXIT
 echo "fetch-secrets: wrote .env for $env_name from $source_label"

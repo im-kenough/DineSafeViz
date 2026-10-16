@@ -16,3 +16,17 @@ def fake_conn(cursor=None):
     if cursor is not None:
         conn.cursor.return_value = cursor
     return conn
+
+
+def rows_conn(rows):
+    """A fake connection whose cursor's fetchall() returns rows."""
+    conn = fake_conn()
+    conn.cursor.return_value.fetchall.return_value = rows
+    return conn
+
+
+def stats_conn(total, min_date, max_date):
+    """A fake connection answering the home-stats query with one row."""
+    conn = fake_conn()
+    conn.cursor.return_value.fetchone.return_value = (total, min_date, max_date)
+    return conn

@@ -1,26 +1,14 @@
 from datetime import date, datetime, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import app as app_module
-from db_fakes import fake_conn
+from db_fakes import stats_conn
 
 
-def _reset_cache():
-    app_module._stats_cache["data"] = None
-    app_module._stats_cache["fetched_at"] = None
-
-
-def _mock_stats_db(total, min_date, max_date):
-    mock_cur = MagicMock()
-    mock_conn = fake_conn(mock_cur)
-    mock_cur.fetchone.return_value = (total, min_date, max_date)
-    return mock_conn, mock_cur
-
-
-def test_get_home_stats_fetches_and_caches_results():
-    _reset_cache()
+def test_get_home_stats_fetches_and_caches_results(empty_stats_cache):
     now = datetime(2026, 5, 7, 12, 0, 0)
-    mock_conn, mock_cur = _mock_stats_db(12345, date(2001, 1, 1), date(2025, 12, 31))
+    mock_conn = stats_conn(12345, date(2001, 1, 1), date(2025, 12, 31))
+    mock_cur = mock_conn.cursor.return_value
 
     with patch("app.psycopg2.connect", return_value=mock_conn), patch("app.datetime") as mock_datetime:
         mock_datetime.now.return_value = now
@@ -55,7 +43,7 @@ def test_get_home_stats_refreshes_expired_cache():
     now = datetime(2026, 5, 7, 12, 0, 0)
     app_module._stats_cache["data"] = {"total_inspections": 10, "years_of_data": 1}
     app_module._stats_cache["fetched_at"] = now - app_module._STATS_TTL - timedelta(seconds=1)
-    mock_conn, _ = _mock_stats_db(54321, date(2010, 6, 1), date(2026, 1, 10))
+    mock_conn = stats_conn(54321, date(2010, 6, 1), date(2026, 1, 10))
 
     with patch("app.psycopg2.connect", return_value=mock_conn), patch("app.datetime") as mock_datetime:
         mock_datetime.now.return_value = now
@@ -65,10 +53,9 @@ def test_get_home_stats_refreshes_expired_cache():
     assert stats["years_of_data"] == 17
 
 
-def test_get_home_stats_does_not_cache_empty_table():
+def test_get_home_stats_does_not_cache_empty_table(empty_stats_cache):
     """An empty table (seed still running) must not be cached, so the next request picks up the seed."""
-    _reset_cache()
-    mock_conn, _ = _mock_stats_db(0, None, None)
+    mock_conn = stats_conn(0, None, None)
 
     with patch("app.psycopg2.connect", return_value=mock_conn):
         stats = app_module._get_home_stats()

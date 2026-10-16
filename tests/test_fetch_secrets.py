@@ -1,9 +1,8 @@
 """scripts/fetch-secrets.sh against a fake IMDS and Key Vault (tests/fakes/curl)."""
 import os
 import stat
-import subprocess
 
-from helpers import run
+from helpers import calls, host_env, run
 
 
 def fetch(repo, env, *args):
@@ -97,7 +96,7 @@ def test_without_imds_fails_fast_and_keeps_env(vm_repo):
 def test_imds_request_has_a_timeout(vm_repo):
     repo, env, log = vm_repo
     fetch(repo, env, "stg")
-    imds = [line for line in log.read_text().splitlines() if "169.254.169.254" in line]
+    imds = [line for line in calls(log) if "169.254.169.254" in line]
     assert imds and "--max-time" in imds[0]
 
 
@@ -128,12 +127,11 @@ def test_dollar_and_slash_survive_compose_interpolation(vm_repo, tmp_path):
         "services:\n  probe:\n    image: alpine\n    environment:\n"
         "      V: ${DSV_TUNNEL_TOKEN}\n"
     )
-    result = subprocess.run(
-        ["docker", "compose", "--project-directory", str(repo),
-         "-f", str(repo / "probe.yml"), "--env-file", str(repo / ".env"),
+    result = run(
+        ["docker", "compose", "--project-directory", repo,
+         "-f", repo / "probe.yml", "--env-file", repo / ".env",
          "run", "--rm", "--no-deps", "probe", "printenv", "V"],
-        capture_output=True, text=True,
-        env={"PATH": os.environ["PATH"], "HOME": os.environ["HOME"]},
+        host_env(),
     )
     # The container sees the exact value. (`config` output would show $$,
     # its own escaping, so check inside a real container instead.)

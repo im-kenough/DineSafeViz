@@ -97,11 +97,12 @@ def md5_b64(source):
     return base64.b64encode(digest.digest()).decode()
 
 
-def validate_csv(source, column_map, min_rows, name=None):
+def validate_csv(source, column_map, min_rows, name=None, encoding=None):
     """Check headers and row count of a CSV path or text stream; return the row
-    count or raise DataError. A stream is read to EOF and not rewound."""
+    count or raise DataError. A stream is read to EOF and not rewound. Pass a
+    path's encoding when it's already known, to skip detecting it."""
     if isinstance(source, (str, os.PathLike)):
-        with open_csv(source) as f:
+        with open_csv(source, encoding) as f:
             return validate_csv(f, column_map, min_rows, name or os.path.basename(source))
     name = name or os.path.basename(getattr(source, "name", "<stream>"))
     try:
@@ -295,27 +296,32 @@ def newest_historical(store):
 # Ingestion
 # ---------------------------------------------------------------------------
 
-def _scan_member(zf, info, name):
-    """One pass over a ZIP member's bytes. Returns (encoding, md5, size).
-
-    Counts the bytes actually decompressed, rather than trusting the header's
-    file_size, and enforces MAX_HISTORICAL_BYTES.
-    """
-    if info.file_size > MAX_HISTORICAL_BYTES:
-        raise DataError(f"{name}: {info.file_size} bytes, more than the {MAX_HISTORICAL_BYTES} limit")
+def _scan_bytes(raw, name, limit=None):
+    """One pass over a binary stream that detects its CSV encoding and
+    checksums it. Returns (encoding, md5, size). Raises DataError past limit
+    bytes, counting the bytes actually read."""
     detector = EncodingDetector()
     digest = hashlib.md5(usedforsecurity=False)  # integrity checksum, not security
     size = 0
+    for chunk in iter(lambda: raw.read(1 << 20), b""):
+        size += len(chunk)
+        if limit is not None and size > limit:
+            raise DataError(f"{name}: more than the {limit} byte limit")
+        digest.update(chunk)
+        detector.feed(chunk)
+    return detector.result(), base64.b64encode(digest.digest()).decode(), size
+
+
+def _scan_member(zf, info, name):
+    """_scan_bytes over a ZIP member, enforcing MAX_HISTORICAL_BYTES and
+    checking the decompressed size against the header's file_size."""
+    if info.file_size > MAX_HISTORICAL_BYTES:
+        raise DataError(f"{name}: {info.file_size} bytes, more than the {MAX_HISTORICAL_BYTES} limit")
     with zf.open(info) as raw:
-        for chunk in iter(lambda: raw.read(1 << 20), b""):
-            size += len(chunk)
-            if size > MAX_HISTORICAL_BYTES:
-                raise DataError(f"{name}: more than the {MAX_HISTORICAL_BYTES} byte limit")
-            digest.update(chunk)
-            detector.feed(chunk)
+        encoding, md5, size = _scan_bytes(raw, name, MAX_HISTORICAL_BYTES)
     if size != info.file_size:
         raise DataError(f"{name}: {size} bytes decompressed, but the ZIP header says {info.file_size}")
-    return detector.result(), base64.b64encode(digest.digest()).decode(), size
+    return encoding, md5, size
 
 
 def _download_historical(url, tmp, download):
@@ -386,8 +392,9 @@ def ingest(store, force=False, historical=False, resolve=resolve_resources,
             recent_path = os.path.join(tmp, RECENT_NAME)
             print(f"Downloading {resources['recent']['url']} ...")
             download(resources["recent"]["url"], recent_path)
-            rows = validate_csv(recent_path, RECENT_COLUMN_MAP, MIN_RECENT_ROWS)
-            recent_md5 = md5_b64(recent_path)
+            with open(recent_path, "rb") as f:
+                encoding, recent_md5, _ = _scan_bytes(f, RECENT_NAME)
+            rows = validate_csv(recent_path, RECENT_COLUMN_MAP, MIN_RECENT_ROWS, encoding=encoding)
             if newest and newest[1].md5 == recent_md5:
                 print(f"Recent file unchanged since {newest[0]}; not uploading it.")
                 os.remove(recent_path)  # free the tmpfs during the historical upload

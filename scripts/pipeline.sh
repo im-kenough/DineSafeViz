@@ -44,8 +44,7 @@ for arg in "$@"; do
   esac
 done
 
-repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-cd "$repo_dir"
+cd "$REPO_DIR"
 
 settings=deploy/$env_name.env
 require_settings "$settings" "$env_name"

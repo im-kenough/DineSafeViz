@@ -1,6 +1,9 @@
 # shellcheck shell=bash
 # Helpers shared by the scripts in this directory.
 
+# The repo root (this file's parent's parent), however the script was called.
+REPO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+
 # Prints "<script name>: $*" to stderr and exits 1.
 die() {
   local name=${0##*/}
@@ -30,8 +33,7 @@ require_settings() {
 
 # Applies every migration in src/dsv-db/migrations/, in name order, as the
 # database superuser inside the running dsv-db. Each one is idempotent, so
-# rerunning them is a no-op. Run from the repo root. Returns 1 on the first
-# failure.
+# rerunning them is a no-op. Returns 1 on the first failure.
 #
 # Each file runs as one transaction (-1), so a load alongside never sees a
 # REVOKE without its GRANT, and a failure rolls the whole file back. The
@@ -40,7 +42,7 @@ require_settings() {
 # fail with "tuple concurrently updated".
 apply_migrations() {
   local migration
-  for migration in src/dsv-db/migrations/*.sql; do
+  for migration in "$REPO_DIR"/src/dsv-db/migrations/*.sql; do
     docker compose exec -T dsv-db sh -c \
       'psql -q -v ON_ERROR_STOP=1 -1 -c "SELECT pg_advisory_xact_lock(293455937613)" -f - -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <"$migration" \
       || return 1

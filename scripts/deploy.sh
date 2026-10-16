@@ -87,9 +87,7 @@ main() {
     *) usage ;;
   esac
 
-  local repo_dir
-  repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-  cd "$repo_dir"
+  cd "$REPO_DIR"
   require_settings "deploy/$env_name.env" "$env_name"
   if [[ $env_name == dev ]]; then
     deploy_dev
@@ -127,7 +125,7 @@ $dirty"
     || die "git checkout failed. Fix the working tree on the VM, then rerun."
 
   # 4. Write .env from Key Vault, pinned to this image tag.
-  DSV_VERSION="$tag" "$repo_dir/scripts/fetch-secrets.sh" "$env_name"
+  DSV_VERSION="$tag" scripts/fetch-secrets.sh "$env_name"
 
   # 5. Pull (including the pipeline image, which is in a profile), start and
   # wait for health, then migrate and load.
