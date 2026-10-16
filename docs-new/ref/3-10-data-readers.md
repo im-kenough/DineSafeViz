@@ -9,10 +9,10 @@ This page describes how the app (`dsv-app`) and the inspections dashboard
 Two services read Postgres, both as `dinesafe_app`: `SELECT` only, with a
 10-second `statement_timeout`. Neither writes.
 
-| Reader                                           | Code                              | Connection                                                       | Caching                                               |
-| ------------------------------------------------ | --------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------- |
-| `dsv-app`                                        | `src/dsv-app/app.py`              | New psycopg2 connection per query. No pool. 5 s connect timeout. | Inspection count and date range, in memory, 5-day TTL |
-| `dsv-analytics`, inspections dashboard (Grafana) | `src/dsv-analytics/provisioning/` | Provisioned data source `dinesafe-postgres`, `sslmode: disable`  | None. Panels query on every dashboard load.           |
+| Reader                                           | Code                              | Connection                                                              | Caching                                               |
+| ------------------------------------------------ | --------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------- |
+| `dsv-app`                                        | `src/dsv-app/app.py`              | `ThreadedConnectionPool` (`minconn=1, maxconn=4`). 5 s connect timeout. | Inspection count and date range, in memory, 5-day TTL |
+| `dsv-analytics`, inspections dashboard (Grafana) | `src/dsv-analytics/provisioning/` | Provisioned data source `dinesafe-postgres`, `sslmode: disable`         | None. Panels query on every dashboard load.           |
 
 - `load_log` is readable, but nothing displays it yet.
 - Connections are plaintext, on the internal `backend` network only.

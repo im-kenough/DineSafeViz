@@ -13,12 +13,13 @@ import os
 import threading
 import collections
 import itertools
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from psycopg2.pool import ThreadedConnectionPool
 from flask import Flask, abort, render_template, request
 
 app = Flask(__name__)
@@ -35,6 +36,13 @@ DB_CONFIG = {
     "user": os.environ.get("DSV_DB_USER", "dinesafe"),
     "password": os.environ.get("DSV_DB_PASSWORD", "dinesafe"),
 }
+
+# Sized to gunicorn.conf.py (1 worker, 4 gthread threads). Created lazily on
+# the first query so preload_app=True doesn't share connections across fork().
+POOL_MINCONN = 1
+POOL_MAXCONN = 4
+_pool: Optional[ThreadedConnectionPool] = None
+_pool_lock = threading.Lock()
 
 # Fallback range start, used only when the DB is unreachable or empty
 DATA_START = date(2001, 1, 1)
@@ -59,12 +67,72 @@ _STATS_TTL = timedelta(days=5)
 # Database access
 # ---------------------------------------------------------------------------
 
+def _get_conn(connect_timeout: int = 5):
+    """Borrow a connection from the pool, creating the pool lazily in the worker."""
+    global _pool
+    with _pool_lock:
+        if _pool is None or _pool.closed:
+            _pool = ThreadedConnectionPool(
+                POOL_MINCONN, POOL_MAXCONN, **DB_CONFIG, connect_timeout=connect_timeout
+            )
+        _pool._kwargs["connect_timeout"] = connect_timeout
+        conn = _pool.getconn()
+        if not isinstance(getattr(conn, "closed", 0), int):
+            conn.closed = 0
+        if conn.closed:
+            _pool.putconn(conn, close=True)
+            conn = _pool.getconn()
+            if not isinstance(getattr(conn, "closed", 0), int):
+                conn.closed = 0
+        return _pool, conn
+
+
+class _PoolCursor:
+    """Cursor wrapper that retries once if a pooled connection died while idle."""
+
+    def __init__(self, connect_timeout: int, cursor_kwargs: dict):
+        self._connect_timeout = connect_timeout
+        self._cursor_kwargs = cursor_kwargs
+        self.pool, self.conn = _get_conn(connect_timeout)
+        self.cur = self.conn.cursor(**cursor_kwargs)
+
+    def execute(self, *args, **kwargs):
+        try:
+            return self.cur.execute(*args, **kwargs)
+        except (psycopg2.OperationalError, psycopg2.InterfaceError):
+            self.cur.close()
+            self.pool.putconn(self.conn, close=True)
+            self.conn = None
+            self.cur = None
+            self.pool, self.conn = _get_conn(self._connect_timeout)
+            self.cur = self.conn.cursor(**self._cursor_kwargs)
+            return self.cur.execute(*args, **kwargs)
+
+    def close(self, broken: bool = False):
+        if self.cur is not None:
+            self.cur.close()
+        if self.conn is not None:
+            try:
+                self.pool.putconn(self.conn, close=broken or bool(self.conn.closed))
+            except psycopg2.Error:
+                self.pool.putconn(self.conn, close=True)
+
+    def __getattr__(self, name):
+        return getattr(self.cur, name)
+
+
 @contextmanager
 def _db_cursor(connect_timeout: int = 5, **cursor_kwargs):
-    """Open a connection and cursor, closing both on exit."""
-    with closing(psycopg2.connect(**DB_CONFIG, connect_timeout=connect_timeout)) as conn, \
-            closing(conn.cursor(**cursor_kwargs)) as cur:
-        yield cur
+    """Borrow a pooled connection and open a cursor, returning the connection on exit."""
+    cursor = _PoolCursor(connect_timeout, cursor_kwargs)
+    broken = False
+    try:
+        yield cursor
+    except psycopg2.Error:
+        broken = True
+        raise
+    finally:
+        cursor.close(broken=broken)
 
 
 def _fetch_inspections(start: date, end: date) -> List[Dict]:
