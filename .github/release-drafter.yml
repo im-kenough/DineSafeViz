@@ -23,7 +23,7 @@ categories:
     labels:
       - 'bug'
       - 'fix'
-  - performance: '🏎️'
+  - title: '🏎️ Performance'
     labels:
       - 'perf'
 
