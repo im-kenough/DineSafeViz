@@ -1,9 +1,10 @@
 from datetime import date
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import psycopg2
 
 import app as app_module
+from db_fakes import fake_conn
 from app import (
     DATA_START, build_days, get_adjacent_quarters, get_data_range, get_quarter_bounds, get_quarter_months,
     get_valid_quarters, get_valid_years, parse_year_quarter, sort_rows,
@@ -127,7 +128,7 @@ def test_parse_non_numeric_params():
 
 
 def _stats_db(total, min_date, max_date):
-    conn = MagicMock()
+    conn = fake_conn()
     conn.cursor.return_value.fetchone.return_value = (total, min_date, max_date)
     return conn
 

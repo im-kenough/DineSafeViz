@@ -2,6 +2,7 @@ from datetime import date, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import app as app_module
+from db_fakes import fake_conn
 
 
 def _reset_cache():
@@ -10,9 +11,8 @@ def _reset_cache():
 
 
 def _mock_stats_db(total, min_date, max_date):
-    mock_conn = MagicMock()
     mock_cur = MagicMock()
-    mock_conn.cursor.return_value = mock_cur
+    mock_conn = fake_conn(mock_cur)
     mock_cur.fetchone.return_value = (total, min_date, max_date)
     return mock_conn, mock_cur
 
