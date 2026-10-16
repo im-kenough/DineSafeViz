@@ -1,0 +1,139 @@
+#!/bin/bash
+# Create vm-dsv-stg01 on the existing nic-dsv-stg01 (and its public IP,
+# pip-dsv-stg01), so the VM keeps the same address every time it's rebuilt.
+# Pair with delete-stg-vm.sh, which removes the VM and its disks but leaves
+# the NIC and public IP. For other VMs use create-gen-vm.sh.
+#
+# Usage:
+#   ./create-stg-vm.sh            # create vm-dsv-stg01
+#   DRY_RUN=1 ./create-stg-vm.sh  # check prerequisites, print the commands
+# shellcheck disable=SC2086  # $TAGS is word-split on purpose
+set -euo pipefail
+
+#################################
+# Variables
+#################################
+SUB_ID=53db2ec0-9b36-42d0-aa0d-7745f6dafe9a   # sub-dsv-stg01
+LOC=canadacentral
+RG=rg-dsv-stg01
+
+VM_NAME=vm-dsv-stg01
+NIC_NAME=nic-dsv-stg01
+MI_NAME=id-dsv-stg01-vm
+OS_DISK_NAME=osdisk-dsv-stg01
+
+SIZE=Standard_B2als_v2
+IMAGE=Canonical:ubuntu-24_04-lts:server:latest
+OS_DISK_SIZE_GB=64
+STORAGE_SKU=Premium_LRS
+
+ADMIN_USER=dsv-vm-admin
+SSH_KEY=$HOME/.ssh/id_ed25519_dsv_stg01_az_admin.pub
+TAGS="workload=dsv env=stg owner=dsv-admin01 managed-by=manual"
+
+DRY_RUN=${DRY_RUN:-}
+
+#################################
+# Helpers
+#################################
+die(){
+    echo "ERROR: $*" >&2
+    exit 1
+}
+
+# Runs "az <args>", or only prints it when DRY_RUN is set.
+run_az(){
+    if [[ -n $DRY_RUN ]]; then
+        echo "[dry run] az $*"
+    else
+        az "$@"
+    fi
+}
+
+#################################
+# Steps
+#################################
+select_subscription(){
+    # by ID: both the admin and ops accounts cache subs with the same names
+    az account show -o none 2>/dev/null || die "not signed in; run 'az login' first"
+    az account set --subscription "$SUB_ID"
+    echo "Signed in as $(az account show --query user.name -o tsv)," \
+        "subscription $(az account show --query name -o tsv)"
+}
+
+check_prerequisites(){
+    echo "Checking prerequisites in $RG..."
+    az identity show -g "$RG" -n "$MI_NAME" -o none || die "identity $MI_NAME not found"
+    [[ -f $SSH_KEY ]] || die "SSH public key $SSH_KEY not found"
+
+    if az vm show -g "$RG" -n "$VM_NAME" -o none 2>/dev/null; then
+        die "VM $VM_NAME already exists in $RG"
+    fi
+    if az disk show -g "$RG" -n "$OS_DISK_NAME" -o none 2>/dev/null; then
+        die "disk $OS_DISK_NAME already exists in $RG"
+    fi
+
+    # the NIC must be there, and free
+    az network nic show -g "$RG" -n "$NIC_NAME" -o none 2>/dev/null \
+        || die "NIC $NIC_NAME not found"
+    local nic_vm
+    nic_vm=$(az network nic show -g "$RG" -n "$NIC_NAME" --query virtualMachine.id -o tsv)
+    [[ -z $nic_vm ]] || die "NIC $NIC_NAME is already attached to ${nic_vm##*/}"
+    echo "Prerequisites OK"
+}
+
+create_vm(){
+    echo "Creating $VM_NAME ($SIZE)..."
+    local mi_id
+    mi_id=$(az identity show -g "$RG" -n "$MI_NAME" --query id -o tsv)
+
+    # Detach keeps the NIC (and so the public IP) when the VM is deleted;
+    # Delete removes the OS disk with it
+    run_az vm create -g "$RG" -n "$VM_NAME" -l "$LOC" \
+        --image "$IMAGE" --size "$SIZE" \
+        --security-type TrustedLaunch --enable-secure-boot true --enable-vtpm true \
+        --nics "$NIC_NAME" --nic-delete-option Detach \
+        --os-disk-name "$OS_DISK_NAME" --os-disk-size-gb "$OS_DISK_SIZE_GB" \
+        --storage-sku "$STORAGE_SKU" --os-disk-delete-option Delete \
+        --admin-username "$ADMIN_USER" --ssh-key-values "$SSH_KEY" \
+        --assign-identity "$mi_id" --patch-mode AutomaticByPlatform \
+        --tags $TAGS -o none
+}
+
+configure_patching(){
+    # az vm create has no options for these; without the bypass flag Azure
+    # patches on its own schedule and ignores the maintenance configuration
+    echo "Configuring patch settings..."
+    run_az vm update -g "$RG" -n "$VM_NAME" --set \
+        osProfile.linuxConfiguration.patchSettings.assessmentMode=AutomaticByPlatform \
+        'osProfile.linuxConfiguration.patchSettings.automaticByPlatformSettings={"bypassPlatformSafetyChecksOnUserSchedule": true}' \
+        -o none
+}
+
+enable_boot_diagnostics(){
+    # the serial console needs boot diagnostics
+    echo "Enabling boot diagnostics..."
+    run_az vm boot-diagnostics enable -g "$RG" -n "$VM_NAME" -o none
+}
+
+show_vm(){
+    [[ -n $DRY_RUN ]] && return
+    az vm show -d -g "$RG" -n "$VM_NAME" \
+        --query "{name:name, size:hardwareProfile.vmSize, state:powerState, publicIp:publicIps, privateIp:privateIps}" \
+        -o table
+}
+
+#################################
+# Main
+#################################
+main(){
+    select_subscription
+    check_prerequisites
+    create_vm
+    configure_patching
+    enable_boot_diagnostics
+    show_vm
+    echo "Done."
+}
+
+main "$@"

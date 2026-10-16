@@ -1,15 +1,15 @@
 #!/bin/bash
-# Delete a DineSafeViz VM that create-vm.sh made, plus its NIC and public IP.
+# Delete a DineSafeViz VM that create-gen-vm.sh made, plus its NIC and public IP.
 # The OS disk goes with the VM or stays, depending on its delete option.
 # If the VM is gone (e.g. a failed create), the NIC and public IP named for
 # VM_NUM are cleaned up instead. A stopgap until real IaC.
 #
 # Usage:
-#   ./delete-vm.sh                # delete vm01-dsv-stg01, after a prompt
-#   VM_NUM=02 ./delete-vm.sh      # delete vm02-dsv-stg01
-#   VM_NAME=vm-dsv-stg01 ./delete-vm.sh   # a VM named before the numbering
-#   DRY_RUN=1 ./delete-vm.sh      # show what would be deleted, delete nothing
-#   YES=1 ./delete-vm.sh          # skip the prompt
+#   ./delete-gen-vm.sh                # delete vm01-dsv-stg01, after a prompt
+#   VM_NUM=02 ./delete-gen-vm.sh      # delete vm02-dsv-stg01
+#   VM_NAME=vm-dsv-stg01 ./delete-gen-vm.sh   # a VM named before the numbering
+#   DRY_RUN=1 ./delete-gen-vm.sh      # show what would be deleted, delete nothing
+#   YES=1 ./delete-gen-vm.sh          # skip the prompt
 set -euo pipefail
 
 #################################

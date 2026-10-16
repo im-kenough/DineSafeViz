@@ -5,11 +5,11 @@
 # vm02-dsv-stg01, ... A stopgap until real IaC; edit the variables below.
 #
 # Usage:
-#   ./create-vm.sh                # create vm01-dsv-stg01
-#   VM_NUM=02 ./create-vm.sh      # create vm02-dsv-stg01
-#   DRY_RUN=1 ./create-vm.sh      # check prerequisites, print the commands
+#   ./create-gen-vm.sh                # create vm01-dsv-stg01
+#   VM_NUM=02 ./create-gen-vm.sh      # create vm02-dsv-stg01
+#   DRY_RUN=1 ./create-gen-vm.sh      # check prerequisites, print the commands
 #   ENV=prod01 SHORT=prod SUB_ID=<id> SIZE=Standard_B2ats_v2 \
-#     DELETE_OPTION=Detach ./create-vm.sh
+#     DELETE_OPTION=Detach ./create-gen-vm.sh
 # shellcheck disable=SC2086  # $TAGS is word-split on purpose
 set -euo pipefail
 
