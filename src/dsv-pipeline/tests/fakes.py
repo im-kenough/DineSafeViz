@@ -111,10 +111,14 @@ class FakeStore:
         with open(path, "wb") as f:
             f.write(self.blobs[name][0])
 
-    def upload(self, name, path, md5, metadata=None):
+    def upload(self, name, source, md5, metadata=None, length=None):
         assert name not in self.blobs, f"overwrote {name}"
-        with open(path, "rb") as f:
-            body = f.read()
+        if isinstance(source, (str, os.PathLike)):
+            with open(source, "rb") as f:
+                body = f.read()
+        else:
+            body = source.read()
+            assert length == len(body), f"wrong length for {name}"
         assert b64md5(body) == md5, f"wrong MD5 for {name}"
         self.blobs[name] = (body, dict(metadata or {}))
         self.uploads.append(name)

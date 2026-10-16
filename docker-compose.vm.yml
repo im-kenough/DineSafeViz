@@ -83,9 +83,11 @@ services:
     networks: [egress, backend]
     read_only: true
     tmpfs: [/tmp]
-    # A full seed peaked at 121 MiB, including the /tmp tmpfs, which counts
-    # against this limit (October 15, 2026). loader.py streams rows into COPY,
-    # and the seed keeps one historical CSV in /tmp at a time.
+    # A full seed peaked at 121 MiB (October 15, 2026) and ingest --historical
+    # at 28 MiB, or 70 MiB when also downloading the recent CSV (October 16,
+    # 2026), /tmp tmpfs included. loader.py streams rows into COPY with one
+    # historical CSV in /tmp at a time, and data.py streams historical CSVs
+    # straight out of the ZIP.
     mem_limit: 256m
 
   dsv-analytics:
