@@ -2,6 +2,7 @@ from datetime import date, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import app as app_module
+from db_fakes import fake_conn
 
 
 def _reset_cache():
@@ -10,9 +11,8 @@ def _reset_cache():
 
 
 def _mock_stats_db(total, min_date, max_date):
-    mock_conn = MagicMock()
     mock_cur = MagicMock()
-    mock_conn.cursor.return_value = mock_cur
+    mock_conn = fake_conn(mock_cur)
     mock_cur.fetchone.return_value = (total, min_date, max_date)
     return mock_conn, mock_cur
 
@@ -34,7 +34,7 @@ def test_get_home_stats_fetches_and_caches_results():
     assert app_module._stats_cache["fetched_at"] == now
     assert mock_cur.execute.call_count == 1
     assert "SELECT DISTINCT establishment_id, inspection_date" in mock_cur.execute.call_args.args[0]
-    mock_conn.close.assert_called_once()
+    mock_conn.close.assert_not_called()
     mock_cur.close.assert_called_once()
 
 
