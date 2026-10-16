@@ -42,6 +42,9 @@ ClientAliveInterval 120
 ClientAliveCountMax 3
 CONF
 chmod 644 "$SSHD_DROPIN"
+# sshd -t/-T need this; 24.04's socket-activated ssh.service only creates it
+# while running, and removes it when it stops.
+install -d -m 0755 /run/sshd
 if sshd -t; then
     systemctl reload ssh || systemctl restart ssh
     echo "   sshd config valid and reloaded"
