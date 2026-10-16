@@ -1,13 +1,11 @@
 """Static checks of the merged Compose config (docker compose config)."""
 import json
-import os
 import re
-import subprocess
 from pathlib import Path
 
 import pytest
 
-from helpers import ROOT, run
+from helpers import ROOT, host_env, run
 
 COMPOSE_DIR = Path(__file__).resolve().parent / "compose"
 
@@ -19,12 +17,7 @@ def compose_config(env_file, *files, profiles=()):
     for profile in profiles:
         cmd += ["--profile", profile]
     cmd += ["config", "--format", "json"]
-    return subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        env={"PATH": os.environ["PATH"], "HOME": os.environ["HOME"]},
-    )
+    return run(cmd, host_env())
 
 
 def load(env_file, *files, profiles=()):

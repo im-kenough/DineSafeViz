@@ -4,7 +4,7 @@ import sys
 import psycopg2
 import pytest
 
-from db_helpers import container_ip, docker, migrate, start_db, wait_ready
+from db_helpers import container_ip, migrated_db
 from helpers import ROOT
 
 sys.path.insert(0, str(ROOT / "src" / "dsv-pipeline" / "tests"))
@@ -22,19 +22,18 @@ NEW = "recent/20261012T113012Z/Dinesafe.csv"
 
 @pytest.fixture(scope="module")
 def db():
-    name = start_db({"DSV_DB_APP_PASSWORD": "app-pw", "DSV_DB_MIGRATOR_PASSWORD": MIGRATOR_PW})
-    try:
-        assert wait_ready(name), docker("logs", name).stderr
-        assert migrate(name).returncode == 0
+    with migrated_db({"DSV_DB_APP_PASSWORD": "app-pw", "DSV_DB_MIGRATOR_PASSWORD": MIGRATOR_PW}) as name:
         yield name
-    finally:
-        docker("rm", "-f", name, check=False)
+
+
+def connect(db):
+    return psycopg2.connect(host=container_ip(db), dbname="dinesafe",
+                            user="dinesafe_migrator", password=MIGRATOR_PW)
 
 
 @pytest.fixture
 def conn(db):
-    c = psycopg2.connect(host=container_ip(db), dbname="dinesafe",
-                         user="dinesafe_migrator", password=MIGRATOR_PW)
+    c = connect(db)
     with c.cursor() as cur:
         cur.execute("DELETE FROM inspections")
         cur.execute("DELETE FROM load_log")
@@ -146,8 +145,7 @@ def test_seed_without_complete_historical_is_an_error(conn, store):
 def test_concurrent_loads_wait_for_each_other(db, conn, store):
     import threading
 
-    other = psycopg2.connect(host=container_ip(db), dbname="dinesafe",
-                             user="dinesafe_migrator", password=MIGRATOR_PW)
+    other = connect(db)
     try:
         with other.cursor() as cur:
             cur.execute("SELECT pg_advisory_lock(%s)", (pipeline.LOAD_LOCK,))

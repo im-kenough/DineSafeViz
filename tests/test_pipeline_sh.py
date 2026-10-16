@@ -1,22 +1,17 @@
 """scripts/pipeline.sh with fake curl, az, and docker (tests/fakes)."""
 import pytest
 
-from helpers import run
+from helpers import MIGRATE, calls, first, run
 
 
 def pipeline_sh(repo, env, *args):
     return run([repo / "scripts" / "pipeline.sh", *args], env, cwd=repo)
 
 
-def calls(log):
-    return log.read_text().splitlines()
-
-
 def docker_calls(log):
     return [line for line in calls(log) if line.startswith("docker ")]
 
 
-MIGRATE = "docker compose exec -T dsv-db sh -c psql -q -v ON_ERROR_STOP=1"
 RUN = "docker compose --profile pipeline run --rm "
 
 
@@ -138,7 +133,7 @@ def test_loads_apply_every_migration_first(vm_repo, env_name, command):
     # The command line itself is exercised against real Postgres in test_db_init.py.
     assert len([line for line in lines if line.startswith(MIGRATE)]) == len(migrations)
     assert max(i for i, line in enumerate(lines) if line.startswith(MIGRATE)) \
-        < next(i for i, line in enumerate(lines) if line.startswith(RUN))
+        < first(lines, RUN)
 
 
 def test_ingest_never_touches_the_database(vm_repo):

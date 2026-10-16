@@ -22,3 +22,10 @@ def seeded_stats_cache():
         "min_date": date(2001, 1, 1), "max_date": date.today(),
     }
     app_module._stats_cache["fetched_at"] = datetime.now()
+
+
+@pytest.fixture
+def empty_stats_cache():
+    """Empty the stats cache that seeded_stats_cache filled, so the next lookup queries the DB."""
+    app_module._stats_cache["data"] = None
+    app_module._stats_cache["fetched_at"] = None

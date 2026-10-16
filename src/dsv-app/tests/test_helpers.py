@@ -4,7 +4,7 @@ from unittest.mock import patch
 import psycopg2
 
 import app as app_module
-from db_fakes import fake_conn
+from db_fakes import stats_conn
 from app import (
     DATA_START, build_days, get_adjacent_quarters, get_data_range, get_quarter_bounds, get_quarter_months,
     get_valid_quarters, get_valid_years, parse_year_quarter, sort_rows,
@@ -127,31 +127,17 @@ def test_parse_non_numeric_params():
     assert parse_year_quarter({"year": "abc", "q": "xyz"}, FIRST, LAST) == (2025, 1)
 
 
-def _stats_db(total, min_date, max_date):
-    conn = fake_conn()
-    conn.cursor.return_value.fetchone.return_value = (total, min_date, max_date)
-    return conn
-
-
-def _clear_cache():
-    app_module._stats_cache["data"] = None
-    app_module._stats_cache["fetched_at"] = None
-
-
-def test_data_range_comes_from_db():
-    _clear_cache()
-    with patch("app.psycopg2.connect", return_value=_stats_db(10, FIRST, LAST)):
+def test_data_range_comes_from_db(empty_stats_cache):
+    with patch("app.psycopg2.connect", return_value=stats_conn(10, FIRST, LAST)):
         assert get_data_range() == (FIRST, LAST)
 
 
-def test_data_range_falls_back_when_db_empty():
-    _clear_cache()
-    with patch("app.psycopg2.connect", return_value=_stats_db(0, None, None)):
+def test_data_range_falls_back_when_db_empty(empty_stats_cache):
+    with patch("app.psycopg2.connect", return_value=stats_conn(0, None, None)):
         assert get_data_range() == (DATA_START, date.today())
 
 
-def test_data_range_falls_back_when_db_unreachable_and_does_not_cache():
-    _clear_cache()
+def test_data_range_falls_back_when_db_unreachable_and_does_not_cache(empty_stats_cache):
     with patch("app.psycopg2.connect", side_effect=psycopg2.OperationalError("down")):
         assert get_data_range() == (DATA_START, date.today())
     assert app_module._stats_cache["fetched_at"] is None

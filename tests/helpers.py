@@ -4,6 +4,7 @@ These tests cover the Azure VM deployment files: the deploy scripts, the
 Compose override, the nginx config, and the database init scripts. App and
 data-loader unit tests stay in src/dsv-app/tests and src/dsv-pipeline/tests.
 """
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -37,3 +38,30 @@ def run(cmd, env, cwd=None):
         text=True,
         timeout=120,
     )
+
+
+def host_env():
+    """The minimal environment the real docker CLI needs."""
+    return {"PATH": os.environ["PATH"], "HOME": os.environ["HOME"]}
+
+
+def docker(*args, check=True):
+    return subprocess.run(
+        ["docker", *args], capture_output=True, text=True, check=check, timeout=120
+    )
+
+
+# The fakes in tests/fakes append each command line to a log; these read it.
+MIGRATE = "docker compose exec -T dsv-db sh -c psql -q -v ON_ERROR_STOP=1"
+
+
+def calls(log):
+    return log.read_text().splitlines()
+
+
+def first(lines, prefix):
+    return next(i for i, line in enumerate(lines) if line.startswith(prefix))
+
+
+def ran(lines, prefix):
+    return any(line.startswith(prefix) for line in lines)

@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from db_helpers import DB_DIR, docker, migrate, psql, run_migration, start_db, wait_ready
+from db_helpers import DB_DIR, docker, migrate, migrated_db, psql, run_migration, start_db, wait_ready
 
 SET_PASSWORDS = DB_DIR / "set-passwords.sh"
 # A quote and a dollar sign prove the psql quoting in set-passwords.sh.
@@ -32,16 +32,8 @@ def db():
 
 @pytest.fixture(scope="module")
 def ready_db():
-    name = start_db(
-        {"DSV_DB_APP_PASSWORD": APP_PW, "DSV_DB_MIGRATOR_PASSWORD": MIGRATOR_PW}
-    )
-    try:
-        assert wait_ready(name), docker("logs", name).stderr
-        result = migrate(name)
-        assert result.returncode == 0, result.stderr
+    with migrated_db({"DSV_DB_APP_PASSWORD": APP_PW, "DSV_DB_MIGRATOR_PASSWORD": MIGRATOR_PW}) as name:
         yield name
-    finally:
-        docker("rm", "-f", name, check=False)
 
 
 def test_set_passwords_is_executable():

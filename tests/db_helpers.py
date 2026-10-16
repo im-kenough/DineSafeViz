@@ -1,10 +1,12 @@
 """Start the real Postgres image with this repo's init scripts, for tests."""
+import functools
 import re
 import subprocess
 import time
 import uuid
+from contextlib import contextmanager
 
-from helpers import ROOT, compose_image
+from helpers import ROOT, compose_image, docker
 
 IMAGE = compose_image("postgres")
 DB_DIR = ROOT / "src" / "dsv-db"
@@ -16,12 +18,6 @@ INIT_FILES = {
 MIGRATIONS = sorted((DB_DIR / "migrations").glob("*.sql"))
 # Read from apply_migrations, so these tests run the real command line.
 MIGRATE_PSQL = re.search(r"'(psql [^']*)'", (ROOT / "scripts" / "lib.sh").read_text())[1]
-
-
-def docker(*args, check=True):
-    return subprocess.run(
-        ["docker", *args], capture_output=True, text=True, check=check, timeout=120
-    )
 
 
 def start_db(env):
@@ -80,6 +76,20 @@ def migrate(name):
     return result
 
 
+@contextmanager
+def migrated_db(env):
+    """A started, ready, fully migrated container, removed on exit."""
+    name = start_db(env)
+    try:
+        assert wait_ready(name), docker("logs", name).stderr
+        result = migrate(name)
+        assert result.returncode == 0, result.stderr
+        yield name
+    finally:
+        docker("rm", "-f", name, check=False)
+
+
+@functools.cache
 def container_ip(name):
     return docker(
         "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", name

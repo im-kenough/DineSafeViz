@@ -1,18 +1,11 @@
 import re
 from datetime import date
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import psycopg2
 
-from db_fakes import fake_conn
-
-
-def _mock_db(rows):
-    mock_cur = MagicMock()
-    mock_conn = fake_conn(mock_cur)
-    mock_cur.fetchall.return_value = rows
-    return mock_conn
+from db_fakes import rows_conn
 
 
 def _row(name="Pasta Palace", address="99 King St W", est_type="Restaurant",
@@ -41,14 +34,14 @@ def _row(name="Pasta Palace", address="99 King St W", est_type="Restaurant",
 
 def _render(client, rows):
     """Render the February 2024 month fragment, which holds _row()'s date."""
-    with patch("app.psycopg2.connect", return_value=_mock_db(rows)):
+    with patch("app.psycopg2.connect", return_value=rows_conn(rows)):
         resp = client.get("/inspections/month?year=2024&m=2")
     return resp.data.decode()
 
 
 def _render_page(client, db=None, url="/inspections?year=2024&q=1"):
     """Render an /inspections page, Q1 2024 by default."""
-    with patch("app.psycopg2.connect", return_value=db or _mock_db([])):
+    with patch("app.psycopg2.connect", return_value=db or rows_conn([])):
         return client.get(url).data.decode()
 
 
@@ -59,8 +52,7 @@ _HOME_STATS = {
 
 
 def test_home_has_dashboard_link(client):
-    with patch("app._get_home_stats", return_value=_HOME_STATS):
-        resp = client.get("/")
+    resp = client.get("/")
     assert b'href="/dashboard"' in resp.data
     assert b"Dashboard" in resp.data
     assert b'href="/info"' in resp.data
@@ -85,13 +77,12 @@ def test_info_page_renders_without_db(client):
 
 
 def test_route_returns_200(client):
-    with patch("app._get_home_stats", return_value=_HOME_STATS):
-        resp = client.get("/")
+    resp = client.get("/")
     assert resp.status_code == 200
 
 
 def test_route_renders_day_boxes(client):
-    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+    with patch("app.psycopg2.connect", return_value=rows_conn([])):
         resp = client.get("/inspections")
     assert b"day-box" in resp.data
 
@@ -108,13 +99,13 @@ def test_route_shows_inspection_data(client):
 
 
 def test_route_invalid_params_returns_200(client):
-    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+    with patch("app.psycopg2.connect", return_value=rows_conn([])):
         resp = client.get("/inspections?year=1900&q=99")
     assert resp.status_code == 200
 
 
 def test_route_no_data_day_shows_no_data_text(client):
-    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+    with patch("app.psycopg2.connect", return_value=rows_conn([])):
         resp = client.get("/inspections")
     assert b"No data" in resp.data
 
@@ -124,8 +115,7 @@ def test_status_class_on_row(client):
 
 
 def test_footer_content(client):
-    with patch("app._get_home_stats", return_value=_HOME_STATS):
-        resp = client.get("/")
+    resp = client.get("/")
     assert b"&copy; 2026 Kenneth Ho" in resp.data
     version = (Path(__file__).resolve().parent.parent / "VERSION.txt").read_text().strip()
     assert f"DineSafeViz v{version}".encode() in resp.data
@@ -143,8 +133,7 @@ def _older_years(html):
 
 
 def test_dropdown_menu_present(client):
-    with patch("app._get_home_stats", return_value=_HOME_STATS):
-        resp = client.get("/")
+    resp = client.get("/")
     assert b'<details class="dropdown"' in resp.data
     assert b'class="dropdown-menu"' in resp.data
 
@@ -217,8 +206,7 @@ def test_timeline_omits_next_at_latest_quarter(client):
 
 
 def test_dropdown_has_year_and_quarter_links(client):
-    with patch("app._get_home_stats", return_value=_HOME_STATS):
-        resp = client.get("/")
+    resp = client.get("/")
     assert b'href="/inspections?year=2023&q=4"' in resp.data
     assert b'href="/inspections?year=2023&q=1"' in resp.data
     assert b'href="/inspections?year=2024&q=1"' in resp.data
@@ -226,8 +214,7 @@ def test_dropdown_has_year_and_quarter_links(client):
 
 
 def test_standalone_year_tabs_removed(client):
-    with patch("app._get_home_stats", return_value=_HOME_STATS):
-        resp = client.get("/")
+    resp = client.get("/")
     assert b'href="/inspections?year=2024"' not in resp.data
     assert b'href="/inspections?year=2023"' not in resp.data
 
@@ -279,7 +266,7 @@ def test_info_nav_active_class(client):
 
 
 def test_index_nav_active_class(client):
-    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+    with patch("app.psycopg2.connect", return_value=rows_conn([])):
         resp = client.get("/inspections")
     assert b'class="nav-btn active">Inspections' in resp.data
 
@@ -393,7 +380,7 @@ def test_heading_end_date_is_today_for_current_quarter(client):
     today = date.today()
     q = (today.month - 1) // 3 + 1
     start = date(today.year, 3 * q - 2, 1)
-    with patch("app.psycopg2.connect", return_value=_mock_db([])):
+    with patch("app.psycopg2.connect", return_value=rows_conn([])):
         html = client.get(f"/inspections?year={today.year}&q={q}").data.decode()
     expected = (f'DineSafe Inspections | Q{q} {today.year}'
                 f'<span class="heading-dates">{start.strftime("%B %-d, %Y")} - {today.strftime("%B %-d, %Y")}</span>')
@@ -402,7 +389,7 @@ def test_heading_end_date_is_today_for_current_quarter(client):
 
 
 def test_inspections_latest_month_open_and_inlined(client):
-    db = _mock_db([])
+    db = rows_conn([])
     html = _render_page(client, db)
     assert re.search(r'<details class="month-box" id="month-2024-03" open>', html)
     assert "Sunday, March 31, 2024" in html
@@ -437,7 +424,7 @@ def test_timeline_has_single_expand_collapse_toggle(client):
 
 
 def test_month_fragment_renders_only_that_month(client):
-    db = _mock_db([_row(name="Risky Bistro")])
+    db = rows_conn([_row(name="Risky Bistro")])
     with patch("app.psycopg2.connect", return_value=db):
         resp = client.get("/inspections/month?year=2024&m=2")
     html = resp.data.decode()
@@ -454,6 +441,6 @@ def test_month_fragment_bad_params_404(client):
     next_year = date.today().year + 1
     for qs in ("", "year=2024", "year=2024&m=13", "year=2024&m=0", "year=abc&m=2",
                "year=2000&m=12", f"year={next_year}&m=1"):
-        with patch("app.psycopg2.connect", return_value=_mock_db([])):
+        with patch("app.psycopg2.connect", return_value=rows_conn([])):
             resp = client.get(f"/inspections/month?{qs}")
         assert resp.status_code == 404, qs

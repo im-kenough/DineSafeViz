@@ -3,7 +3,6 @@
 The upstreams point at 127.0.0.1, where nothing listens, so a proxied
 request returns 502. A 404 means nginx itself blocked the path.
 """
-import subprocess
 import time
 import urllib.error
 import urllib.request
@@ -11,19 +10,13 @@ import uuid
 
 import pytest
 
-from helpers import ROOT, compose_image
+from helpers import ROOT, compose_image, docker
 
 IMAGE = compose_image("nginx")
 # --mount fails on a missing source; -v would create a root-owned dir.
 CONF = ["--mount", f"type=bind,src={ROOT}/src/dsv-nginx/nginx.conf,dst=/etc/nginx/nginx.conf,readonly"]
 SNIPPETS = ["--mount", f"type=bind,src={ROOT}/src/dsv-nginx/snippets,dst=/etc/nginx/snippets,readonly"]
 HOSTS = ["--add-host", "dsv-app:127.0.0.1", "--add-host", "dsv-analytics:127.0.0.1"]
-
-
-def docker(*args, check=True):
-    return subprocess.run(
-        ["docker", *args], capture_output=True, text=True, check=check, timeout=120
-    )
 
 
 def start_nginx(with_snippets):
