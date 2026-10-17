@@ -55,6 +55,10 @@ These steps prepare a new prod VM. They run on the VM as `dsv-vm-admin`.
 > Without the `sed`, its vault check fails on prod and stops the setup
 > before hardening. Restore the file afterward: `deploy.sh` refuses to run
 > on a checkout with local changes.
+> If `setup-vm.sh` exits with an error, restore the file before retrying:
+> ```bash
+> git checkout -- infra/az/init-setup-vm.sh
+> ```
 
 4. Open a new SSH session before closing the old one, to confirm the hardened
    SSH settings and pick up `docker` group membership.

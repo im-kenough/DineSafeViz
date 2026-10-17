@@ -41,7 +41,8 @@ port is open.
 - [ ] Add a published application route: `stg.dinesafeviz.com` (stg) or
       `dinesafeviz.com` (prod) to `http://dsv-nginx:80`.
 - [ ] Confirm a proxied `CNAME` to `<tunnel-id>.cfargotunnel.com` exists.
-- [ ] Store the token as `dsv-tunnel-token` in the vault (step 4).
+- [ ] Store the token as `dsv-tunnel-token` in the vault — return here after
+      completing section 4.
 
 ## 4. Azure resources
 
@@ -97,7 +98,11 @@ These steps run on the VM. Details are in
 - [ ] Copy `deploy/<env>.env-example` to `deploy/<env>.env`.
 - [ ] New environment only: run `./scripts/pipeline.sh <env> ingest` to fill
       Blob Storage.
-- [ ] Run `./scripts/deploy.sh <env> main` and check `docker compose ps`.
+- [ ] Run the deploy and check `docker compose ps`.
+      - Stg: `./scripts/deploy.sh stg main`
+      - Prod: `./scripts/deploy.sh prod vX.Y.Z` — prod requires a semver tag,
+        not `main`. See [Deploy the app to prod](deploy-prod-vm.md) for the
+        tag-first flow.
 - [ ] Reboot and confirm the stack comes back and the site loads.
 - [ ] Prod only: take a snapshot and test a restore before go-live.
 - [ ] Add the resource locks.

@@ -64,7 +64,7 @@ allowances.
         - `dsv-db-app-password`: password for the role the app connects as.
         - `dsv-analytics-admin-password`: Grafana admin password.
         - `dsv-tunnel-token`: token `cloudflared` uses to connect as the prod
-          tunnel (to do).
+          tunnel.
     - **Storage**
       - `stdsvprod01`: StorageV2 account with shared keys and public access
         off, reachable only from the VM subnet and your home IP address.
