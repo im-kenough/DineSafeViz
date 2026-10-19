@@ -122,8 +122,12 @@ h2.page-heading {
     position: absolute;
     width: 1px;
     height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
     overflow: hidden;
     clip: rect(0 0 0 0);
+    clip-path: inset(50%);
     white-space: nowrap;
 }
 
@@ -269,9 +273,16 @@ footer {
     align-items: center;
 }
 
-/* labels only on desktop; below that the row is too tight, so icons only */
+/* labels only on desktop; below that the row is too tight, so icons only,
+   sized to a 44x44 tap target */
 @media (max-width: 1023px) {
     .link-label { display: none; }
+    .social-links .nav-btn {
+        justify-content: center;
+        min-width: 44px;
+        min-height: 44px;
+        box-sizing: border-box;
+    }
 }
 
 /* ── inspections dropdown ───────────────────────────────── */
@@ -324,17 +335,12 @@ footer {
     .tabs > a,
     .tabs > .dropdown > summary { padding: 0.5rem 0.35rem; }
     .social-links { margin-left: 0; }
-    .social-links .nav-btn {
-        justify-content: center;
-        min-width: 44px;
-        min-height: 44px;
-        box-sizing: border-box;
-    }
 
     /* picker spans the nav width instead of hanging off the Inspections tab */
     .dropdown { position: static; }
     .dropdown-menu { right: 0; }
     .picker-grid { width: 100%; }
+    .picker-grid .nav-btn { padding: 0.5rem 0.6rem; }
 
     h2.page-heading { font-size: 1.15rem; }
     .heading-dates { font-size: 0.9rem; }

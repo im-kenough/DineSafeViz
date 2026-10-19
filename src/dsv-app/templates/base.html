@@ -1,4 +1,4 @@
-{% from "_icons.html" import icon -%}
+{% from "_icons.html" import icon, icon_sprite -%}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15,6 +15,7 @@
     {% block head %}{% endblock %}
 </head>
 <body>
+    {{ icon_sprite() }}
     <header>
         <a href="{{ url_for('home') }}"><h1>DineSafeViz</h1></a>
     </header>
@@ -52,15 +53,15 @@
         <a href="{{ url_for('dashboard') }}" class="nav-btn {{ 'active' if request.endpoint == 'dashboard' else '' }}">Dashboard</a>
         <a href="{{ url_for('info') }}" class="nav-btn {{ 'active' if request.endpoint == 'info' else '' }}">Info</a>
         <div class="social-links">
-            <a class="nav-btn icon-btn" href="https://github.com/im-kenough/DineSafeViz" target="_blank" rel="noopener" aria-label="DineSafeViz on GitHub">
+            <a class="nav-btn icon-btn" href="https://github.com/im-kenough/DineSafeViz" target="_blank" rel="noopener" aria-label="DineSafeViz on GitHub (opens in new tab)">
                 {{ icon("github") }}
                 <span class="link-label">GitHub</span>
             </a>
-            <a class="nav-btn icon-btn" href="https://www.linkedin.com/in/kenneth-yyz" target="_blank" rel="noopener" aria-label="Kenneth Ho on LinkedIn">
+            <a class="nav-btn icon-btn" href="https://www.linkedin.com/in/kenneth-yyz" target="_blank" rel="noopener" aria-label="Kenneth Ho on LinkedIn (opens in new tab)">
                 {{ icon("linkedin") }}
                 <span class="link-label">LinkedIn</span>
             </a>
-            <a class="nav-btn icon-btn" href="https://kennethho.ca" target="_blank" rel="noopener" aria-label="kennethho.ca, Kenneth Ho's personal website">
+            <a class="nav-btn icon-btn" href="https://kennethho.ca" target="_blank" rel="noopener" aria-label="kennethho.ca, Kenneth Ho's personal website (opens in new tab)">
                 {{ icon("globe") }}
                 <span class="link-label">kennethho.ca</span>
             </a>

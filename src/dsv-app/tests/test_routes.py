@@ -59,9 +59,16 @@ def test_home_has_dashboard_link(client):
     assert b"Info" in resp.data
 
 
+def test_home_icons_use_shared_sprite(client):
+    html = client.get("/").get_data(as_text=True)
+    for name in ("github", "linkedin", "globe"):
+        assert html.count(f'<symbol id="icon-{name}"') == 1
+        assert f'<use href="#icon-{name}"/>' in html
+
+
 def test_nav_social_links_have_aria_labels(client):
     html = client.get("/info").data.decode()
-    assert 'href="https://kennethho.ca" target="_blank" rel="noopener" aria-label="kennethho.ca, Kenneth Ho\'s personal website"' in html
+    assert 'href="https://kennethho.ca" target="_blank" rel="noopener" aria-label="kennethho.ca, Kenneth Ho\'s personal website (opens in new tab)"' in html
     assert 'href="https://www.linkedin.com/in/kenneth-yyz" target="_blank" rel="noopener" aria-label=' in html
     assert 'href="https://github.com/im-kenough/DineSafeViz" target="_blank" rel="noopener" aria-label=' in html
 
