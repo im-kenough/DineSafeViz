@@ -60,7 +60,7 @@ def test_home_has_dashboard_link(client):
 
 
 def test_home_icons_use_shared_sprite(client):
-    html = client.get("/").get_data(as_text=True)
+    html = client.get("/").data.decode()
     for name in ("github", "linkedin", "globe"):
         assert html.count(f'<symbol id="icon-{name}"') == 1
         assert f'<use href="#icon-{name}"/>' in html
@@ -68,9 +68,9 @@ def test_home_icons_use_shared_sprite(client):
 
 def test_nav_social_links_have_aria_labels(client):
     html = client.get("/info").data.decode()
-    assert 'href="https://kennethho.ca" target="_blank" rel="noopener" aria-label="kennethho.ca, Kenneth Ho\'s personal website (opens in new tab)"' in html
-    assert 'href="https://www.linkedin.com/in/kenneth-yyz" target="_blank" rel="noopener" aria-label=' in html
-    assert 'href="https://github.com/im-kenough/DineSafeViz" target="_blank" rel="noopener" aria-label=' in html
+    for href in ("https://kennethho.ca", "https://www.linkedin.com/in/kenneth-yyz", "https://github.com/im-kenough/DineSafeViz"):
+        assert f'href="{href}" target="_blank" rel="noopener" aria-label=' in html
+    assert 'aria-label="kennethho.ca, Kenneth Ho\'s personal website (opens in new tab)"' in html
 
 
 def test_info_page(client):

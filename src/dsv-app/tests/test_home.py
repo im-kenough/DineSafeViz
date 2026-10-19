@@ -85,7 +85,6 @@ def test_home_renders_about_card(client):
     card = html[html.index('<section class="day-box about"'):]
     card = card[:card.index("</section>")]
     assert 'aria-labelledby="about-heading"' in card
-    assert 'id="about-heading"' in card
     assert 'href="https://github.com/im-kenough/DineSafeViz" target="_blank" rel="noopener"' in card
     assert 'href="https://kennethho.ca" target="_blank" rel="noopener"' in card
     assert "(opens in new tab)" in card

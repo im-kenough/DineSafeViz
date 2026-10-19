@@ -114,7 +114,9 @@ h2.page-heading {
 .icon-btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
+    box-sizing: border-box;
 }
 
 /* screen-reader-only text */
@@ -273,18 +275,6 @@ footer {
     align-items: center;
 }
 
-/* labels only on desktop; below that the row is too tight, so icons only,
-   sized to a 44x44 tap target */
-@media (max-width: 1023px) {
-    .link-label { display: none; }
-    .social-links .nav-btn {
-        justify-content: center;
-        min-width: 44px;
-        min-height: 44px;
-        box-sizing: border-box;
-    }
-}
-
 /* ── inspections dropdown ───────────────────────────────── */
 .dropdown { position: relative; }
 
@@ -333,7 +323,7 @@ footer {
     .tabs > a,
     .tabs > .dropdown { flex: 1 1 auto; }
     .tabs > a,
-    .tabs > .dropdown > summary { padding: 0.5rem 0.35rem; }
+    .dropdown > summary { padding: 0.5rem 0.35rem; }
     .social-links { margin-left: 0; }
 
     /* picker spans the nav width instead of hanging off the Inspections tab */
@@ -367,6 +357,13 @@ footer {
         margin: 1.25rem auto;
         padding: 0 1.25rem;
     }
+}
+
+/* ── below desktop (≤ 1023px: mobile + tablet) ──────────── */
+/* nav social links drop their labels; icons sized to a 44x44 tap target */
+@media (max-width: 1023px) {
+    .link-label { display: none; }
+    .social-links .nav-btn { min-width: 44px; min-height: 44px; }
 }
 
 /* ── QHD spacing ────────────────────────────────────────── */
