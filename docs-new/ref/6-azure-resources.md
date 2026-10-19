@@ -1,127 +1,130 @@
 # Azure resources
 
-This page lists the Azure resources that host DineSafeViz and what each one
-is for. Each environment has its own subscription, and both use the same
-names, with only the environment suffix changing: `prod01` or `stg01`.
+This page lists every Azure resource for each environment, grouped by
+subscription and resource group, with one line on what each one does.
 
-## Naming
-
-Names follow the Cloud Adoption Framework abbreviations, in the form
-`<type>-dsv-<env>01[-<purpose>]`.
-
-- `<type>`: the resource type abbreviation, for example `vm`, `nic`, or `kv`.
-- `dsv`: the workload, DineSafeViz.
-- `<env>01`: the environment, `prod01` or `stg01`.
-- Numbered VMs: VMs and their OS disks put the instance number in front, for
-  example `vm01-dsv-prod01` and `osdisk-vm01-dsv-prod01`.
-- Storage accounts: storage account names can't contain hyphens, so the storage
-  account is `stdsv<env>01`.
-- Tags: every resource has `workload=dsv`, `env=<prod|stg>`,
+- Names follow `<type>-dsv-<env>01[-<purpose>]`, where `<env>` is `prod` or
+  `stg`.
+- Storage account names can't contain hyphens, so they're `stdsv<env>01`.
+- Every resource has the tags `workload=dsv`, `env=<prod|stg>`,
   `owner=dsv-admin01`, and `managed-by=manual`.
+- To set up a new environment, see
+  [Set up an Azure environment](../how-to/initial-setup/setup-azure-environment.md).
 
-## Subscriptions and cost
+## Tenant
 
-These sit above the resource groups and separate prod billing from stg.
+These Entra ID objects are shared by both environments.
 
-- `sub-dsv-prod01`: the free-account subscription that runs prod 24/7 on the
-  free VM and disk allowances.
-- `sub-dsv-stg01`: the pay-as-you-go subscription for stg, where the VM
-  exists only while you're testing.
-- `budget-dsv-prod01-monthly`, `budget-dsv-stg01-monthly`: 40 CAD monthly
-  budgets that send alerts at 50, 80, and 100% of actual spend and 100% of
-  forecast spend.
+- **Accounts**
+  - `dsv-admin01`: cloud-only admin that creates resources, role
+    assignments, and locks.
+  - `dsv-ops01`: daily operator that manages secrets and snapshots through the
+    operator groups.
+  - Break-glass account: separate Global Admin used only if `dsv-admin01` is
+    locked out.
 
-## Identity and access
+## Prod
 
-Entra ID accounts and groups separate admin work from daily operations.
+Prod runs 24/7 in the free-account subscription on the free VM and disk
+allowances.
 
-- `dsv-admin01`: the cloud-only admin account that creates resources, role
-  assignments, and locks.
-- `dsv-ops01`: the daily operator account that manages secrets and snapshots
-  through the operator groups.
-- `sg-dsv-prod01-operators`: lets operators read `rg-dsv-prod01`, manage the
-  prod secrets and snapshots, and start, stop, and use the serial console on
-  the prod VM.
-- `sg-dsv-stg01-operators`: gives stg operators Contributor on
-  `rg-dsv-stg01`, plus the stg secrets and read access to the stg CSVs.
+- **Subscription `sub-dsv-prod01`**: billing boundary for prod.
+  - `budget-dsv-prod01-monthly`: 40 CAD budget that alerts at 50, 80, and 100%
+    actual and 100% forecast spend.
+  - `sg-dsv-prod01-operators` (Entra group): gives operators Reader on the
+    resource group, secrets access, snapshots, and VM start and stop.
+  - **Resource group `rg-dsv-prod01`**: holds every prod resource below.
+    - **Managed identity**
+      - `id-dsv-prod01-vm`: lets the VM read vault secrets and the CSV
+        container without stored credentials.
+    - **Compute**
+      - `vm01-dsv-prod01`: `Standard_B2ats_v2` Ubuntu 24.04 Trusted Launch VM
+        that runs the app with Docker Compose.
+      - `osdisk-vm01-dsv-prod01`: 64 GiB Premium SSD OS disk, kept when the VM
+        is deleted.
+      - `mc-dsv-prod01-vms01`: Update Manager maintenance configuration that
+        patches the VM Sundays from midnight Eastern.
+      - `mc-dsv-prod01-vms01assignment`: enrolls the VM in the maintenance
+        configuration.
+    - **Network**
+      - `vnet-dsv-prod01`: virtual network, `10.10.0.0/24`.
+      - `snet-dsv-prod01-app`: `/27` VM subnet with service endpoints for Key
+        Vault and Storage.
+      - `nsg-dsv-prod01-app`: subnet firewall whose only allow rule admits SSH
+        from your home IP address.
+      - `pip-dsv-prod01`: static public IP address for outbound traffic and
+        SSH.
+      - `nic-dsv-prod01`: VM network interface that keeps the public IP address
+        across VM rebuilds.
+    - **Key Vault**
+      - `kv-dsv-prod01`: RBAC-model vault with purge protection, reachable only
+        from the VM subnet and your home IP address.
+        - `dsv-db-password`: PostgreSQL superuser password.
+        - `dsv-db-migrator-password`: password for the schema migration role.
+        - `dsv-db-app-password`: password for the role the app connects as.
+        - `dsv-analytics-admin-password`: Grafana admin password.
+        - `dsv-tunnel-token`: token `cloudflared` uses to connect as the prod
+          tunnel.
+    - **Storage**
+      - `stdsvprod01`: StorageV2 account with shared keys and public access
+        off, reachable only from the VM subnet and your home IP address.
+        - `dinesafe`: private blob container for the DineSafe CSVs, with
+          versioning and 7-day soft delete.
+    - **Locks**
+      - `lock-rg-dsv-prod01`: `CanNotDelete` lock on the whole resource group
+        (to do, after the first deploy works).
+  - **Resource group `rg-dsv-prod01-snapshots`**: holds OS disk snapshots,
+    with no lock so old ones can be pruned.
+    - `snap-dsv-prod01-<yyyymmdd-hhmm>`: incremental OS disk snapshot taken
+      before each deploy; keep the newest three.
 
-## Resource groups
+## Stg
 
-Each environment keeps its resources in one resource group.
+Stg runs in a pay-as-you-go subscription. The VM and its OS disk exist only
+while you're testing; everything else persists.
 
-- `rg-dsv-prod01`, `rg-dsv-stg01`: hold every resource for the environment
-  that's listed below.
-- `rg-dsv-prod01-snapshots`: holds the prod OS disk snapshots taken before
-  each deploy, with no lock, so old snapshots can be pruned.
-
-## Network
-
-The network gives the VM a fixed address and limits inbound traffic to SSH
-from home. Visitors reach the app through the Cloudflare tunnel, not
-through an inbound port.
-
-- `vnet-dsv-prod01`, `vnet-dsv-stg01`: the environment's virtual network,
-  `10.10.0.0/24` for prod and `10.20.0.0/24` for stg.
-- `snet-dsv-prod01-app`, `snet-dsv-stg01-app`: the `/27` subnet for the VM,
-  with service endpoints that let it reach Key Vault and Storage privately.
-- `nsg-dsv-prod01-app`, `nsg-dsv-stg01-app`: the network security group on
-  the subnet, whose only allow rule, `AllowSshFromHome`, admits SSH from your
-  home IP address.
-- `pip-dsv-prod01`, `pip-dsv-stg01`: the static Standard public IP address
-  that gives the VM outbound internet access and your SSH path.
-- `nic-dsv-prod01`, `nic-dsv-stg01`: the VM's network interface, which keeps
-  the public IP address when the VM is deleted and recreated.
-
-## Compute
-
-The VM runs Ubuntu 24.04 with Docker Compose and pulls the app images from
-GHCR.
-
-- `vm01-dsv-prod01`, `vm01-dsv-stg01`: the Trusted Launch VM that runs the
-  app containers (`Standard_B2ats_v2` for prod and `Standard_B2als_v2` for
-  stg).
-- `osdisk-vm01-dsv-prod01`, `osdisk-vm01-dsv-stg01`: the 64 GiB Premium SSD
-  OS disk, which prod keeps when its VM is deleted and stg deletes with its
-  VM.
-- `mc-dsv-prod01-vms01`, `mc-dsv-stg01-vms01`: the Azure Update Manager
-  maintenance configuration that patches the VM weekly, on Saturdays for stg
-  and Sundays for prod, from midnight Eastern.
-- `mc-dsv-prod01-vms01assignment`, `mc-dsv-stg01-vms01assignment`: enroll the
-  VM in its maintenance configuration, and are recreated each time the VM is
-  rebuilt.
-
-## Identity for the VM
-
-The VM signs in to Azure with a managed identity, so no credentials are
-stored on it.
-
-- `id-dsv-prod01-vm`, `id-dsv-stg01-vm`: the VM's user-assigned managed
-  identity, which reads the vault secrets and reads and writes the CSV
-  container.
-
-## Secrets
-
-The Key Vault keeps the secrets that `scripts/fetch-secrets.sh` reads on the
-VM at deploy time.
-
-- `kv-dsv-prod01`, `kv-dsv-stg01`: the Standard, RBAC-model Key Vault with
-  purge protection, which only the VM subnet and your home IP address can
-  reach.
-- `dsv-db-password`: the PostgreSQL superuser password.
-- `dsv-db-migrator-password`: the password for the role that runs schema
-  migrations.
-- `dsv-db-app-password`: the password for the database role that the app's
-  services connect as.
-- `dsv-analytics-admin-password`: the Grafana admin password.
-- `dsv-tunnel-token`: the token that lets `cloudflared` on the VM connect as
-  the environment's Cloudflare tunnel.
-
-## Storage
-
-Blob Storage keeps the DineSafe CSVs that the data pipeline loads.
-
-- `stdsvprod01`, `stdsvstg01`: the StorageV2 account with shared keys and
-  public access off, which only the VM subnet and your home IP address can
-  reach.
-- `dinesafe`: the private blob container for the CSVs, with versioning and a
-  7-day soft delete so overwritten or deleted files can be recovered.
+- **Subscription `sub-dsv-stg01`**: billing boundary for stg.
+  - `budget-dsv-stg01-monthly`: 40 CAD budget that alerts at 50, 80, and 100%
+    actual and 100% forecast spend.
+  - `sg-dsv-stg01-operators` (Entra group): gives operators Contributor on the
+    resource group, secrets access, and read access to the CSVs.
+  - **Resource group `rg-dsv-stg01`**: holds every stg resource below.
+    - **Managed identity**
+      - `id-dsv-stg01-vm`: lets the VM read vault secrets and the CSV
+        container without stored credentials.
+    - **Compute (deleted between test sessions)**
+      - `vm01-dsv-stg01`: `Standard_B2als_v2` Ubuntu 24.04 Trusted Launch VM
+        that runs the app with Docker Compose.
+      - `osdisk-vm01-dsv-stg01`: 64 GiB Premium SSD OS disk, deleted with the
+        VM.
+      - `mc-dsv-stg01-vms01`: Update Manager maintenance configuration that
+        patches the VM Saturdays from midnight Eastern.
+      - `mc-dsv-stg01-vms01assignment`: enrolls the VM in the maintenance
+        configuration; recreated with each VM.
+    - **Network**
+      - `vnet-dsv-stg01`: virtual network, `10.20.0.0/24`.
+      - `snet-dsv-stg01-app`: `/27` VM subnet with service endpoints for Key
+        Vault and Storage.
+      - `nsg-dsv-stg01-app`: subnet firewall whose only allow rule admits SSH
+        from your home IP address.
+      - `pip-dsv-stg01`: static public IP address for outbound traffic and SSH.
+      - `nic-dsv-stg01`: VM network interface that keeps the public IP address
+        across VM rebuilds.
+    - **Key Vault**
+      - `kv-dsv-stg01`: RBAC-model vault with purge protection, reachable only
+        from the VM subnet and your home IP address.
+        - `dsv-db-password`: PostgreSQL superuser password.
+        - `dsv-db-migrator-password`: password for the schema migration role.
+        - `dsv-db-app-password`: password for the role the app connects as.
+        - `dsv-analytics-admin-password`: Grafana admin password.
+        - `dsv-tunnel-token`: token `cloudflared` uses to connect as the stg
+          tunnel.
+    - **Storage**
+      - `stdsvstg01`: StorageV2 account with shared keys and public access off,
+        reachable only from the VM subnet and your home IP address.
+        - `dinesafe`: private blob container for the DineSafe CSVs, with
+          versioning and 7-day soft delete.
+    - **Locks (to do)**
+      - `lock-kv-dsv-stg01`: `CanNotDelete` lock on the vault.
+      - `lock-vnet-dsv-stg01`: `CanNotDelete` lock on the virtual network.
+      - `lock-id-dsv-stg01-vm`: `CanNotDelete` lock on the managed identity.
