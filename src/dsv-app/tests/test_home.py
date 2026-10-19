@@ -77,3 +77,18 @@ def test_home_route_renders_stats(client):
     assert b"12,345" in resp.data
     assert b"over 25 years" in resp.data
     assert b'href="/inspections"' in resp.data
+
+
+def test_home_renders_about_card(client):
+    html = client.get("/").data.decode()
+
+    card = html[html.index('<section class="day-box about"'):]
+    card = card[:card.index("</section>")]
+    assert 'aria-labelledby="about-heading"' in card
+    assert 'id="about-heading"' in card
+    assert 'href="https://github.com/im-kenough/DineSafeViz" target="_blank" rel="noopener"' in card
+    assert 'href="https://kennethho.ca" target="_blank" rel="noopener"' in card
+    assert "(opens in new tab)" in card
+    assert "Not affiliated with the City of Toronto." in card
+    # sits under Explore
+    assert html.index('class="hero"') < html.index('id="explore-heading"') < html.index('id="about-heading"')

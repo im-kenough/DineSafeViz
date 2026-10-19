@@ -257,6 +257,11 @@ footer {
     gap: 0.5rem;
 }
 
+/* labels only on desktop; below that the row is too tight, so icons only */
+@media (max-width: 1023px) {
+    .link-label { display: none; }
+}
+
 /* ── inspections dropdown ───────────────────────────────── */
 .dropdown { position: relative; }
 
@@ -301,13 +306,11 @@ footer {
     }
 
     /* tabs share the first row; icon-only social links take the second */
-    .tabs { position: relative; }
+    .tabs { position: relative; gap: 0.25rem; }
     .tabs > a,
     .tabs > .dropdown { flex: 1 1 auto; }
-    .tabs .nav-btn { padding: 0.5rem 0.6rem; }
+    .tabs .nav-btn { padding: 0.5rem 0.35rem; }
     .social-links { margin-left: 0; }
-
-    .link-label { display: none; }
 
     /* picker spans the nav width instead of hanging off the Inspections tab */
     .dropdown { position: static; }
