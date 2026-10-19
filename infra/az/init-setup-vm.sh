@@ -3,6 +3,13 @@ set -euo pipefail
 # shellcheck source=scripts/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/lib.sh"
 
+# stg or prod, from the VM's hostname (vm01-dsv-<env>01)
+case $(hostname) in
+    *-dsv-stg01) DSV_ENV=stg ;;
+    *-dsv-prod01) DSV_ENV=prod ;;
+    *) die "can't tell stg from prod by the hostname $(hostname)" ;;
+esac
+
 
 ##########################
 # Install applications
@@ -79,7 +86,7 @@ verify_az_kv_access(){
     local token
     token=$(imds_token https%3A%2F%2Fvault.azure.net)
     curl -s -H "Authorization: Bearer $token" \
-    "https://kv-dsv-stg01.vault.azure.net/secrets?api-version=7.4" \
+    "https://kv-dsv-${DSV_ENV}01.vault.azure.net/secrets?api-version=7.4" \
     | jq -r '.value[].id | split("/") | last'
 }
 
@@ -122,7 +129,7 @@ secure_imds(){
 
 setup_data_refresh_timer(){
     for f in dsv-pipeline.service dsv-pipeline.timer; do
-        sed -e "s|@ADMIN_USER@|$USER|" -e "s|@REPO_DIR@|$PWD|" -e "s|@ENV@|stg|" \
+        sed -e "s|@ADMIN_USER@|$USER|" -e "s|@REPO_DIR@|$PWD|" -e "s|@ENV@|$DSV_ENV|" \
         "deploy/systemd/$f" | sudo tee "/etc/systemd/system/$f" >/dev/null
     done
     sudo systemctl daemon-reload
@@ -133,6 +140,7 @@ setup_data_refresh_timer(){
 # Main function
 
 main(){
+    echo "Setting up a $DSV_ENV VM"
     install_applications
     add_swap_file
     
