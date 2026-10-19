@@ -15,7 +15,7 @@ set -euo pipefail
 # Variables
 #################################
 SUB_ID=53db2ec0-9b36-42d0-aa0d-7745f6dafe9a   # sub-dsv-stg01
-RG=rg-dsv-stg01
+RG="rg-dsv-stg01"
 VM_NAME=vm01-dsv-stg01
 SSH_CONFIG=$HOME/.ssh/config
 
@@ -72,11 +72,6 @@ detach_nics(){
         sets+=("networkProfile.networkInterfaces[$i].deleteOption=Detach")
     done
     run_az vm update -g "$RG" -n "$VM_NAME" --set "${sets[@]}" -o none
-}
-
-delete_vm(){
-    echo "Deleting VM $VM_NAME..."
-    run_az vm delete -g "$RG" -n "$VM_NAME" --yes
 }
 
 delete_disks(){

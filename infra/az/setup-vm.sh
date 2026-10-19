@@ -1,6 +1,7 @@
 #!/bin/bash
 # Wrapper script to configure and harden a DineSafeViz Azure VM.
 # Runs initial setup (docker, swap, IMDS blocking, refresh timer) followed by OS hardening.
+# Works on stg and prod; init-setup-vm.sh picks the environment from the hostname.
 #
 # Usage (run on the VM as the admin user):
 #   bash infra/az/setup-vm.sh

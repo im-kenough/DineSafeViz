@@ -18,7 +18,7 @@ set -euo pipefail
 #################################
 SUB_ID=53db2ec0-9b36-42d0-aa0d-7745f6dafe9a   # sub-dsv-stg01
 LOC=canadacentral
-RG=rg-dsv-stg01
+RG="rg-dsv-stg01"
 
 VM_NAME=vm01-dsv-stg01
 NIC_NAME=nic-dsv-stg01
@@ -51,32 +51,13 @@ source "$(dirname "${BASH_SOURCE[0]}")/vm-lib.sh"
 #################################
 check_prerequisites(){
     echo "Checking prerequisites in $RG..."
-    
-    # kept for create_vm
-    MI_ID=$(az identity show -g "$RG" -n "$MI_NAME" --query id -o tsv) \
-        || die "identity $MI_NAME not found"
-    az extension show -n maintenance -o none 2>/dev/null \
-        || die "az maintenance extension missing; run 'az extension add -n maintenance'"
-    
-    # kept for enroll_maintenance
-    MC_ID=$(az maintenance configuration show -g "$RG" --resource-name "$MC_NAME" --query id -o tsv) \
-        || die "maintenance configuration $MC_NAME not found"
+    check_vm_prerequisites
     [[ -f $SSH_KEY ]] || die "SSH public key $SSH_KEY not found"
     [[ -f $DEPLOY_KEY ]] || die "deploy key $DEPLOY_KEY not found"
 
-    if az vm show -g "$RG" -n "$VM_NAME" -o none 2>/dev/null; then
-        die "VM $VM_NAME already exists in $RG"
-    fi
-    
     if az disk show -g "$RG" -n "$OS_DISK_NAME" -o none 2>/dev/null; then
         die "disk $OS_DISK_NAME already exists in $RG"
     fi
-
-    # the NIC must be there, and free
-    local nic_vm
-    nic_vm=$(az network nic show -g "$RG" -n "$NIC_NAME" --query virtualMachine.id -o tsv 2>/dev/null) \
-        || die "NIC $NIC_NAME not found"
-    [[ -z $nic_vm ]] || die "NIC $NIC_NAME is already attached to ${nic_vm##*/}"
     echo "Prerequisites OK"
 }
 
@@ -93,20 +74,6 @@ create_vm(){
         --admin-username "$ADMIN_USER" --ssh-key-values "$SSH_KEY" \
         --assign-identity "$MI_ID" --patch-mode AutomaticByPlatform \
         --tags $TAGS -o none
-}
-
-wait_until_ready(){
-    # the patch settings update must finish before the VM can be enrolled
-    echo "Waiting for $VM_NAME to finish provisioning..."
-    run_az vm wait -g "$RG" -n "$VM_NAME" --updated
-}
-
-enroll_maintenance(){
-    # the enrollment goes with the VM when it's deleted, so redo it each build
-    echo "Enrolling $VM_NAME in $MC_NAME..."
-    run_az maintenance assignment create -g "$RG" -n "$MC_ASSIGNMENT_NAME" -l "$LOC" \
-        --provider-name Microsoft.Compute --resource-type virtualMachines \
-        --resource-name "$VM_NAME" --maintenance-configuration-id "$MC_ID" -o none
 }
 
 #################################
