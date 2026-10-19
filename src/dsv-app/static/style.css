@@ -108,6 +108,30 @@ h2.page-heading {
 }
 .nav-btn.active,
 .nav-btn:hover:not(.active) { background: #2952d9; color: #fff; }
+.nav-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+/* icon + label button (nav social links, home about links) */
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    box-sizing: border-box;
+}
+
+/* screen-reader-only text */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
 
 /* ── tabs ───────────────────────────────────────────────── */
 .tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
@@ -251,12 +275,6 @@ footer {
     align-items: center;
 }
 
-.social-links a {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
 /* ── inspections dropdown ───────────────────────────────── */
 .dropdown { position: relative; }
 
@@ -301,18 +319,18 @@ footer {
     }
 
     /* tabs share the first row; icon-only social links take the second */
-    .tabs { position: relative; }
+    .tabs { position: relative; gap: 0.25rem; }
     .tabs > a,
     .tabs > .dropdown { flex: 1 1 auto; }
-    .tabs .nav-btn { padding: 0.5rem 0.6rem; }
+    .tabs > a,
+    .dropdown > summary { padding: 0.5rem 0.35rem; }
     .social-links { margin-left: 0; }
-
-    .link-label { display: none; }
 
     /* picker spans the nav width instead of hanging off the Inspections tab */
     .dropdown { position: static; }
     .dropdown-menu { right: 0; }
     .picker-grid { width: 100%; }
+    .picker-grid .nav-btn { padding: 0.5rem 0.6rem; }
 
     h2.page-heading { font-size: 1.15rem; }
     .heading-dates { font-size: 0.9rem; }
@@ -339,6 +357,13 @@ footer {
         margin: 1.25rem auto;
         padding: 0 1.25rem;
     }
+}
+
+/* ── below desktop (≤ 1023px: mobile + tablet) ──────────── */
+/* nav social links drop their labels; icons sized to a 44x44 tap target */
+@media (max-width: 1023px) {
+    .link-label { display: none; }
+    .social-links .nav-btn { min-width: 44px; min-height: 44px; }
 }
 
 /* ── QHD spacing ────────────────────────────────────────── */

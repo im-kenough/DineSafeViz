@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon %}
 {% block head %}
     <style>
         .home-shell {
@@ -33,15 +34,56 @@
             color: var(--text);
             font-weight: 600;
         }
-        .explore {
+        .explore,
+        .about {
             margin-bottom: 0;
+            border-left: 4px solid var(--accent);
+        }
+        .explore h2,
+        .about h2 {
+            color: var(--text);
+            font-size: clamp(1.3rem, 2.5vw, 1.75rem);
+        }
+        .explore {
             padding: 1.5rem;
         }
         .explore h2 {
             margin: 0 0 1rem;
             text-align: center;
-            color: var(--text);
-            font-size: clamp(1.3rem, 2.5vw, 1.75rem);
+        }
+        .about {
+            padding: 1.25rem 1.5rem;
+            background: var(--surface-2);
+        }
+        .about h2 {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0 0 0.5rem;
+        }
+        .badge {
+            padding: 0.1rem 0.5rem;
+            border: 1px solid var(--accent);
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .about p {
+            margin: 0 0 1rem;
+        }
+        .about-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .about-links .nav-btn {
+            min-height: 44px;
+        }
+        .about .disclaimer {
+            margin: 0;
+            font-size: 0.85rem;
         }
         .nav-grid {
             display: grid;
@@ -85,8 +127,15 @@
             .hero {
                 padding: 1.75rem 1rem 1.5rem;
             }
-            .explore {
+            .explore,
+            .about {
                 padding: 1.25rem 1rem;
+            }
+            .about-links {
+                flex-direction: column;
+            }
+            .about-links .nav-btn {
+                white-space: normal;
             }
         }
     </style>
@@ -110,6 +159,22 @@
                     <p>See how inspection results change over time across the city.</p>
                 </a>
             </div>
+        </section>
+
+        <section class="day-box about" aria-labelledby="about-heading">
+            <h2 id="about-heading">About this project <span class="badge">Work in progress</span></h2>
+            <p>DineSafeViz is a portfolio project by Kenneth Ho. Check out the repo to see how IaC, CI/CD and Azure operations are handled, with architecture diagrams and runbooks.</p>
+            <div class="about-links">
+                <a class="nav-btn icon-btn" href="https://github.com/im-kenough/DineSafeViz" target="_blank" rel="noopener">
+                    {{ icon("github") }}
+                    View the repo on GitHub <span aria-hidden="true">↗</span><span class="visually-hidden">(opens in new tab)</span>
+                </a>
+                <a class="nav-btn icon-btn" href="https://kennethho.ca" target="_blank" rel="noopener">
+                    {{ icon("globe") }}
+                    Visit kennethho.ca <span aria-hidden="true">↗</span><span class="visually-hidden">(opens in new tab)</span>
+                </a>
+            </div>
+            <p class="disclaimer">Not affiliated with the City of Toronto. Data from Toronto Open Data.</p>
         </section>
     </div>
 {% endblock %}

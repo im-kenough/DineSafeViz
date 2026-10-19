@@ -59,6 +59,20 @@ def test_home_has_dashboard_link(client):
     assert b"Info" in resp.data
 
 
+def test_home_icons_use_shared_sprite(client):
+    html = client.get("/").data.decode()
+    for name in ("github", "linkedin", "globe"):
+        assert html.count(f'<symbol id="icon-{name}"') == 1
+        assert f'<use href="#icon-{name}"/>' in html
+
+
+def test_nav_social_links_have_aria_labels(client):
+    html = client.get("/info").data.decode()
+    for href in ("https://kennethho.ca", "https://www.linkedin.com/in/kenneth-yyz", "https://github.com/im-kenough/DineSafeViz"):
+        assert f'href="{href}" target="_blank" rel="noopener" aria-label=' in html
+    assert 'aria-label="kennethho.ca, Kenneth Ho\'s personal website (opens in new tab)"' in html
+
+
 def test_info_page(client):
     with patch("app._get_home_stats", return_value=_HOME_STATS):
         resp = client.get("/info")
