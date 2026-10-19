@@ -15,8 +15,8 @@ Everything in
 prod.
 
 - [ ] `kv-dsv-prod01` has all five secrets, including `dsv-tunnel-token`.
-- [ ] The tunnel `tun-dsv-prod01` routes `dinesafeviz.com` to
-      `http://dsv-nginx:80`.
+- [ ] The tunnel `tun-dsv-prod01` routes `dinesafeviz.com` and
+      `www.dinesafeviz.com` to `http://dsv-nginx:80`.
 - [ ] Your home IP address is allowed by `nsg-dsv-prod01-app`, the vault, and
       the storage account.
 - [ ] The release commit is deployed and working on stg
@@ -136,7 +136,8 @@ tunnel.
 2. Check the result.
    - The script ends with `deploy: prod is running 0.5.0 (<commit>)`.
    - `docker compose ps` shows every service as healthy.
-   - `https://dinesafeviz.com` and `https://dinesafeviz.com/analytics/` load.
+   - `https://dinesafeviz.com`, `https://www.dinesafeviz.com`, and
+     `https://dinesafeviz.com/analytics/` load.
 3. First deploy only:
    - Reboot (`sudo reboot`) and confirm the stack comes back.
    - Test a restore from the snapshot (Azure checklist, step 8.3).

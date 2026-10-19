@@ -12,11 +12,11 @@ once per environment.
 
 The domain is registered once and shared by both environments.
 
-- [ ] Register `dinesafeviz.com`.
-- [ ] Add the domain to Cloudflare as a zone (Free plan).
-- [ ] At the registrar, point the nameservers at the two Cloudflare
+- [X] Register `dinesafeviz.com`.
+- [X] Add the domain to Cloudflare as a zone (Free plan).
+- [X] At the registrar, point the nameservers at the two Cloudflare
       nameservers.
-- [ ] Confirm the zone shows **Active** in Cloudflare.
+- [X] Confirm the zone shows **Active** in Cloudflare.
 
 ## 2. DNS and zone settings
 
@@ -24,9 +24,9 @@ Cloudflare serves DNS and TLS for both hostnames. Zone settings are set once.
 
 - [ ] Delete any `A` or `CNAME` record on the apex (prod) or `stg` (stg)
       before routing the tunnel; the tunnel creates its own.
-- [ ] **SSL/TLS** > **Edge Certificates**: minimum TLS 1.3, **Always Use
+- [X] **SSL/TLS** > **Edge Certificates**: minimum TLS 1.3, **Always Use
       HTTPS**, **Automatic HTTPS Rewrites**.
-- [ ] Turn on **Bot fight mode** and confirm the **Cloudflare Free Managed
+- [X] Turn on **Bot fight mode** and confirm the **Cloudflare Free Managed
       Ruleset** is on.
 - [ ] Turn on HSTS (6 months, include subdomains) only after both hostnames
       work over HTTPS.
@@ -36,12 +36,15 @@ Cloudflare serves DNS and TLS for both hostnames. Zone settings are set once.
 Each environment has its own tunnel. The VM connects out, so no inbound web
 port is open.
 
-- [ ] Create tunnel `tun-dsv-<env>01` (**Cloudflared**, **Docker**); copy
+- [x] Create tunnel `tun-dsv-<env>01` (**Cloudflared**, **Docker**); copy
       only the token.
-- [ ] Add a published application route: `stg.dinesafeviz.com` (stg) or
+- [X] Add a published application route: `stg.dinesafeviz.com` (stg) or
       `dinesafeviz.com` (prod) to `http://dsv-nginx:80`.
-- [ ] Confirm a proxied `CNAME` to `<tunnel-id>.cfargotunnel.com` exists.
-- [ ] Store the token as `dsv-tunnel-token` in the vault — return here after
+- [X] Prod only: add a second published route `www.dinesafeviz.com` to
+      `http://dsv-nginx:80`.
+- [ ] Confirm proxied `CNAME` records to `<tunnel-id>.cfargotunnel.com` exist
+      for each hostname.
+- [X] Store the token as `dsv-tunnel-token` in the vault — return here after
       completing section 4.
 
 ## 4. Azure resources
