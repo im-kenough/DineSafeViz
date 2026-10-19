@@ -91,6 +91,7 @@ ssh_config_hostname(){
 # (for enroll_maintenance), and dies if VM_NAME exists or NIC_NAME is missing
 # or attached to a VM.
 check_vm_prerequisites(){
+    # shellcheck disable=SC2034  # MI_ID is read by the create-*-vm.sh callers
     MI_ID=$(az identity show -g "$RG" -n "$MI_NAME" --query id -o tsv) \
         || die "identity $MI_NAME not found"
     az extension show -n maintenance -o none 2>/dev/null \

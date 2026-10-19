@@ -18,7 +18,7 @@ set -euo pipefail
 #################################
 SUB_ID=53db2ec0-9b36-42d0-aa0d-7745f6dafe9a   # sub-dsv-stg01
 LOC=canadacentral
-RG=rg-dsv-stg01
+RG="rg-dsv-stg01"
 
 VM_NAME=vm01-dsv-stg01
 NIC_NAME=nic-dsv-stg01

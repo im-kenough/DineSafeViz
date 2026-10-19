@@ -23,8 +23,8 @@ set -euo pipefail
 # Variables
 #################################
 SUB_ID=a3c53ab4-7208-4b24-bddb-2118dd7b2206   # sub-dsv-prod01
-RG=rg-dsv-prod01
-SNAP_RG=rg-dsv-prod01-snapshots
+RG="rg-dsv-prod01"
+SNAP_RG="rg-dsv-prod01-snapshots"
 VM_NAME=vm01-dsv-prod01
 OS_DISK_NAME=osdisk-vm01-dsv-prod01
 ADMIN_ACCOUNT=dsv-admin01@dinesafevizoutlook.onmicrosoft.com
