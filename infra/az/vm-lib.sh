@@ -32,16 +32,16 @@ select_subscription(){
     # -o tsv prints a list one item per line
     local account
     mapfile -t account < <(az account show --query "[user.name, name]" -o tsv)
-    echo "Signed in as ${account[0]}, subscription ${account[1]}"
+    AZ_USER=${account[0]}   # kept for check_admin_account
+    echo "Signed in as $AZ_USER, subscription ${account[1]}"
 }
 
-# Refuses to go on unless the signed-in user is ADMIN_ACCOUNT. Prod operators
-# only have Reader on the resource group, so these scripts can't work for them.
+# Refuses to go on unless the user select_subscription signed in as is
+# ADMIN_ACCOUNT. Prod operators only have Reader on the resource group, so
+# these scripts can't work for them.
 check_admin_account(){
-    local user
-    user=$(az account show --query user.name -o tsv)
-    [[ ${user,,} == "${ADMIN_ACCOUNT,,}" ]] \
-        || die "signed in as $user; run this as $ADMIN_ACCOUNT (prod operators only have Reader on $RG)"
+    [[ ${AZ_USER,,} == "${ADMIN_ACCOUNT,,}" ]] \
+        || die "signed in as $AZ_USER; run this as $ADMIN_ACCOUNT (prod operators only have Reader on $RG)"
 }
 
 # Dies if any of the resource groups given as arguments has a lock, before
@@ -87,6 +87,28 @@ ssh_config_hostname(){
 #################################
 # Create steps
 #################################
+# The checks every create-*-vm.sh needs: sets MI_ID (for create_vm) and MC_ID
+# (for enroll_maintenance), and dies if VM_NAME exists or NIC_NAME is missing
+# or attached to a VM.
+check_vm_prerequisites(){
+    MI_ID=$(az identity show -g "$RG" -n "$MI_NAME" --query id -o tsv) \
+        || die "identity $MI_NAME not found"
+    az extension show -n maintenance -o none 2>/dev/null \
+        || die "az maintenance extension missing; run 'az extension add -n maintenance'"
+    MC_ID=$(az maintenance configuration show -g "$RG" --resource-name "$MC_NAME" --query id -o tsv) \
+        || die "maintenance configuration $MC_NAME not found"
+
+    if az vm show -g "$RG" -n "$VM_NAME" -o none 2>/dev/null; then
+        die "VM $VM_NAME already exists in $RG"
+    fi
+
+    # the NIC must be there, and free
+    local nic_vm
+    nic_vm=$(az network nic show -g "$RG" -n "$NIC_NAME" --query virtualMachine.id -o tsv 2>/dev/null) \
+        || die "NIC $NIC_NAME not found"
+    [[ -z $nic_vm ]] || die "NIC $NIC_NAME is already attached to ${nic_vm##*/}"
+}
+
 configure_patching(){
     # az vm create has no options for these; without the bypass flag Azure
     # patches on its own schedule and ignores the maintenance configuration
@@ -101,6 +123,20 @@ enable_boot_diagnostics(){
     # the serial console needs boot diagnostics
     echo "Enabling boot diagnostics..."
     run_az vm boot-diagnostics enable -g "$RG" -n "$VM_NAME" -o none
+}
+
+wait_until_ready(){
+    # the patch settings update must finish before the VM can be enrolled
+    echo "Waiting for $VM_NAME to finish provisioning..."
+    run_az vm wait -g "$RG" -n "$VM_NAME" --updated
+}
+
+enroll_maintenance(){
+    # the enrollment goes with the VM when it's deleted, so redo it each build
+    echo "Enrolling $VM_NAME in $MC_NAME..."
+    run_az maintenance assignment create -g "$RG" -n "$MC_ASSIGNMENT_NAME" -l "$LOC" \
+        --provider-name Microsoft.Compute --resource-type virtualMachines \
+        --resource-name "$VM_NAME" --maintenance-configuration-id "$MC_ID" -o none
 }
 
 show_vm(){
@@ -230,6 +266,11 @@ confirm(){
     local answer
     read -r -p "Type the VM name to confirm: " answer
     [[ $answer == "$VM_NAME" ]] || die "confirmation didn't match, nothing deleted"
+}
+
+delete_vm(){
+    echo "Deleting VM $VM_NAME..."
+    run_az vm delete -g "$RG" -n "$VM_NAME" --yes
 }
 
 forget_host_key(){

@@ -61,11 +61,12 @@ parse_args(){
 
 find_vm(){
     # read before the delete; afterwards the VM can't tell us
-    if az vm show -g "$RG" -n "$VM_NAME" -o none 2>/dev/null; then
-        VM_FOUND=1
-        mapfile -t DISK_IDS < <(az vm show -g "$RG" -n "$VM_NAME" \
+    local disks
+    if disks=$(az vm show -g "$RG" -n "$VM_NAME" \
             --query "[storageProfile.osDisk.managedDisk.id, storageProfile.dataDisks[].managedDisk.id][]" \
-            -o tsv)
+            -o tsv 2>/dev/null); then
+        VM_FOUND=1
+        mapfile -t DISK_IDS <<<"$disks"
         OS_DISK_ID=${DISK_IDS[0]}
         mapfile -t NIC_IDS < <(az vm show -g "$RG" -n "$VM_NAME" \
             --query "networkProfile.networkInterfaces[].id" -o tsv)
@@ -83,27 +84,23 @@ find_vm(){
     fi
 }
 
+list_disks_and_snapshots(){
+    local id
+    for id in "${DISK_IDS[@]}"; do
+        echo "  Disk:     ${id##*/}"
+    done
+    for id in "${SNAPSHOT_IDS[@]}"; do
+        echo "  Snapshot: ${id##*/} (in $SNAP_RG)"
+    done
+}
+
 show_plan(){
     local id
     echo "About to delete from $RG:"
     [[ -z $VM_FOUND ]] || echo "  VM:       $VM_NAME"
-    if [[ -n $PURGE ]]; then
-        for id in "${DISK_IDS[@]}"; do
-            echo "  Disk:     ${id##*/}"
-        done
-        for id in "${SNAPSHOT_IDS[@]}"; do
-            echo "  Snapshot: ${id##*/} (in $SNAP_RG)"
-        done
-    fi
+    [[ -z $PURGE ]] || list_disks_and_snapshots
     echo "Keeping:"
-    if [[ -z $PURGE ]]; then
-        for id in "${DISK_IDS[@]}"; do
-            echo "  Disk:     ${id##*/}"
-        done
-        for id in "${SNAPSHOT_IDS[@]}"; do
-            echo "  Snapshot: ${id##*/} (in $SNAP_RG)"
-        done
-    fi
+    [[ -n $PURGE ]] || list_disks_and_snapshots
     for id in "${NIC_IDS[@]}"; do
         echo "  NIC:      ${id##*/}"
     done
@@ -119,19 +116,14 @@ set_detach_options(){
     echo "Setting disk and NIC delete options to Detach..."
     # one update for all of them; each one is a full PUT of the VM
     local sets=("storageProfile.osDisk.deleteOption=Detach") i
-    for i in "${!DISK_IDS[@]}"; do
-        # DISK_IDS[0] is the OS disk, the rest are data disks
-        [[ $i -eq 0 ]] || sets+=("storageProfile.dataDisks[$((i - 1))].deleteOption=Detach")
+    # DISK_IDS[0] is the OS disk, the rest are data disks
+    for (( i = 1; i < ${#DISK_IDS[@]}; i++ )); do
+        sets+=("storageProfile.dataDisks[$((i - 1))].deleteOption=Detach")
     done
     for i in "${!NIC_IDS[@]}"; do
         sets+=("networkProfile.networkInterfaces[$i].deleteOption=Detach")
     done
     run_az vm update -g "$RG" -n "$VM_NAME" --set "${sets[@]}" -o none
-}
-
-delete_vm(){
-    echo "Deleting VM $VM_NAME..."
-    run_az vm delete -g "$RG" -n "$VM_NAME" --yes
 }
 
 delete_disks(){
@@ -157,11 +149,7 @@ main(){
     parse_args "$@"
     select_subscription
     check_admin_account
-    if [[ -n $PURGE ]]; then
-        check_no_locks "$RG" "$SNAP_RG"
-    else
-        check_no_locks "$RG"
-    fi
+    check_no_locks "$RG" ${PURGE:+"$SNAP_RG"}
     find_vm
     show_plan
     confirm

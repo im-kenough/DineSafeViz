@@ -10,7 +10,6 @@ case $(hostname) in
     *) die "can't tell stg from prod by the hostname $(hostname)" ;;
 esac
 
-
 ##########################
 # Install applications
 install_docker(){

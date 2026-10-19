@@ -74,11 +74,6 @@ detach_nics(){
     run_az vm update -g "$RG" -n "$VM_NAME" --set "${sets[@]}" -o none
 }
 
-delete_vm(){
-    echo "Deleting VM $VM_NAME..."
-    run_az vm delete -g "$RG" -n "$VM_NAME" --yes
-}
-
 delete_disks(){
     # disks with delete option Delete are already gone; delete the rest
     local id

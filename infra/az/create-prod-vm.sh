@@ -93,29 +93,11 @@ parse_args(){
 
 check_prerequisites(){
     echo "Checking prerequisites in $RG..."
+    check_vm_prerequisites
 
-    # kept for create_vm
-    MI_ID=$(az identity show -g "$RG" -n "$MI_NAME" --query id -o tsv) \
-        || die "identity $MI_NAME not found"
-    az extension show -n maintenance -o none 2>/dev/null \
-        || die "az maintenance extension missing; run 'az extension add -n maintenance'"
-
-    # kept for enroll_maintenance
-    MC_ID=$(az maintenance configuration show -g "$RG" --resource-name "$MC_NAME" --query id -o tsv) \
-        || die "maintenance configuration $MC_NAME not found"
     # kept for grant_ops_access
     OPS_GROUP_ID=$(az ad group show --group "$OPS_GROUP" --query id -o tsv) \
         || die "group $OPS_GROUP not found"
-
-    if az vm show -g "$RG" -n "$VM_NAME" -o none 2>/dev/null; then
-        die "VM $VM_NAME already exists in $RG"
-    fi
-
-    # the NIC must be there, and free
-    local nic_vm
-    nic_vm=$(az network nic show -g "$RG" -n "$NIC_NAME" --query virtualMachine.id -o tsv 2>/dev/null) \
-        || die "NIC $NIC_NAME not found"
-    [[ -z $nic_vm ]] || die "NIC $NIC_NAME is already attached to ${nic_vm##*/}"
 
     # the disk must not belong to another VM
     local managed_by
@@ -157,43 +139,27 @@ restore_disk(){
 
 create_vm(){
     echo "Creating $VM_NAME ($SIZE)..."
-    # Detach keeps the NIC (and so the public IP) and the OS disk when the VM
-    # is deleted
+    local os_disk
     if [[ -n $OVERWRITE ]]; then
-        run_az vm create -g "$RG" -n "$VM_NAME" -l "$LOC" \
-            --image "$IMAGE" --size "$SIZE" \
-            --security-type TrustedLaunch --enable-secure-boot true --enable-vtpm true \
-            --nics "$NIC_NAME" --nic-delete-option Detach \
-            --os-disk-name "$OS_DISK_NAME" --os-disk-size-gb "$OS_DISK_SIZE_GB" \
-            --storage-sku "$STORAGE_SKU" --os-disk-delete-option Detach \
-            --admin-username "$ADMIN_USER" --ssh-key-values "$SSH_KEY" \
-            --assign-identity "$MI_ID" --patch-mode AutomaticByPlatform \
-            --tags $TAGS -o none
+        os_disk=(--image "$IMAGE"
+            --os-disk-name "$OS_DISK_NAME" --os-disk-size-gb "$OS_DISK_SIZE_GB"
+            --storage-sku "$STORAGE_SKU"
+            --admin-username "$ADMIN_USER" --ssh-key-values "$SSH_KEY"
+            --patch-mode AutomaticByPlatform)
     else
         # the disk already has the image, admin user and SSH key; there's no
         # osProfile to hold --patch-mode, so it's left out
-        run_az vm create -g "$RG" -n "$VM_NAME" -l "$LOC" \
-            --attach-os-disk "$OS_DISK_ID" --os-type linux --size "$SIZE" \
-            --security-type TrustedLaunch --enable-secure-boot true --enable-vtpm true \
-            --nics "$NIC_NAME" --nic-delete-option Detach \
-            --os-disk-delete-option Detach \
-            --assign-identity "$MI_ID" \
-            --tags $TAGS -o none
+        os_disk=(--attach-os-disk "$OS_DISK_ID" --os-type linux)
     fi
-}
-
-wait_until_ready(){
-    # the patch settings update must finish before the VM can be enrolled
-    echo "Waiting for $VM_NAME to finish provisioning..."
-    run_az vm wait -g "$RG" -n "$VM_NAME" --updated
-}
-
-enroll_maintenance(){
-    # the enrollment goes with the VM when it's deleted, so redo it each build
-    echo "Enrolling $VM_NAME in $MC_NAME..."
-    run_az maintenance assignment create -g "$RG" -n "$MC_ASSIGNMENT_NAME" -l "$LOC" \
-        --provider-name Microsoft.Compute --resource-type virtualMachines \
-        --resource-name "$VM_NAME" --maintenance-configuration-id "$MC_ID" -o none
+    # Detach keeps the NIC (and so the public IP) and the OS disk when the VM
+    # is deleted
+    run_az vm create -g "$RG" -n "$VM_NAME" -l "$LOC" \
+        "${os_disk[@]}" --size "$SIZE" \
+        --security-type TrustedLaunch --enable-secure-boot true --enable-vtpm true \
+        --nics "$NIC_NAME" --nic-delete-option Detach \
+        --os-disk-delete-option Detach \
+        --assign-identity "$MI_ID" \
+        --tags $TAGS -o none
 }
 
 # the attached-disk VM has no osProfile, so the patch settings, and maybe the
