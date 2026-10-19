@@ -321,8 +321,15 @@ footer {
     .tabs { position: relative; gap: 0.25rem; }
     .tabs > a,
     .tabs > .dropdown { flex: 1 1 auto; }
-    .tabs .nav-btn { padding: 0.5rem 0.35rem; }
+    .tabs > a,
+    .tabs > .dropdown > summary { padding: 0.5rem 0.35rem; }
     .social-links { margin-left: 0; }
+    .social-links .nav-btn {
+        justify-content: center;
+        min-width: 44px;
+        min-height: 44px;
+        box-sizing: border-box;
+    }
 
     /* picker spans the nav width instead of hanging off the Inspections tab */
     .dropdown { position: static; }
