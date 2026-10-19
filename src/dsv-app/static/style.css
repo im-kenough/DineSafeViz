@@ -108,6 +108,24 @@ h2.page-heading {
 }
 .nav-btn.active,
 .nav-btn:hover:not(.active) { background: #2952d9; color: #fff; }
+.nav-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+/* icon + label button (nav social links, home about links) */
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* screen-reader-only text */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
 
 /* ── tabs ───────────────────────────────────────────────── */
 .tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
@@ -249,12 +267,6 @@ footer {
     display: flex;
     gap: 0.5rem;
     align-items: center;
-}
-
-.social-links a {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
 }
 
 /* labels only on desktop; below that the row is too tight, so icons only */
