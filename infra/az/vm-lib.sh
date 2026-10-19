@@ -11,6 +11,11 @@ die(){
     exit 1
 }
 
+# Prints the comment block at the top of the script given as $1 (the usage text).
+print_usage(){
+    awk 'NR == 1 { next } /^# shellcheck/ || !/^#/ { exit } { sub(/^# ?/, ""); print }' "$1"
+}
+
 # Runs "az <args>", or only prints it when DRY_RUN is set.
 run_az(){
     if [[ -n $DRY_RUN ]]; then
@@ -28,6 +33,42 @@ select_subscription(){
     local account
     mapfile -t account < <(az account show --query "[user.name, name]" -o tsv)
     echo "Signed in as ${account[0]}, subscription ${account[1]}"
+}
+
+# Refuses to go on unless the signed-in user is ADMIN_ACCOUNT. Prod operators
+# only have Reader on the resource group, so these scripts can't work for them.
+check_admin_account(){
+    local user
+    user=$(az account show --query user.name -o tsv)
+    [[ ${user,,} == "${ADMIN_ACCOUNT,,}" ]] \
+        || die "signed in as $user; run this as $ADMIN_ACCOUNT (prod operators only have Reader on $RG)"
+}
+
+# Dies if any of the resource groups given as arguments has a lock, before
+# anything is changed.
+check_no_locks(){
+    local rg locks
+    for rg in "$@"; do
+        locks=$(az lock list -g "$rg" --query "[].join(' ', [name, level])" -o tsv)
+        [[ -z $locks ]] || die "resource group $rg has a lock (name, level): ${locks//$'\n'/, }; remove it first"
+    done
+}
+
+#################################
+# Snapshots
+#################################
+# Prints the IDs of the snapshots in SNAP_RG that were taken from the disk
+# with ID $1, oldest first. Azure IDs vary in case, so the match ignores it.
+list_disk_snapshots(){
+    az snapshot list -g "$SNAP_RG" \
+        --query "[].[timeCreated, creationData.sourceResourceId, id]" -o tsv \
+        | awk -F'\t' -v disk="$1" 'tolower($2) == tolower(disk) { print $1 "\t" $3 }' \
+        | sort | cut -f2
+}
+
+# Prints the ID of the newest snapshot of the disk with ID $1, or nothing.
+latest_disk_snapshot(){
+    list_disk_snapshots "$1" | tail -n 1
 }
 
 #################################
