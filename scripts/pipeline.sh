@@ -17,6 +17,8 @@
 # Blob Data Reader on stg), and can only load. The account comes from
 # deploy/<env>.env. The token reaches the container as a mode-600 file,
 # never as an argument or environment variable, and is deleted on exit.
+# Needs the .env that scripts/deploy.sh writes (via fetch-secrets.sh): on a
+# fresh VM, deploy or run fetch-secrets.sh first.
 #
 # Exit codes: 0 ok, 1 error, 2 usage.
 set -euo pipefail
@@ -51,6 +53,18 @@ require_settings "$settings" "$env_name"
 account=$(require_setting "$settings" DSV_STORAGE_ACCOUNT)
 [[ $account =~ ^[a-z0-9]{3,24}$ ]] \
   || die "DSV_STORAGE_ACCOUNT in $settings isn't a valid storage account name: '$account'"
+
+# Compose reads the secrets, and on the VMs the image tag, from .env. Without
+# it every DSV_* variable is blank and dsv-db exits on its empty password.
+if [[ $env_name == dev ]]; then
+  [[ -f .env ]] || die ".env is missing. Run scripts/deploy.sh dev first."
+else
+  # deploy.sh's image tags: prod vX.Y.Z is X.Y.Z, stg main is sha-<commit:0:7>.
+  fix="Deploy first (scripts/deploy.sh $env_name), or write it without deploying: DSV_VERSION=<image tag, e.g. 0.5.0 or sha-abc1234> scripts/fetch-secrets.sh $env_name"
+  [[ -f .env ]] || die ".env is missing. $fix"
+  [[ -n $(setting .env DSV_VERSION) ]] \
+    || die ".env has no DSV_VERSION, so Compose can't pick the image. $fix"
+fi
 
 if [[ $env_name == dev ]]; then
   token=$(az account get-access-token --resource https://storage.azure.com/ \

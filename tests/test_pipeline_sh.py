@@ -15,6 +15,14 @@ def docker_calls(log):
 RUN = "docker compose --profile pipeline run --rm "
 
 
+@pytest.fixture(autouse=True)
+def dotenv(vm_repo):
+    """The .env that scripts/deploy.sh (via fetch-secrets.sh) writes first."""
+    repo, env, log = vm_repo
+    (repo / ".env").write_text("COMPOSE_FILE=docker-compose.yml\nDSV_VERSION=1.2.3\n")
+    return repo / ".env"
+
+
 def run_calls(log):
     return [line for line in calls(log) if line.startswith(RUN)]
 
@@ -111,6 +119,37 @@ def test_dev_without_settings_file_names_the_example(vm_repo):
     assert result.returncode == 1
     assert "deploy/dev.env-example" in result.stderr
     assert calls(log) == []
+
+
+# A fresh VM has no .env until a deploy or fetch-secrets.sh writes one; without
+# it Compose starts dsv-db with a blank password.
+@pytest.mark.parametrize("env_name, command, hint", [
+    ("prod", "ingest", "DSV_VERSION=<image tag"), ("stg", "load", "scripts/deploy.sh stg"),
+    ("dev", "load", "scripts/deploy.sh dev"),
+])
+def test_missing_dotenv_explains_and_runs_nothing(vm_repo, dotenv, env_name, command, hint):
+    repo, env, log = vm_repo
+    dotenv.unlink()
+    result = pipeline_sh(repo, env, env_name, command)
+    assert result.returncode == 1
+    assert ".env is missing" in result.stderr
+    assert hint in result.stderr
+    assert calls(log) == []
+
+
+def test_vm_dotenv_without_version_explains_and_runs_nothing(vm_repo, dotenv):
+    repo, env, log = vm_repo
+    dotenv.write_text("COMPOSE_FILE=docker-compose.yml\n")
+    result = pipeline_sh(repo, env, "prod", "ingest")
+    assert result.returncode == 1
+    assert "no DSV_VERSION" in result.stderr
+    assert calls(log) == []
+
+
+def test_dev_dotenv_needs_no_version(vm_repo, dotenv):
+    repo, env, log = vm_repo
+    dotenv.write_text("COMPOSE_FILE=docker-compose.yml\n")
+    assert pipeline_sh(repo, env, "dev", "load").returncode == 0
 
 
 def test_invalid_account_name_is_rejected(vm_repo):
