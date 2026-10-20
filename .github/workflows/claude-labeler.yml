@@ -1,0 +1,70 @@
+# Gives every new pull request exactly one label, picked by Claude from the
+# repo's existing labels. release-drafter.yml sorts release notes by label.
+# Claude only reads; it returns the label as structured output and a separate
+# step applies it, so Claude can never add more than one.
+name: Claude Labeler
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  label:
+    name: Claude label
+    # Fork PRs get no secrets. PRs opened with a label already (e.g.
+    # Dependabot's `dependencies`) keep it, so the one-label rule holds.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      toJSON(github.event.pull_request.labels) == '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write # gh pr edit --add-label
+      id-token: write # OIDC exchange for the Claude GitHub App token
+    steps:
+      # The action needs a checkout; the code itself is not read.
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Pick a label with Claude
+        id: claude
+        uses: anthropics/claude-code-action@db77d4d3c98f3f6380e7cd45ffba2342a3dbde3c # v1.0.254
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Pick the ONE label that best describes this pull request.
+
+            1. List the labels with `gh label list --limit 100`. Read each
+               description. Only these labels are allowed.
+            2. Read the PR with `gh pr view ${{ github.event.pull_request.number }}`
+               and `gh pr diff ${{ github.event.pull_request.number }}`.
+            3. Choose the single best match for the PR's main purpose. Prefer
+               a specific label (infosec, ci-cd, iac, db, ...) over a generic
+               one (enhancement, chore) when it fits. Never pick duplicate,
+               invalid, wontfix, good first issue, help wanted, question, or
+               idea: those are for issues and triage, not PRs.
+
+            Return the exact label name. Do not edit the PR or post comments.
+          claude_args: >-
+            --model claude-haiku-5-5
+            --json-schema '{"type":"object","properties":{"label":{"type":"string"}},"required":["label"],"additionalProperties":false}'
+            --allowedTools "Bash(gh label list:*),Bash(gh pr view:*),Bash(gh pr diff:*)"
+            --disallowedTools "Edit,Write,NotebookEdit,WebFetch,WebSearch"
+
+      # gh fails on a label that doesn't exist, so a made-up name fails the job.
+      - name: Apply the label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          LABEL: ${{ fromJSON(steps.claude.outputs.structured_output).label }}
+        run: gh pr edit "$PR_NUMBER" --add-label "$LABEL"
