@@ -458,3 +458,33 @@ def test_month_fragment_bad_params_404(client):
         with patch("app.psycopg2.connect", return_value=rows_conn([])):
             resp = client.get(f"/inspections/month?{qs}")
         assert resp.status_code == 404, qs
+
+
+def test_unknown_url_renders_styled_404(client):
+    resp = client.get("/no-such-page")
+    html = resp.data.decode()
+    assert resp.status_code == 404
+    assert "Page not found" in html
+    assert '<nav class="tabs">' in html
+    assert 'href="/"' in html and "Back to Home" in html
+
+
+def test_month_fragment_404_uses_styled_page(client):
+    with patch("app.psycopg2.connect", return_value=rows_conn([])):
+        resp = client.get("/inspections/month?year=1900&m=1")
+    assert resp.status_code == 404
+    assert "Page not found" in resp.data.decode()
+
+
+def test_unhandled_error_renders_styled_500(client):
+    import app as app_module
+    app_module.app.config["PROPAGATE_EXCEPTIONS"] = False
+    try:
+        with patch("app._fetch_inspections", side_effect=RuntimeError("boom")):
+            resp = client.get("/inspections")
+    finally:
+        app_module.app.config["PROPAGATE_EXCEPTIONS"] = None
+    html = resp.data.decode()
+    assert resp.status_code == 500
+    assert "Something went wrong" in html
+    assert '<nav class="tabs">' in html

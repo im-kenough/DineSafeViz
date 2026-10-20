@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}DineSafeViz - {{ heading }}{% endblock %}
+{% block head %}
+    <style>
+        .error-content {
+            max-width: 60rem;
+            line-height: 1.6;
+        }
+        .error-content .nav-btn {
+            display: inline-block;
+            margin-top: 1rem;
+        }
+    </style>
+{% endblock %}
+{% block content %}
+    <div class="error-content">
+        <h2 class="page-heading">{{ heading }}</h2>
+        <p>{{ message }}</p>
+        <a href="{{ url_for('home') }}" class="nav-btn">Back to Home</a>
+    </div>
+{% endblock %}
