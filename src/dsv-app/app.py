@@ -634,6 +634,30 @@ def info():
 
 
 # ---------------------------------------------------------------------------
+# Error pages
+# ---------------------------------------------------------------------------
+
+@app.errorhandler(404)
+def not_found(_error):
+    """Render the site-styled 404 page instead of Werkzeug's default."""
+    return render_template(
+        "error.html",
+        heading="Page not found",
+        message="The page you're looking for doesn't exist or has moved.",
+    ), 404
+
+
+@app.errorhandler(500)
+def server_error(_error):
+    """Render the site-styled 500 page instead of Werkzeug's default."""
+    return render_template(
+        "error.html",
+        heading="Something went wrong",
+        message="The server hit an error loading this page. Please try again in a moment.",
+    ), 500
+
+
+# ---------------------------------------------------------------------------
 # Health checks
 # ---------------------------------------------------------------------------
 
