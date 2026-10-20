@@ -1,44 +1,150 @@
+# Reviews every non-draft pull request with Claude and posts high-signal
+# findings as inline comments plus one summary comment that is edited on each
+# push. Claude gets the same lint and test tools as ci.yml so it can prove a
+# finding before posting it. The review rules live in the prompt below because CLAUDE.MD is gitignored.
 name: Claude Code Review
 
 on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
-
+    name: Claude review
+    # Drafts wait for ready_for_review. Fork PRs get no secrets, so skip them.
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       pull-requests: read
-      issues: read
-      id-token: write
-
+      id-token: write # OIDC exchange for the Claude GitHub App token
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 1
+          persist-credentials: false
 
-      - name: Run Claude Code Review
-        id: claude-review
-        uses: anthropics/claude-code-action@v1
+      # No pip cache, same reason as ci.yml.
+      - name: Set up Python 3.14
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Install lint, test, app, and pipeline dependencies
+        run: >-
+          pip install
+          -r requirements-ci.txt
+          -r src/dsv-app/requirements.txt
+          -r src/dsv-app/requirements-dev.txt
+          -r src/dsv-pipeline/requirements.txt
+
+      - name: Run Claude code review
+        uses: anthropics/claude-code-action@db77d4d3c98f3f6380e7cd45ffba2342a3dbde3c # v1.0.254
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
-          plugins: 'code-review@claude-code-plugins'
-          prompt: '/code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
-          claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment"'
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request. The merge result is checked out in the
+            working directory. Post only HIGH-SIGNAL findings: false positives
+            waste the reviewer's time and erode trust.
+
+            ## About the repo
+
+            DineSafeViz is a dockerized Flask + Postgres + Grafana app behind
+            nginx that visualizes Toronto's DineSafe inspection data, plus a
+            data pipeline (Blob Storage -> Postgres). It is a homelab and
+            portfolio project for a sysadmin/DevOps analyst, not a software
+            developer, so frame findings from an operations angle
+            (reliability, security, observability, process). Security and
+            privacy are first-class concerns.
+
+            ## Repo rules (flag clear violations; quote the rule)
+
+            1. Cost: free and open-source first, then a managed free tier,
+               then low-cost paid. New paid tooling without its cost and a
+               free alternative noted is a finding.
+            2. Simplicity: no features beyond the PR's stated goal, no
+               abstractions for single-use code, no unrequested
+               configurability, no error handling for impossible cases.
+            3. Surgical changes: every changed line should trace to the PR's
+               goal. Flag unrelated edits to adjacent code, comments, or
+               formatting, and imports/variables/functions the PR left unused.
+               Pre-existing dead code is not a finding.
+            4. Match existing style. Comments explain why, not what, at the
+               density of the surrounding code.
+            5. GitHub Actions: third-party and GitHub actions are pinned to a
+               full commit SHA with a `# vX.Y.Z` comment; `docker://` images
+               and Compose images are pinned as `tag@sha256:<digest>`;
+               `actions/checkout` sets `persist-credentials: false`; the
+               workflow sets top-level `permissions: contents: read` and jobs
+               add only what they need; no GitHub expressions (dollar sign and
+               double braces) inside `run:` (pass them through `env:`).
+            6. Python: Ruff config in ruff.toml (E4, E7, E9, F, B, S with
+               Bandit security rules; S is ignored under tests/). Target is
+               Python 3.14.
+            7. Tests: each suite (tests/, src/dsv-app/tests,
+               src/dsv-pipeline/tests) has its own conftest.py and runs
+               separately. A behavior change without a matching test change
+               is worth a note, not a blocker.
+            8. Docs: if the PR changes behavior that docs/ describes, flag
+               docs that are now wrong.
+
+            ## What to flag
+
+            - Code that will fail: syntax errors, bad imports, wrong names,
+              broken shell or YAML, failed lint or tests.
+            - Logic that is clearly wrong for any input.
+            - Security or privacy problems in the changed code: secrets,
+              injection, over-broad permissions, unpinned dependencies,
+              exposed ports.
+            - Clear violations of the repo rules above.
+
+            Do NOT flag style nits, subjective preferences, speculative issues
+            that depend on unusual inputs, or problems in code the PR did not
+            change.
+
+            ## How to work
+
+            1. Read the PR with `gh pr view` and `gh pr diff`. Read existing
+               comments (`gh pr view --comments` and
+               `gh api --paginate repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments`)
+               and do not repeat a finding that is already posted.
+            2. Review the diff. Use subagents in parallel for large PRs.
+            3. Prove findings with the repo's own tools, run only on the files
+               or tests the PR touches (CI runs the full suites):
+               `ruff check <paths>`, `shellcheck <files>`,
+               `yamllint <files>`, `actionlint <workflow files>`,
+               `zizmor --offline <workflow files>`, and
+               `pytest <suite>/<test file>` for src/dsv-app/tests and
+               src/dsv-pipeline/tests. Do not run the tests/ suite: it starts
+               real Postgres containers, and CI already runs it.
+            4. Before posting, check every finding again against the code.
+               Drop any you are not sure of.
+
+            ## Output
+
+            - One inline comment per confirmed finding, using
+              `mcp__github_inline_comment__create_inline_comment` with
+              `confirmed: true`. Say what is wrong, why, and the fix. Include
+              a suggestion block when the fix is small.
+            - Then one summary comment:
+              `gh pr comment ${{ github.event.pull_request.number }} --edit-last --create-if-none --body "..."`.
+              List the findings (or "No issues found"), the tools you ran and
+              their results.
+            - Only post GitHub comments. Do not put the review in your final
+              message.
+          claude_args: >-
+            --allowedTools "Read,Glob,Grep,Task,TodoWrite,mcp__github_inline_comment__create_inline_comment,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment ${{ github.event.pull_request.number }} --edit-last --create-if-none:*),Bash(gh api --paginate repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git ls-files:*),Bash(ruff check:*),Bash(shellcheck:*),Bash(yamllint:*),Bash(actionlint:*),Bash(zizmor --offline:*),Bash(pytest src/dsv-app/tests:*),Bash(pytest src/dsv-pipeline/tests:*)"
+            --disallowedTools "Edit,Write,NotebookEdit,WebFetch,WebSearch"
