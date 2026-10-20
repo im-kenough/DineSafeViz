@@ -146,5 +146,6 @@ jobs:
             - Only post GitHub comments. Do not put the review in your final
               message.
           claude_args: >-
+            --model claude-sonnet-5-5
             --allowedTools "Read,Glob,Grep,Task,TodoWrite,mcp__github_inline_comment__create_inline_comment,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment ${{ github.event.pull_request.number }} --edit-last --create-if-none:*),Bash(gh api --paginate repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git ls-files:*),Bash(ruff check:*),Bash(shellcheck:*),Bash(yamllint:*),Bash(actionlint:*),Bash(zizmor --offline:*),Bash(pytest src/dsv-app/tests:*),Bash(pytest src/dsv-pipeline/tests:*)"
             --disallowedTools "Edit,Write,NotebookEdit,WebFetch,WebSearch"
