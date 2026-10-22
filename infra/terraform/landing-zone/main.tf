@@ -49,3 +49,34 @@ resource "azurerm_management_lock" "core" {
   lock_level = "CanNotDelete"
   notes      = "Core layer. Managed by the landing zone."
 }
+
+# Created by hand before Terraform; imported on the first apply. Alerts at
+# 50, 80, and 100% of actual spend and 100% of forecast spend.
+resource "azurerm_consumption_budget_subscription" "monthly" {
+  name            = "budget-${local.name}-monthly"
+  subscription_id = "/subscriptions/${var.subscription_id}"
+  amount          = var.budget_amount
+  time_grain      = "Monthly"
+
+  time_period {
+    start_date = "2026-10-01T00:00:00Z"
+    end_date   = "2036-09-30T00:00:00Z"
+  }
+
+  dynamic "notification" {
+    for_each = [
+      { type = "Actual", threshold = 50 },
+      { type = "Actual", threshold = 80 },
+      { type = "Actual", threshold = 100 },
+      { type = "Forecasted", threshold = 100 },
+    ]
+
+    content {
+      enabled        = true
+      operator       = "GreaterThan"
+      threshold      = notification.value.threshold
+      threshold_type = notification.value.type
+      contact_emails = var.budget_contact_emails
+    }
+  }
+}

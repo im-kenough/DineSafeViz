@@ -35,8 +35,6 @@ variable "lock_core_rg" {
   default     = false
 }
 
-# Used by the budget in Task 3.
-# tflint-ignore: terraform_unused_declarations
 variable "budget_amount" {
   description = "Monthly budget in the billing currency (CAD)."
   type        = number
@@ -46,4 +44,5 @@ variable "budget_amount" {
 variable "budget_contact_emails" {
   description = "Budget alert recipients. Set in the gitignored landing-zone.secret.tfvars."
   type        = list(string)
+  sensitive   = true
 }
