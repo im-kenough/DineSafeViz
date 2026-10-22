@@ -12,8 +12,15 @@ from helpers import FAKES, ROOT, calls, ran, run
 
 INFRA = ROOT / "infra"
 GEN_IMPORTS = INFRA / "terraform" / "landing-zone" / "gen-imports.sh"
-STG_SUB = "53db2ec0-9b36-42d0-aa0d-7745f6dafe9a"
-PROD_SUB = "a3c53ab4-7208-4b24-bddb-2118dd7b2206"
+
+
+def subscription_id(env):
+    """subscription_id from envs/<env>/env.tfvars, the value check-env and
+    gen-imports.sh read."""
+    text = (INFRA / "terraform" / "envs" / env / "env.tfvars").read_text()
+    return re.search(r'^subscription_id\s*=\s*"([^"]+)"', text, re.M)[1]
+
+
 STG_OVERRIDE = (
     'terraform {\n  backend "local" {\n'
     '    path = "../envs/stg/landing-zone.bootstrap.tfstate"\n  }\n}\n'
@@ -77,12 +84,13 @@ def test_gen_imports_blocks(fake_env):
     # The output is nothing but well-formed import blocks.
     assert IMPORT.sub("", result.stdout) == ""
     blocks = dict(IMPORT.findall(result.stdout))
-    rg = f"/subscriptions/{STG_SUB}/resourceGroups/rg-dsv-stg01"
+    sub = subscription_id("stg")
+    rg = f"/subscriptions/{sub}/resourceGroups/rg-dsv-stg01"
     assignment = "/providers/Microsoft.Authorization/roleAssignments/00000000-0000-0000-0000-000000000001"
     assert blocks == {
         "azuread_group.operators": "/groups/00000000-0000-0000-0000-000000000000",
         "azurerm_consumption_budget_subscription.monthly":
-            f"/subscriptions/{STG_SUB}/providers/Microsoft.Consumption/budgets/budget-dsv-stg01-monthly",
+            f"/subscriptions/{sub}/providers/Microsoft.Consumption/budgets/budget-dsv-stg01-monthly",
         'azurerm_role_assignment.this["operators-contributor-core"]': rg + assignment,
         'azurerm_role_assignment.this["operators-kv-secrets-officer"]':
             f"{rg}/providers/Microsoft.KeyVault/vaults/kv-dsv-stg01{assignment}",
@@ -97,7 +105,7 @@ def test_bootstrap_refuses_while_one_is_in_progress(infra, fake_env):
     env, log = fake_env
     override = infra / "terraform" / "landing-zone" / "backend_override.tf"
     override.write_text(STG_OVERRIDE)
-    result = run(["make", "-C", infra, "bootstrap", "ENV=prod"], env | {"FAKE_AZ_SUBSCRIPTION": PROD_SUB})
+    result = run(["make", "-C", infra, "bootstrap", "ENV=prod"], env | {"FAKE_AZ_SUBSCRIPTION": subscription_id("prod")})
     override.unlink()
     assert result.returncode != 0
     assert "ERROR: a bootstrap is already in progress:" in result.stderr
@@ -110,7 +118,7 @@ def test_migrate_refuses_another_envs_bootstrap(infra, fake_env):
     env, log = fake_env
     override = infra / "terraform" / "landing-zone" / "backend_override.tf"
     override.write_text(STG_OVERRIDE)
-    result = run(["make", "-C", infra, "migrate", "ENV=prod"], env | {"FAKE_AZ_SUBSCRIPTION": PROD_SUB})
+    result = run(["make", "-C", infra, "migrate", "ENV=prod"], env | {"FAKE_AZ_SUBSCRIPTION": subscription_id("prod")})
     assert result.returncode != 0
     assert "ERROR: the bootstrap in progress isn't for ENV=prod." in result.stderr
     assert override.read_text() == STG_OVERRIDE
