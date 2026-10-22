@@ -1,0 +1,3 @@
+{"resource_changes": [
+  {"address": "azurerm_management_lock.iac[0]", "mode": "managed", "change": {"actions": ["delete"]}}
+]}

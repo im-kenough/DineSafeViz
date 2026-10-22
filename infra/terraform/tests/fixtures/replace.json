@@ -1,0 +1,4 @@
+{"resource_changes": [
+  {"address": "azurerm_storage_account.tfstate", "mode": "managed", "change": {"actions": ["delete", "create"]}},
+  {"address": "azurerm_user_assigned_identity.plan", "mode": "managed", "change": {"actions": ["create", "delete"]}}
+]}

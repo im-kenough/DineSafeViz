@@ -1,0 +1,5 @@
+{"resource_changes": [
+  {"address": "azurerm_resource_group.iac", "mode": "managed", "change": {"actions": ["create"]}},
+  {"address": "azurerm_resource_group.compute", "mode": "managed", "change": {"actions": ["create"]}},
+  {"address": "data.azuread_client_config.current", "mode": "data", "change": {"actions": ["read"]}}
+]}
