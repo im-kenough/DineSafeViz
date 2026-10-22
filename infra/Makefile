@@ -25,6 +25,11 @@ VAR_FILES = -var-file=$(ENV_DIR)/env.tfvars -var-file=$(ENV_DIR)/$(LAYER).tfvars
 BACKEND_ARGS = $(if $(wildcard terraform/$(LAYER)/backend_override.tf),,-backend-config=$(ENV_DIR)/$(LAYER).backend.hcl)
 LAYERS = $(notdir $(wildcard terraform/landing-zone terraform/core terraform/compute))
 TFLINT_CONFIG = $(CURDIR)/terraform/.tflint.hcl
+# Allowlist checks done by make, so a bad ENV or LAYER never reaches a shell
+# string: each is empty unless the value is one word from the list.
+ENV_OK = $(and $(filter 1,$(words $(ENV))),$(filter $(ENV),stg prod))
+LAYER_OK = $(and $(filter 1,$(words $(LAYER))),$(filter $(LAYER),$(LAYERS)))
+PLAN_FILES = terraform/$(LAYER)/$(PLAN) terraform/$(LAYER)/$(PLAN).json
 
 .PHONY: help check-env check-layer init plan apply bootstrap migrate lint test
 
@@ -32,7 +37,7 @@ help: ## List the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
 
 check-env:
-	@if [[ ! "$(ENV)" =~ ^(stg|prod)$$ ]]; then echo "ERROR: set ENV=stg or ENV=prod" >&2; exit 2; fi
+	@if [[ -z "$(ENV_OK)" ]]; then echo "ERROR: set ENV=stg or ENV=prod" >&2; exit 2; fi
 	@want=$$(sed -n 's/^subscription_id *= *"\(.*\)"/\1/p' terraform/envs/$(ENV)/env.tfvars); \
 	have=$$(az account show --query id -o tsv); \
 	if [[ "$$have" != "$$want" ]]; then \
@@ -40,23 +45,28 @@ check-env:
 	  echo "Run: az account set --subscription $$want" >&2; exit 1; fi
 
 check-layer:
-	@if [[ -z "$(LAYER)" || ! -d terraform/$(LAYER) ]]; then echo "ERROR: set LAYER to one of: $(LAYERS)" >&2; exit 2; fi
+	@if [[ -z "$(LAYER_OK)" ]]; then echo "ERROR: set LAYER to one of: $(LAYERS)" >&2; exit 2; fi
 	@if [[ -f $(SECRET_VARS).example && ! -f $(SECRET_VARS) ]]; then \
 	  echo "ERROR: copy $(SECRET_VARS).example to $(SECRET_VARS) and fill it in." >&2; exit 2; fi
 
 init: check-env check-layer ## terraform init for ENV and LAYER
 	$(TF) init -input=false -reconfigure $(BACKEND_ARGS)
 
+# A refused plan is deleted, so make apply can't pick it up.
 plan: init ## Save a plan for ENV and LAYER, and summarize it
 	$(TF) plan -input=false $(VAR_FILES) -out=$(PLAN)
 	$(TF) show -json $(PLAN) > terraform/$(LAYER)/$(PLAN).json
-	terraform/plan-summary.sh terraform/$(LAYER)/$(PLAN).json
+	terraform/plan-summary.sh terraform/$(LAYER)/$(PLAN).json || { rm -f $(PLAN_FILES); exit 1; }
 
+# apply summarizes the saved plan again, in case it is stale or was put there
+# by hand, so the destroy guard holds unless ALLOW_DESTROY=1.
 apply: init ## Apply the plan saved by make plan
 	@if [[ ! -f terraform/$(LAYER)/$(PLAN) ]]; then \
 	  echo "ERROR: no saved plan. Run: make plan ENV=$(ENV) LAYER=$(LAYER)" >&2; exit 1; fi
+	$(TF) show -json $(PLAN) > terraform/$(LAYER)/$(PLAN).json
+	terraform/plan-summary.sh terraform/$(LAYER)/$(PLAN).json || { rm -f $(PLAN_FILES); exit 1; }
 	$(TF) apply -input=false $(PLAN)
-	rm -f terraform/$(LAYER)/$(PLAN) terraform/$(LAYER)/$(PLAN).json
+	rm -f $(PLAN_FILES)
 
 lint: ## fmt, validate, tflint, and shellcheck
 	terraform fmt -check -recursive terraform
