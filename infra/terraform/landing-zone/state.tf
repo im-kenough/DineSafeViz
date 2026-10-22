@@ -65,10 +65,8 @@ resource "azurerm_storage_container" "landing_zone" {
   }
 }
 
-# Both IDs are used by rbac.tf in Task 3.
+# Both IDs are used by rbac.tf.
 locals {
-  # tflint-ignore: terraform_unused_declarations
-  tfstate_container_id = "${azurerm_storage_account.tfstate.id}/blobServices/default/containers/${azurerm_storage_container.tfstate.name}"
-  # tflint-ignore: terraform_unused_declarations
+  tfstate_container_id      = "${azurerm_storage_account.tfstate.id}/blobServices/default/containers/${azurerm_storage_container.tfstate.name}"
   landing_zone_container_id = "${azurerm_storage_account.tfstate.id}/blobServices/default/containers/${azurerm_storage_container.landing_zone.name}"
 }
