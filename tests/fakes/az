@@ -1,9 +1,36 @@
 #!/usr/bin/env bash
-# Test double for az, used through PATH by tests/test_pipeline_sh.py and
-# tests/test_deploy.py (dev mode).
+# Test double for az, used through PATH by tests/test_pipeline_sh.py,
+# tests/test_deploy.py (dev mode), and tests/test_bootstrap.py.
+#
+# `account show` returns $FAKE_AZ_SUBSCRIPTION, `ad group show` an all-zero
+# object ID, and `role assignment list` an all-zero assignment ID at the
+# given scope, or nothing for a role named in $FAKE_AZ_MISSING_ROLE.
 echo "az $*" >> "${FAKE_LOG:-/dev/null}"
 if [[ -n ${FAKE_AZ_LOGGED_OUT:-} ]]; then
   echo "ERROR: Please run 'az login' to setup account." >&2
   exit 1
 fi
-echo "fake-user-token"
+case "$1 $2" in
+  "account show")
+    echo "${FAKE_AZ_SUBSCRIPTION:-}"
+    ;;
+  "ad group")
+    echo "00000000-0000-0000-0000-000000000000"
+    ;;
+  "role assignment")
+    role="" scope=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --role) role=$2; shift ;;
+        --scope) scope=$2; shift ;;
+      esac
+      shift
+    done
+    if [[ $role != "${FAKE_AZ_MISSING_ROLE:-}" ]]; then
+      echo "$scope/providers/Microsoft.Authorization/roleAssignments/00000000-0000-0000-0000-000000000001"
+    fi
+    ;;
+  *)
+    echo "fake-user-token"
+    ;;
+esac

@@ -79,3 +79,26 @@ lint: ## fmt, validate, tflint, and shellcheck
 
 test: ## Run the tooling's own tests
 	terraform/tests/test-plan-summary.sh
+
+BOOTSTRAP_DIR = terraform/landing-zone
+
+bootstrap: ## First landing zone plan for ENV, with local state and imports
+	@if [[ -f $(BOOTSTRAP_DIR)/backend_override.tf ]]; then \
+	  echo "ERROR: a bootstrap is already in progress:" >&2; \
+	  grep path $(BOOTSTRAP_DIR)/backend_override.tf >&2; \
+	  echo "Finish it with make migrate, or delete backend_override.tf and imports.tf." >&2; exit 1; fi
+	@$(MAKE) check-env ENV=$(ENV)
+	printf 'terraform {\n  backend "local" {\n    path = "../envs/%s/landing-zone.bootstrap.tfstate"\n  }\n}\n' $(ENV) > $(BOOTSTRAP_DIR)/backend_override.tf
+	$(BOOTSTRAP_DIR)/gen-imports.sh $(ENV) > $(BOOTSTRAP_DIR)/imports.tf
+	$(MAKE) plan ENV=$(ENV) LAYER=landing-zone
+
+# Doesn't delete the local state file. Delete it yourself after the plan at
+# the end shows no changes.
+migrate: ## Move ENV's landing zone state from local to its state account
+	@$(MAKE) check-env ENV=$(ENV)
+	@grep -q 'envs/$(ENV)/' $(BOOTSTRAP_DIR)/backend_override.tf 2>/dev/null || [[ ! -f $(BOOTSTRAP_DIR)/backend_override.tf ]] || { \
+	  echo "ERROR: the bootstrap in progress isn't for ENV=$(ENV)." >&2; exit 1; }
+	rm -f $(BOOTSTRAP_DIR)/backend_override.tf $(BOOTSTRAP_DIR)/imports.tf
+	terraform -chdir=$(BOOTSTRAP_DIR) init -input=false -migrate-state -force-copy \
+	  -backend-config=../envs/$(ENV)/landing-zone.backend.hcl
+	$(MAKE) plan ENV=$(ENV) LAYER=landing-zone
