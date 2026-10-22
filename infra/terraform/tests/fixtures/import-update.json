@@ -1,0 +1,5 @@
+{"resource_changes": [
+  {"address": "azuread_group.operators", "mode": "managed", "change": {"actions": ["update"], "importing": {"id": "/groups/x"}}},
+  {"address": "azurerm_consumption_budget_subscription.monthly", "mode": "managed", "change": {"actions": ["no-op"], "importing": {"id": "/subscriptions/x"}}},
+  {"address": "azurerm_storage_account.tfstate", "mode": "managed", "change": {"actions": ["no-op"]}}
+]}

@@ -1,0 +1,14 @@
+# Provider plugins and backend settings, recreated by `terraform init`.
+.terraform/
+# State is remote. Local state exists only during a landing zone bootstrap.
+*.tfstate
+*.tfstate.*
+# Saved plans can contain sensitive values.
+*.tfplan
+*.tfplan.json
+# Values that can't be published: copy the .example file next to each.
+*.secret.tfvars
+# Written by `make bootstrap`, removed by `make migrate`.
+*_override.tf
+landing-zone/imports.tf
+crash.log
