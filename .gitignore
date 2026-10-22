@@ -1,3 +1,4 @@
+.vscode/
 .claude/
 **/CLAUDE.MD
 **/GEMINI.md
@@ -5,6 +6,10 @@
 **/.superpowers/
 **/superpowers/
 **/journal/
+
+**/factory/
+**/scratch/
+**/_scratch/
 
 #ignore actual config values
 **/dev.env
