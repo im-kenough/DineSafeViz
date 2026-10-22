@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Test double for terraform, used through PATH by tests/test_bootstrap.py.
+# Logs its arguments to $FAKE_LOG and succeeds.
+echo "terraform $*" >> "${FAKE_LOG:-/dev/null}"
