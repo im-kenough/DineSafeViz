@@ -91,3 +91,52 @@ def test_access_log_records_cloudflare_visitor_ip(local_nginx):
     get(url + "/", headers={"CF-Connecting-IP": "203.0.113.7"})
     time.sleep(0.5)
     assert "cf=203.0.113.7" in docker("logs", name).stdout
+
+
+# /search is rate-limited per visitor (#348). The fixtures are module-scoped,
+# so each test uses its own CF-Connecting-IP to get a fresh bucket.
+def burst(url, headers=None, count=30):
+    return [get(url + "/search?q=que", headers=headers)[0] for _ in range(count)]
+
+
+def test_search_burst_is_rate_limited(local_nginx):
+    _, url = local_nginx
+    statuses = burst(url, {"CF-Connecting-IP": "203.0.113.10"})
+    assert statuses[0] == 502
+    assert set(statuses) <= {502, 429}
+    assert 429 in statuses
+
+
+def test_search_limit_leaves_other_routes_alone(local_nginx):
+    _, url = local_nginx
+    headers = {"CF-Connecting-IP": "203.0.113.11"}
+    assert 429 in burst(url, headers)
+    assert get(url + "/", headers=headers)[0] == 502
+    assert get(url + "/establishment/x", headers=headers)[0] == 502
+
+
+def test_search_limit_is_per_client(local_nginx):
+    _, url = local_nginx
+    assert 429 in burst(url, {"CF-Connecting-IP": "203.0.113.12"})
+    assert get(url + "/search?q=que", headers={"CF-Connecting-IP": "198.51.100.12"})[0] == 502
+
+
+def test_search_limit_falls_back_to_remote_addr(local_nginx):
+    _, url = local_nginx
+    assert 429 in burst(url)
+
+
+def test_search_gets_the_same_proxy_headers_as_root():
+    conf = (ROOT / "src/dsv-nginx/nginx.conf").read_text()
+
+    def block(start):
+        body = conf[conf.index(start):]
+        return body[: body.index("}")]
+
+    def headers(text):
+        return sorted(line.strip() for line in text.splitlines() if "proxy_set_header" in line)
+
+    search, root = block("location = /search {"), block("location / {")
+    assert "proxy_pass         http://app;" in search
+    assert headers(search) == headers(root)
+    assert len(headers(search)) == 4
