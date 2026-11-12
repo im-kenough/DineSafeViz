@@ -148,8 +148,8 @@ def test_pager_on_first_page(client):
     assert html.index("</ul>") < html.index('<nav class="pager"')
     assert '<span class="nav-btn disabled" aria-disabled="true" aria-label="Previous page">‹</span>' in pager
     assert '<span class="nav-btn active" aria-current="page">1</span>' in pager
-    assert '<a class="nav-btn" href="/search?q=pizza&amp;page=2">2</a>' in pager
-    assert '<a class="nav-btn" href="/search?q=pizza&amp;page=4">4</a>' in pager
+    assert '<a class="nav-btn" href="/search?q=pizza&amp;page=2" rel="nofollow">2</a>' in pager
+    assert '<a class="nav-btn" href="/search?q=pizza&amp;page=4" rel="nofollow">4</a>' in pager
     assert 'href="/search?q=pizza&amp;page=1"' not in pager
     assert re.search(r'<a class="nav-btn" href="/search\?q=pizza&amp;page=2"[^>]*aria-label="Next page"[^>]*>›</a>', pager)
 
@@ -169,6 +169,33 @@ def test_pager_shows_gaps(client):
     assert numbers == ["1", "…", "4", "5", "6", "…", "20"]
 
 
+def test_pager_links_are_nofollow(client):
+    html, _ = _search(client, page="2", rows=_page(157, 2))
+    pager = _pager(html)
+    links = re.findall(r"<a [^>]*>", pager)
+    assert links
+    assert len(links) == len([a for a in links if re.search(r'rel="[^"]*nofollow"', a)])
+    assert '<a class="nav-btn" href="/search?q=pizza&amp;page=1" rel="prev nofollow" aria-label="Previous page">‹</a>' in pager
+    assert '<a class="nav-btn" href="/search?q=pizza&amp;page=3" rel="next nofollow" aria-label="Next page">›</a>' in pager
+    assert '<a class="nav-btn" href="/search?q=pizza&amp;page=1" rel="nofollow">1</a>' in pager
+    assert '<a class="nav-btn" href="/search?q=pizza&amp;page=3" rel="nofollow">3</a>' in pager
+
+
+@pytest.mark.parametrize("page", ["1", "4"])
+def test_pager_spans_have_no_rel(client, page):
+    html, _ = _search(client, page=page, rows=_page(157, int(page)))
+    spans = re.findall(r"<span [^>]*>", _pager(html))
+    assert any("disabled" in s for s in spans) and any("active" in s for s in spans)
+    assert not any("rel=" in s for s in spans)
+
+
+def test_pager_gap_is_aria_hidden(client):
+    html, _ = _search(client, page="5", total=1000)
+    pager = _pager(html)
+    assert pager.count('<span aria-hidden="true">…</span>') == 2
+    assert pager.count("…") == 2
+
+
 @pytest.mark.parametrize("page, pages, window", [
     (5, 20, [1, None, 4, 5, 6, None, 20]),
     (1, 4, [1, 2, 3, 4]),
@@ -184,7 +211,7 @@ def test_page_window(page, pages, window):
 
 def test_pager_links_keep_encoded_query(client):
     html, _ = _search(client, q="burger king")
-    assert '<a class="nav-btn" href="/search?q=burger+king&amp;page=2">2</a>' in _pager(html)
+    assert '<a class="nav-btn" href="/search?q=burger+king&amp;page=2" rel="nofollow">2</a>' in _pager(html)
 
 
 def test_pager_links_escape_script(client):
@@ -196,9 +223,12 @@ def test_pager_links_escape_script(client):
 
 # -- CSS -----------------------------------------------------------------------
 
+def _css():
+    return re.sub(r"/\*.*?\*/", "", _STYLE_CSS.read_text(), flags=re.S)
+
+
 def _css_rule(selector):
-    css = re.sub(r"/\*.*?\*/", "", _STYLE_CSS.read_text(), flags=re.S)
-    for selectors, body in re.findall(r"([^{}]+)\{([^}]*)\}", css):
+    for selectors, body in re.findall(r"([^{}]+)\{([^}]*)\}", _css()):
         if selector in (" ".join(s.split()) for s in selectors.split(",")):
             return body
     return None
@@ -215,3 +245,20 @@ def test_pager_css():
     assert "pointer-events: none" in disabled
     for body in (pager, disabled):
         assert "#" not in body
+
+
+def test_pager_buttons_are_tap_sized():
+    body = _css_rule(".pager .nav-btn")
+    assert body is not None
+    for decl in ("min-width: 44px", "min-height: 44px", "display: inline-flex",
+                 "align-items: center", "justify-content: center"):
+        assert decl in body
+    assert "#" not in body
+
+
+def test_pager_buttons_rule_is_not_in_media_block():
+    css = _css()
+    match = re.search(r"(?:^|[}\s])\.pager \.nav-btn\s*\{", css)
+    assert match is not None
+    before = css[:match.start()]
+    assert before.count("{") == before.count("}")

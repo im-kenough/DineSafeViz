@@ -129,7 +129,8 @@ def test_query_is_html_escaped(client):
 
 def test_search_page_is_noindex_with_title(client):
     html, _, _ = _search(client, "pizza", [_result()])
-    assert '<meta name="robots" content="noindex">' in html
+    assert '<meta name="robots" content="noindex, nofollow">' in html
+    assert 'content="noindex">' not in html
     assert "<title>DineSafeViz - Search</title>" in html
 
 
