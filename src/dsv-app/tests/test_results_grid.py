@@ -1,6 +1,7 @@
 """Search results sit in a 3/2/1 column grid of stacked cards, CSS only (#363)."""
 import re
 from datetime import date
+from functools import cache
 from pathlib import Path
 from unittest.mock import patch
 
@@ -41,16 +42,21 @@ def _css_rules(css):
     return re.findall(r"([^{}]+)\{([^}]*)\}", css)
 
 
+def _block_end(css, start):
+    """Index just past the `}` that closes the block whose body starts at start."""
+    depth, i = 1, start
+    while depth:
+        depth += {"{": 1, "}": -1}.get(css[i], 0)
+        i += 1
+    return i
+
+
+@cache
 def _top_level_css():
     """style.css with every @media block removed, so only base rules remain."""
     css = _STYLE_CSS.read_text()
     while (at := css.find("@media")) != -1:
-        i = css.index("{", at) + 1
-        depth = 1
-        while depth:
-            depth += {"{": 1, "}": -1}.get(css[i], 0)
-            i += 1
-        css = css[:at] + css[i:]
+        css = css[:at] + css[_block_end(css, css.index("{", at) + 1):]
     return css
 
 
@@ -58,11 +64,7 @@ def _media_block(query):
     """Inner text of the first `@media <query>` block in style.css."""
     css = _STYLE_CSS.read_text()
     start = css.index("{", css.index(f"@media {query}")) + 1
-    depth, i = 1, start
-    while depth:
-        depth += {"{": 1, "}": -1}.get(css[i], 0)
-        i += 1
-    return css[start:i - 1]
+    return css[start:_block_end(css, start) - 1]
 
 
 def _own_rule(selector, css=None):
