@@ -33,7 +33,8 @@ ROWS = [
     ("Y1", "Big Zorbo", "Restaurant", "4 Bay St", None, "Pass", "2026-09-01"),
 ]
 
-# More prefix matches than the page holds (SEARCH_LIMIT + 1 of them survive).
+# More prefix matches than a page holds: Z01-Z50 fill page 1, Z51-Z55 and Y1
+# make page 2.
 # Z01 is the most recently inspected, Z55 the least. Each has an older
 # inspection too, so the totals come from rows outside the page's latest row.
 ZORBO = 55
@@ -62,16 +63,26 @@ def search_db():
         yield name
 
 
-def search(name, terms):
-    """Run the app's search query as dinesafe_app. Returns the result dicts."""
+def _run(name, query):
+    """Run one (sql, params) pair as dinesafe_app. Returns the result dicts."""
     conn = psycopg2.connect(
         host=container_ip(name), dbname="dinesafe", user="dinesafe_app",
         password=APP_PW, connect_timeout=5,
     )
     with closing(conn), conn.cursor() as cur:
-        cur.execute(*app_module.search_query(terms))
+        cur.execute(*query)
         columns = [c.name for c in cur.description]
         return [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
+
+
+def search(name, terms, page=1):
+    """Run the app's search page query. Returns the result dicts."""
+    return _run(name, app_module.search_query(terms, page))
+
+
+def count(name, terms):
+    """Run the app's search count query. Returns the total."""
+    return _run(name, app_module.search_count_query(terms))[0]["total"]
 
 
 def test_pizza_ranks_prefix_then_recent(search_db):
@@ -109,13 +120,33 @@ def test_nameless_row_does_not_outrank_prefix_match(search_db):
 
 
 def test_limit_keeps_the_best_ranked_page(search_db):
-    results = search(search_db, ["zorbo"])
+    results = search(search_db, ["zorbo"], 1)
     # Prefix matches beat the newer Y1, then newest first; the limit trims the rest.
-    assert len(results) == app_module.SEARCH_LIMIT + 1
     assert [r["establishment_id"] for r in results] == [
-        f"Z{n:02d}" for n in range(1, app_module.SEARCH_LIMIT + 2)
+        f"Z{n:02d}" for n in range(1, app_module.SEARCH_LIMIT + 1)
     ]
     for r in results:
         assert r["inspection_count"] == 2
         assert str(r["first_inspected"]) == "2020-01-01"
         assert r["establishment_type"] == "Restaurant"
+
+
+def test_count_is_every_matching_establishment(search_db):
+    assert count(search_db, ["zorbo"]) == ZORBO + 1
+    assert count(search_db, ["pizza"]) == 3
+    assert count(search_db, ["sushi", "queen"]) == 1
+    assert count(search_db, ["nomatch"]) == 0
+
+
+def test_page_two_has_the_rest(search_db):
+    results = search(search_db, ["zorbo"], 2)
+    assert [r["establishment_id"] for r in results] == [
+        f"Z{n:02d}" for n in range(app_module.SEARCH_LIMIT + 1, ZORBO + 1)
+    ] + ["Y1"]
+
+
+def test_pages_have_no_repeats_or_gaps(search_db):
+    ids = [r["establishment_id"] for page in (1, 2) for r in search(search_db, ["zorbo"], page)]
+    assert len(ids) == len(set(ids)) == count(search_db, ["zorbo"])
+    assert set(ids) == {f"Z{n:02d}" for n in range(1, ZORBO + 1)} | {"Y1"}
+    assert search(search_db, ["zorbo"], 3) == []

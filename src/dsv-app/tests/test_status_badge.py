@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from db_fakes import rows_conn
+from db_fakes import search_conn
 
 _STYLE_CSS = Path(__file__).resolve().parent.parent / "static" / "style.css"
 EST_ID = "001Vo000013QjdPIAS"
@@ -50,7 +50,7 @@ def _search_result(status="Conditional Pass"):
 
 
 def _get(client, url, rows):
-    with patch("app.psycopg2.connect", return_value=rows_conn(rows)):
+    with patch("app.psycopg2.connect", return_value=search_conn(rows)):
         resp = client.get(url)
     assert resp.status_code == 200
     return resp.data.decode()

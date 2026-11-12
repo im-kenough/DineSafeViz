@@ -117,6 +117,18 @@ h2.page-heading {
 }
 .nav-btn.active,
 .nav-btn:hover:not(.active) { background: #2952d9; color: #fff; }
+/* search result page links, below the results */
+.pager {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+.nav-btn.disabled { color: var(--text-muted); border-color: var(--border); pointer-events: none; }
 .nav-btn:focus-visible,
 .est-link:focus-visible,
 .result-card:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }

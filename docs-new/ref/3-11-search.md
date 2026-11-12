@@ -26,10 +26,10 @@ can be added later without changing this design.
 Search adds two pages to the Flask app. Both reuse the existing styles, error
 pages, and database connection pool.
 
-| Route                               | Shows                                                                                      | Database work                                                 |
-| ----------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| `/search?q=pizza`                   | Up to 50 matching restaurants, each with its latest result, address, and inspection count. | One query, only when `q` has a word of 3 or more characters.  |
-| `/establishment/<establishment_id>` | Every inspection for one establishment ID, newest first, in the `/inspections` day boxes.  | One lookup by ID. A malformed ID returns 404 without a query. |
+| Route                               | Shows                                                                                                                       | Database work                                                                                                                       |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `/search?q=pizza&page=2`            | The number of matching restaurants, and one page of 50 of them, each with its latest result, address, and inspection count. | A count and a page query, only when `q` has a word of 3 or more characters. The page query is skipped when the page would be empty. |
+| `/establishment/<establishment_id>` | Every inspection for one establishment ID, newest first, in the `/inspections` day boxes.                                   | One lookup by ID. A malformed ID returns 404 without a query.                                                                       |
 
 On `/inspections`, each restaurant name links to its restaurant page.
 
@@ -83,26 +83,57 @@ For example, `Pizza Queen St` becomes `pizza` and `queen`. A restaurant
 matches when one of its rows has every word, each in the name or the
 address.
 
+The `page` parameter picks which 50 results to show (`parse_page()`). It
+must be plain ASCII digits. A missing, empty, or `0` page, or anything else
+(for example, `-1`, `+2`, `1.5`, or `²`), shows page 1.
+
+### The count query
+
+`_SEARCH_COUNT_QUERY` counts the matching restaurants with
+`COUNT(DISTINCT establishment_id)`, using the same `WHERE` as the `ids` step
+below. The results heading shows this total, for example `157 restaurants`.
+The total also sets the page count: 50 per page, rounded up.
+
+When the total is 0, or the page is past the last one, the app skips the
+search query. A huge `page` never reaches Postgres as an `OFFSET`.
+
+The count and the page are two statements, so a data load that lands between
+them can shift the results by a row. That's accepted.
+
 ### The search query
 
-One SQL statement, `_SEARCH_QUERY`, works in four steps:
+One SQL statement, `_SEARCH_QUERY`, fetches one page in four steps:
 
 1. **`ids`:** find each `establishment_id` with a row where every word is in
    the name or the address. The trigram indexes do this.
 2. **`latest`:** for each ID, take its newest row for the name, street, unit,
    status, and date. The `establishment_id` index finds the rows.
-3. **`page`:** sort the latest rows and keep the first 51. Names that start
-   with the first word sort first, then the most recently inspected, then name
-   and ID.
-4. **`totals`:** for each of those 51 IDs, across all its rows, count the
+3. **`page`:** sort the latest rows, skip the earlier pages, and keep the
+   next 50 (`LIMIT 50 OFFSET (page - 1) * 50`). Names that start with the first
+   word sort first, then the most recently inspected, then name and ID.
+4. **`totals`:** for each of those 50 IDs, across all its rows, count the
    inspections and find the first date and the type.
 
 The sort needs only the latest rows, so `totals` runs for one page, not for
-every match. The query asks for 51 rows, so the page can say "50+" when there
-are more.
+every match. The limit and offset are query parameters, like the words.
 
 The SQL text never contains user input. `psycopg2.sql` repeats one fixed
 `WHERE` fragment per word, and each word goes in as a query parameter.
+
+### Pager
+
+When there's more than one page, a pager below the results links to the
+other pages. It's plain links, server-rendered, with no JavaScript:
+
+- A previous arrow (`‹`) and a next arrow (`›`). On the first or last page,
+  the arrow is shown but isn't a link.
+- The first page, the last page, and the pages next to the current one
+  (`page_window()`). An ellipsis (`…`) stands in for a run of two or more
+  pages; a single hidden page is shown instead.
+- The current page, highlighted and not a link.
+
+Each link keeps `q`, for example `/search?q=burger+king&page=2`. A page past
+the end shows the total, "No results on page 9.", and a link to page 1.
 
 ### Indexes
 
@@ -132,11 +163,11 @@ two results. Each result's first and latest dates tell them apart.
 
 The feature lives in these files.
 
-| File                                           | Role                                                                                                                                               |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/dsv-db/migrations/002_search_indexes.sql` | The extension and the three indexes.                                                                                                               |
-| `src/dsv-app/app.py`                           | `search_terms()`, `like_pattern()`, `search_query()`, `_search_establishments()`, `_fetch_establishment()`, `build_history()`, and the two routes. |
-| `src/dsv-app/templates/_search.html`           | The search form, shared by the nav and the home hero.                                                                                              |
-| `src/dsv-app/templates/search.html`            | The results page.                                                                                                                                  |
-| `src/dsv-app/templates/establishment.html`     | The restaurant page.                                                                                                                               |
-| `tests/test_search_sql.py`                     | Runs the search query against the real Postgres image.                                                                                             |
+| File                                           | Role                                                                                                                                                                                                        |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/dsv-db/migrations/002_search_indexes.sql` | The extension and the three indexes.                                                                                                                                                                        |
+| `src/dsv-app/app.py`                           | `search_terms()`, `like_pattern()`, `search_count_query()`, `search_query()`, `parse_page()`, `page_window()`, `_search_establishments()`, `_fetch_establishment()`, `build_history()`, and the two routes. |
+| `src/dsv-app/templates/_search.html`           | The search form, shared by the nav and the home hero.                                                                                                                                                       |
+| `src/dsv-app/templates/search.html`            | The results page.                                                                                                                                                                                           |
+| `src/dsv-app/templates/establishment.html`     | The restaurant page.                                                                                                                                                                                        |
+| `tests/test_search_sql.py`                     | Runs the count and search queries against the real Postgres image.                                                                                                                                          |
