@@ -346,7 +346,7 @@ def test_details_has_no_label(client):
 
 def test_inspection_status_uppercase_and_formatted_like_name(client):
     results = _results_html(client, [_row()])
-    assert '<span class="label">Inspection Status</span> <strong>PASS</strong>' in results
+    assert '<span class="label">Inspection Status</span> <strong class="status-badge">PASS</strong>' in results
 
 
 def test_infraction_counts_under_address(client):

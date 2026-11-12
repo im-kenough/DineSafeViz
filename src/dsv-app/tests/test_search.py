@@ -84,7 +84,7 @@ def test_results_render_cards_linking_to_history(client):
     assert 'class="result-card status-conditional"' in html
     assert "123 Queen St W Unit 2" in html
     assert '<span class="label">Last inspected</span> October 3, 2026' in html
-    assert "<strong>CONDITIONAL PASS</strong>" in html
+    assert '<strong class="status-badge">CONDITIONAL PASS</strong>' in html
     assert "14 inspections since 2019" in html
     assert html.index("Pizza Pizza") < html.index("Pizza Nova")
 
