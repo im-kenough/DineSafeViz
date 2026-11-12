@@ -8,6 +8,7 @@ def test_nav_has_search_form(client):
     assert '<form class="search-form nav-search" role="search" action="/search" method="get">' in html
     assert '<label class="visually-hidden" for="nav-q">Search restaurants by name or address</label>' in html
     assert 'id="nav-q" name="q" value=""' in html
+    assert 'placeholder="Enter restaurant name"' in html
     assert 'minlength="3" maxlength="100" required' in html
 
 

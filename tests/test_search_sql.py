@@ -1,6 +1,7 @@
 """The app's search SQL against the real Postgres image, migrated."""
 import sys
 from contextlib import closing
+from datetime import date, timedelta
 
 import psycopg2
 import pytest
@@ -25,7 +26,23 @@ ROWS = [
     ("C1", "Sushi Place", "Restaurant", "55 Queen St W", None, "Pass", "2026-09-01"),
     ("D1", "100% Burgers", "Restaurant", "1 Bay St", None, "Pass", "2026-02-02"),
     ("E1", "1000 Burgers", "Restaurant", "2 Bay St", None, "Pass", "2026-02-03"),
+    # A nameless latest row must not outrank a real prefix match.
+    ("Q1", "Quux Cafe", "Restaurant", "3 Bay St", None, "Pass", "2025-01-01"),
+    ("Q2", None, "Restaurant", "1 Quux St", None, "Pass", "2026-01-01"),
+    # One establishment that matches on the address only, newer than all of Z.
+    ("Y1", "Big Zorbo", "Restaurant", "4 Bay St", None, "Pass", "2026-09-01"),
 ]
+
+# More prefix matches than the page holds (SEARCH_LIMIT + 1 of them survive).
+# Z01 is the most recently inspected, Z55 the least. Each has an older
+# inspection too, so the totals come from rows outside the page's latest row.
+ZORBO = 55
+for _n in range(1, ZORBO + 1):
+    _last = str(date(2026, 8, 1) - timedelta(days=_n))
+    ROWS += [
+        (f"Z{_n:02d}", f"Zorbo {_n}", "Restaurant", "5 Bay St", None, "Pass", _last),
+        (f"Z{_n:02d}", f"Zorbo {_n}", "Restaurant", "5 Bay St", None, "Pass", "2020-01-01"),
+    ]
 
 
 @pytest.fixture(scope="module")
@@ -85,3 +102,20 @@ def test_result_columns_match_the_template(search_db):
         "establishment_status", "last_inspected", "inspection_count",
         "first_inspected", "establishment_type",
     ]
+
+
+def test_nameless_row_does_not_outrank_prefix_match(search_db):
+    assert [r["establishment_id"] for r in search(search_db, ["quux"])] == ["Q1", "Q2"]
+
+
+def test_limit_keeps_the_best_ranked_page(search_db):
+    results = search(search_db, ["zorbo"])
+    # Prefix matches beat the newer Y1, then newest first; the limit trims the rest.
+    assert len(results) == app_module.SEARCH_LIMIT + 1
+    assert [r["establishment_id"] for r in results] == [
+        f"Z{n:02d}" for n in range(1, app_module.SEARCH_LIMIT + 2)
+    ]
+    for r in results:
+        assert r["inspection_count"] == 2
+        assert str(r["first_inspected"]) == "2020-01-01"
+        assert r["establishment_type"] == "Restaurant"

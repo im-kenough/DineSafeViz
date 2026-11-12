@@ -5,6 +5,8 @@
     <style>
         .home-shell {
             display: grid;
+            /* minmax(0, ...) stops the search input's default width from widening the page on small phones */
+            grid-template-columns: minmax(0, 1fr);
             gap: 1.5rem;
         }
         .hero {

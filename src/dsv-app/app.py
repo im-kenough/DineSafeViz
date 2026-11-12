@@ -56,6 +56,12 @@ STATUS_ORDER = {
     "Conditional Pass": 1,
     "Pass": 2,
 }
+# CSS class for each status's card accent (_days.html, search.html).
+STATUS_CLASS = {
+    "Closed": "status-closed",
+    "Conditional Pass": "status-conditional",
+    "Pass": "status-pass",
+}
 SEVERITY_ORDER = {
     "C - Crucial": 0,
     "S - Significant": 1,
@@ -223,18 +229,23 @@ def _db_cursor(connect_timeout: int = 5, **cursor_kwargs):
         cursor.release()
 
 
+# Every column _days.html renders, for the date-range and per-establishment fetches.
+_INSPECTION_SELECT = (
+    "SELECT inspection_date, establishment_status, action, infraction_details,"
+    "       establishment_name, establishment_address, establishment_type,"
+    "       street, unit, postal_code,"
+    "       outcome, outcome_date, amount_fined,"
+    "       establishment_id, severity,"
+    "       infraction_category"
+    " FROM inspections"
+)
+
+
 def _fetch_inspections(start: date, end: date) -> List[Dict]:
     """Fetch inspection rows between start and end (inclusive)."""
     with _db_cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(
-            "SELECT inspection_date, establishment_status, action, infraction_details,"
-            "       establishment_name, establishment_address, establishment_type,"
-            "       street, unit, postal_code,"
-            "       outcome, outcome_date, amount_fined,"
-            "       establishment_id, severity,"
-            "       infraction_category"
-            " FROM inspections"
-            " WHERE inspection_date BETWEEN %s AND %s",
+            _INSPECTION_SELECT + " WHERE inspection_date BETWEEN %s AND %s",
             (start, end),
         )
         return cur.fetchall()
@@ -244,14 +255,7 @@ def _fetch_establishment(establishment_id: str) -> List[Dict]:
     """Fetch every row for one establishment, in any order."""
     with _db_cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(
-            "SELECT inspection_date, establishment_status, action, infraction_details,"
-            "       establishment_name, establishment_address, establishment_type,"
-            "       street, unit, postal_code,"
-            "       outcome, outcome_date, amount_fined,"
-            "       establishment_id, severity,"
-            "       infraction_category"
-            " FROM inspections"
-            " WHERE establishment_id = %s",
+            _INSPECTION_SELECT + " WHERE establishment_id = %s",
             (establishment_id,),
         )
         return cur.fetchall()
@@ -267,7 +271,8 @@ _SEARCH_MATCH = sql.SQL("(establishment_name ILIKE %s OR establishment_address I
 # Finds the matching establishment IDs, then summarizes all of each one's rows:
 # a match on one row (say, before a rename) still counts every inspection.
 # Names starting with the first word rank first, then the most recently
-# inspected, then name and ID so the order is stable.
+# inspected, then name and ID so the order is stable. Ranking and LIMIT need
+# only each one's latest row, so the totals are counted for the page alone.
 _SEARCH_QUERY = sql.SQL("""
 WITH ids AS (
     SELECT DISTINCT establishment_id FROM inspections WHERE {match}
@@ -279,21 +284,25 @@ latest AS (
     FROM inspections i JOIN ids USING (establishment_id)
     ORDER BY i.establishment_id, i.inspection_date DESC, i.id DESC
 ),
-totals AS (
-    SELECT i.establishment_id,
-           COUNT(DISTINCT i.inspection_date) AS inspection_count,
-           MIN(i.inspection_date) AS first_inspected,
-           MAX(i.establishment_type) AS establishment_type
-    FROM inspections i JOIN ids USING (establishment_id)
-    GROUP BY i.establishment_id
+page AS (
+    SELECT latest.*, ROW_NUMBER() OVER (
+               ORDER BY COALESCE(establishment_name ILIKE %s, false) DESC,
+                        last_inspected DESC, establishment_name, establishment_id
+           ) AS rank
+    FROM latest
+    ORDER BY rank
+    LIMIT %s
 )
-SELECT latest.*, totals.inspection_count, totals.first_inspected, totals.establishment_type
-FROM latest JOIN totals USING (establishment_id)
-ORDER BY latest.establishment_name ILIKE %s DESC,
-         latest.last_inspected DESC,
-         latest.establishment_name,
-         latest.establishment_id
-LIMIT %s
+SELECT page.establishment_id, page.establishment_name, page.street, page.unit,
+       page.establishment_status, page.last_inspected,
+       totals.inspection_count, totals.first_inspected, totals.establishment_type
+FROM page CROSS JOIN LATERAL (
+    SELECT COUNT(DISTINCT inspection_date) AS inspection_count,
+           MIN(inspection_date) AS first_inspected,
+           MAX(establishment_type) AS establishment_type
+    FROM inspections WHERE establishment_id = page.establishment_id
+) totals
+ORDER BY page.rank
 """)
 
 
@@ -328,7 +337,10 @@ def search_query(terms: List[str]) -> Tuple[sql.Composed, List]:
     the page can tell there are more.
     """
     match = sql.SQL(" AND ").join([_SEARCH_MATCH] * len(terms))
-    params: List = [pattern for term in terms for pattern in (like_pattern(term),) * 2]
+    params: List = []
+    for term in terms:
+        pattern = like_pattern(term)
+        params += [pattern, pattern]
     params += [like_pattern(terms[0], prefix=True), SEARCH_LIMIT + 1]
     return _SEARCH_QUERY.format(match=match), params
 
@@ -540,6 +552,14 @@ def _pick(args: Dict[str, str], key: str, valid: List[int]) -> int:
 # Inspection grouping and sorting
 # ---------------------------------------------------------------------------
 
+def _rows_by_date(rows: List[Dict]) -> Dict[date, List[Dict]]:
+    """Bucket rows by their inspection_date."""
+    by_date = collections.defaultdict(list)
+    for row in rows:
+        by_date[row["inspection_date"]].append(row)
+    return by_date
+
+
 def build_days(rows: List[Dict], start: date, end: date) -> List[Tuple[date, List[Dict]]]:
     """Group inspections by date and establishment, newest date first.
 
@@ -555,9 +575,7 @@ def build_days(rows: List[Dict], start: date, end: date) -> List[Tuple[date, Lis
         A list of (date, inspections) tuples ordered from end to start (newest first).
         Each tuple contains a date and a status-sorted list of establishments for that date.
     """
-    by_date = collections.defaultdict(list)
-    for row in rows:
-        by_date[row["inspection_date"]].append(row)
+    by_date = _rows_by_date(rows)
 
     days = []
     d = end
@@ -580,9 +598,7 @@ def build_history(rows: List[Dict]) -> List[Tuple[date, List[Dict]]]:
         A list of (date, [establishment]) tuples ordered newest first. Each
         list holds the one grouped establishment from group_establishments.
     """
-    by_date = collections.defaultdict(list)
-    for row in rows:
-        by_date[row["inspection_date"]].append(row)
+    by_date = _rows_by_date(rows)
     return [(d, group_establishments(by_date[d])) for d in sorted(by_date, reverse=True)]
 
 
@@ -685,6 +701,16 @@ def inject_globals():
     }
 
 
+# Constants, as globals so imported macros (_search.html) see them too.
+app.jinja_env.globals.update(
+    status_class=STATUS_CLASS,
+    search_min_term=SEARCH_MIN_TERM,
+    search_max_len=SEARCH_MAX_LEN,
+    search_limit=SEARCH_LIMIT,
+)
+app.jinja_env.filters["longdate"] = lambda d: d.strftime("%B %-d, %Y")
+
+
 # ---------------------------------------------------------------------------
 # Page routes
 # ---------------------------------------------------------------------------
@@ -772,13 +798,7 @@ def establishment(establishment_id):
     if not rows:
         abort(404)
     days = build_history(rows)
-    return render_template(
-        "establishment.html",
-        est=days[0][1][0],
-        days=days,
-        first_date=days[-1][0],
-        last_date=days[0][0],
-    )
+    return render_template("establishment.html", est=days[0][1][0], days=days)
 
 
 @app.route("/search")
@@ -797,7 +817,6 @@ def search():
         terms=terms,
         results=results[:SEARCH_LIMIT],
         more=len(results) > SEARCH_LIMIT,
-        limit=SEARCH_LIMIT,
     )
 
 

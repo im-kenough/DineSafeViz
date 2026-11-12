@@ -4,35 +4,27 @@
     <meta name="robots" content="noindex">
 {% endblock %}
 {% block content %}
-    {% set status_class = {
-        'Closed':           'status-closed',
-        'Conditional Pass': 'status-conditional',
-        'Pass':             'status-pass'
-    } %}
     {% set hint = 'Search by restaurant name or address, like pizza or queen.' %}
-    {% if not q %}
+    {% if not terms %}
     <h2 class="page-heading">Search restaurants</h2>
-    <p class="no-data">{{ hint }}</p>
-    {% elif not terms %}
-    <h2 class="page-heading">Search restaurants</h2>
-    <p class="no-data">Type a word of at least 3 characters.</p>
+    <p class="no-data">{{ hint if not q else 'Type a word of at least %d characters.' % search_min_term }}</p>
     {% elif not results %}
     <h2 class="page-heading">Results for "{{ q }}"</h2>
     <p class="no-data">No restaurants match "{{ q }}". {{ hint }}</p>
     {% else %}
     {% set count = results | length %}
-    <h2 class="page-heading">Results for "{{ q }}"<span class="heading-dates">{% if more %}{{ limit }}+ restaurants. Showing the first {{ limit }}. Add a word to narrow it down.{% else %}{{ count }} restaurant{{ 's' if count != 1 }}{% endif %}</span></h2>
+    <h2 class="page-heading">Results for "{{ q }}"<span class="heading-dates">{% if more %}{{ search_limit }}+ restaurants. Showing the first {{ search_limit }}. Add a word to narrow it down.{% else %}{{ count }} restaurant{{ 's' if count != 1 }}{% endif %}</span></h2>
     <ul class="results">
         {% for r in results %}
         <li>
             <a class="result-card {{ status_class.get(r.establishment_status, '') }}" href="{{ url_for('establishment', establishment_id=r.establishment_id) }}">
                 <span class="result-place">
-                    <strong>{{ r.establishment_name }}</strong>
+                    <strong>{{ r.establishment_name or '—' }}</strong>
                     <span>{{ r.street }}{% if r.unit %} {{ r.unit }}{% endif %}</span>
                     {% if r.establishment_type %}<span class="est-type">{{ r.establishment_type }}</span>{% endif %}
                 </span>
                 <span class="result-latest">
-                    <span><span class="label">Last inspected</span> {{ r.last_inspected.strftime('%B %-d, %Y') }}</span>
+                    <span><span class="label">Last inspected</span> {{ r.last_inspected | longdate }}</span>
                     <strong>{{ r.establishment_status | upper }}</strong>
                     <span class="est-type">{{ r.inspection_count }} inspection{{ 's' if r.inspection_count != 1 }} since {{ r.first_inspected.year }}</span>
                 </span>

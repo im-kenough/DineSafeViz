@@ -108,7 +108,9 @@ h2.page-heading {
 }
 .nav-btn.active,
 .nav-btn:hover:not(.active) { background: #2952d9; color: #fff; }
-.nav-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.nav-btn:focus-visible,
+.est-link:focus-visible,
+.result-card:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 
 /* icon + label button (nav social links, home about links) */
 .icon-btn {
@@ -142,7 +144,7 @@ h2.page-heading {
 }
 
 /* ── search form (nav and home hero) ────────────────────── */
-.search-form { display: flex; gap: 0.5rem; }
+.search-form { display: flex; gap: 0.5rem; min-width: 0; }
 .search-form input {
     flex: 1 1 auto;
     min-width: 0;
@@ -157,8 +159,8 @@ h2.page-heading {
 .search-form input::placeholder { color: var(--text-muted); }
 .search-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .search-form button { font-family: inherit; cursor: pointer; }
-/* nav: the form takes over .social-links' job of pushing the icons right */
-.nav-search { margin-left: auto; width: clamp(12rem, 22vw, 20rem); }
+/* nav: the form fills the gap after the tabs and takes over .social-links' job of pushing the icons right */
+.nav-search { flex: 1 1 18rem; max-width: 30rem; margin-left: auto; }
 .nav-search + .social-links { margin-left: 0; }
 .hero-search { max-width: 36rem; margin: 1.5rem auto 0; }
 .hero-search input { padding: 0.75rem 1rem; }
@@ -247,9 +249,9 @@ th {
 }
 
 /* ── establishment cards ────────────────────────────────── */
-.est-card {
+/* .result-card (search results) shares the card frame */
+.est-card, .result-card {
     display: grid;
-    grid-template-columns: minmax(12rem, 1fr) 2fr;
     gap: 1rem;
     border: 1px solid var(--border);
     border-left: 6px solid var(--border);
@@ -258,6 +260,7 @@ th {
     margin-bottom: 0.6rem;
     font-size: clamp(0.8rem, 0.9vw, 1.05rem);
 }
+.est-card { grid-template-columns: minmax(12rem, 1fr) 2fr; }
 .est-card:last-child { margin-bottom: 0; }
 .est-location { display: flex; flex-direction: column; gap: 0.15rem; }
 /* restaurant name links to its history page; underlined so it reads as a link on touch screens */
@@ -268,7 +271,6 @@ th {
     text-underline-offset: 0.2em;
 }
 .est-link:hover { color: var(--accent); }
-.est-link:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .est-type, .inf-meta { color: var(--text-muted); }
 .label { color: var(--text-muted); font-weight: 600; margin-right: 0.35rem; }
 .est-status { margin-bottom: 0.4rem; }
@@ -286,21 +288,12 @@ th {
 /* ── search results ─────────────────────────────────────── */
 .results { list-style: none; margin: 0; padding: 0; }
 .result-card {
-    display: grid;
     grid-template-columns: 1fr auto;
-    gap: 1rem;
-    border: 1px solid var(--border);
-    border-left: 6px solid var(--border);
-    border-radius: 6px;
-    padding: 0.6rem 0.9rem;
-    margin-bottom: 0.6rem;
     background: var(--surface);
     color: var(--text);
     text-decoration: none;
-    font-size: clamp(0.8rem, 0.9vw, 1.05rem);
 }
 .result-card:hover { background: var(--surface-2); }
-.result-card:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .result-place,
 .result-latest { display: flex; flex-direction: column; gap: 0.15rem; }
 .result-place strong { color: var(--accent); }
@@ -365,6 +358,11 @@ footer {
     color: var(--text-muted);
 }
 
+/* ── below desktop (≤ 1023px): the search drops under the tabs ── */
+@media (max-width: 1023px) {
+    .nav-search { max-width: none; margin-left: 0; }
+}
+
 /* ── mobile (≤ 600px: all phones in portrait) ───────────── */
 @media (max-width: 600px) {
     body {
@@ -380,7 +378,9 @@ footer {
     .dropdown > summary { padding: 0.5rem 0.35rem; }
     .social-links { margin-left: 0; }
     /* search gets its own full-width row under the tabs */
-    .nav-search { flex: 1 1 100%; width: auto; margin-left: 0; }
+    .nav-search { flex: 1 1 100%; }
+    /* slimmer side padding so the placeholder fits on 320px phones */
+    .hero-search input { padding-inline: 0.75rem; }
 
     /* picker spans the nav width instead of hanging off the Inspections tab */
     .dropdown { position: static; }
@@ -399,15 +399,15 @@ footer {
     .timeline .short { display: inline; }
     .toggle-icon { margin-right: 0; font-size: 1.25rem; line-height: 1; }
 
-    /* establishment card stacks location above results */
-    .est-card { grid-template-columns: 1fr; gap: 0.4rem; padding: 0.5rem 0.6rem; }
-    /* result card stacks the latest inspection under the place */
-    .result-card { grid-template-columns: 1fr; gap: 0.4rem; padding: 0.5rem 0.6rem; }
+    /* cards stack: location above results, latest inspection under the place */
+    .est-card, .result-card { grid-template-columns: 1fr; gap: 0.4rem; padding: 0.5rem 0.6rem; }
     .result-latest { text-align: left; }
     /* narrow severity column so category/details get the width */
     .infractions { table-layout: fixed; }
     .infractions th:first-child { width: 5.5rem; }
     .infractions th, .infractions td { padding: 0.3rem 0.4rem; }
+    .infractions th { white-space: normal; }
+    .infractions td { overflow-wrap: anywhere; }
 }
 
 /* ── tablet (601px – 1023px: iPad portrait, phone landscape) */
@@ -416,13 +416,18 @@ footer {
         margin: 1.25rem auto;
         padding: 0 1.25rem;
     }
+
+    /* search takes its own row under the tabs, with the icons after it in both DOM and visual order.
+       The basis leaves 10rem for the icons (3 x 44px + gaps = 9.25rem), so the search wraps
+       below the tabs but the icons still fit beside it. */
+    .nav-search { flex: 1 1 calc(100% - 10rem); }
 }
 
-/* ── below desktop (≤ 1023px: mobile + tablet) ──────────── */
-/* nav social links drop their labels; icons sized to a 44x44 tap target */
-@media (max-width: 1023px) {
+/* ── touch widths (≤ 1279px: mobile, tablet, iPad landscape) */
+/* nav social links drop their labels so the search fits; icons sized to a 44x44 tap target */
+@media (max-width: 1279px) {
     .link-label { display: none; }
-    .social-links .nav-btn { min-width: 44px; min-height: 44px; }
+    .social-links .nav-btn { min-width: 44px; min-height: 44px; padding: 0; }
     .search-form input,
     .search-form button { min-height: 44px; }
 }

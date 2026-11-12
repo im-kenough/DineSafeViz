@@ -2,7 +2,7 @@
 {% macro search_form(id, extra_class='', value='') -%}
 <form class="search-form {{ extra_class }}" role="search" action="{{ url_for('search') }}" method="get">
     <label class="visually-hidden" for="{{ id }}">Search restaurants by name or address</label>
-    <input type="search" id="{{ id }}" name="q" value="{{ value }}" placeholder="Search restaurants" minlength="3" maxlength="100" required>
+    <input type="search" id="{{ id }}" name="q" value="{{ value }}" placeholder="Enter restaurant name" minlength="{{ search_min_term }}" maxlength="{{ search_max_len }}" required>
     <button type="submit" class="nav-btn">Search</button>
 </form>
 {%- endmacro %}
