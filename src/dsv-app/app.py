@@ -19,6 +19,7 @@ from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 import psycopg2
+from psycopg2 import sql
 from psycopg2.errors import QueryCanceled
 from psycopg2.extensions import TRANSACTION_STATUS_IDLE
 from psycopg2.extras import RealDictCursor
@@ -61,6 +62,14 @@ SEVERITY_ORDER = {
     "M - Minor": 2,
 }
 RECENT_YEARS = 4
+
+# Search: query length cap, shortest word a trigram index can help with,
+# most words matched, and most results shown.
+SEARCH_MAX_LEN = 100
+SEARCH_MIN_TERM = 3
+SEARCH_MAX_TERMS = 5
+SEARCH_LIMIT = 50
+
 _stats_cache = {"data": None, "fetched_at": None}
 _stats_cache_lock = threading.Lock()
 _STATS_TTL = timedelta(days=5)
@@ -68,6 +77,10 @@ _STATS_TTL = timedelta(days=5)
 # Numeric IDs (historical rows) or 18-character IDs (2023 onward). Anything
 # else 404s before it reaches the database.
 _ESTABLISHMENT_ID_RE = re.compile(r"[A-Za-z0-9]{1,32}")
+
+# C0 and C1 control characters, stripped from search queries. psycopg2 refuses
+# a NUL in a parameter (ValueError, so a 500), and none belong in a name.
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 
 
 # ---------------------------------------------------------------------------
@@ -241,6 +254,89 @@ def _fetch_establishment(establishment_id: str) -> List[Dict]:
             " WHERE establishment_id = %s",
             (establishment_id,),
         )
+        return cur.fetchall()
+
+
+# ---------------------------------------------------------------------------
+# Search
+# ---------------------------------------------------------------------------
+
+# One per search word: the word is in the name or the address.
+_SEARCH_MATCH = sql.SQL("(establishment_name ILIKE %s OR establishment_address ILIKE %s)")
+
+# Finds the matching establishment IDs, then summarizes all of each one's rows:
+# a match on one row (say, before a rename) still counts every inspection.
+# Names starting with the first word rank first, then the most recently
+# inspected, then name and ID so the order is stable.
+_SEARCH_QUERY = sql.SQL("""
+WITH ids AS (
+    SELECT DISTINCT establishment_id FROM inspections WHERE {match}
+),
+latest AS (
+    SELECT DISTINCT ON (i.establishment_id)
+           i.establishment_id, i.establishment_name, i.street, i.unit,
+           i.establishment_status, i.inspection_date AS last_inspected
+    FROM inspections i JOIN ids USING (establishment_id)
+    ORDER BY i.establishment_id, i.inspection_date DESC, i.id DESC
+),
+totals AS (
+    SELECT i.establishment_id,
+           COUNT(DISTINCT i.inspection_date) AS inspection_count,
+           MIN(i.inspection_date) AS first_inspected,
+           MAX(i.establishment_type) AS establishment_type
+    FROM inspections i JOIN ids USING (establishment_id)
+    GROUP BY i.establishment_id
+)
+SELECT latest.*, totals.inspection_count, totals.first_inspected, totals.establishment_type
+FROM latest JOIN totals USING (establishment_id)
+ORDER BY latest.establishment_name ILIKE %s DESC,
+         latest.last_inspected DESC,
+         latest.establishment_name,
+         latest.establishment_id
+LIMIT %s
+""")
+
+
+def search_terms(raw: Optional[str]) -> List[str]:
+    """Split a search query into the words to match.
+
+    Lowercases, caps the query at SEARCH_MAX_LEN characters, drops duplicate
+    words and words shorter than SEARCH_MIN_TERM (a trigram index can't help
+    with them), and keeps at most SEARCH_MAX_TERMS words, in query order.
+    """
+    terms: List[str] = []
+    for word in (raw or "")[:SEARCH_MAX_LEN].lower().split():
+        if len(word) >= SEARCH_MIN_TERM and word not in terms:
+            terms.append(word)
+    return terms[:SEARCH_MAX_TERMS]
+
+
+def like_pattern(term: str, prefix: bool = False) -> str:
+    """Return an ILIKE pattern for term: anywhere, or with prefix, at the start.
+
+    Escapes LIKE's own wildcards and escape character, so they match literally.
+    """
+    escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"{escaped}%" if prefix else f"%{escaped}%"
+
+
+def search_query(terms: List[str]) -> Tuple[sql.Composed, List]:
+    """Build the search SQL and its parameters for one or more terms.
+
+    The SQL repeats the constant _SEARCH_MATCH once per term; the terms
+    themselves travel only as parameters. Asks for SEARCH_LIMIT + 1 rows so
+    the page can tell there are more.
+    """
+    match = sql.SQL(" AND ").join([_SEARCH_MATCH] * len(terms))
+    params: List = [pattern for term in terms for pattern in (like_pattern(term),) * 2]
+    params += [like_pattern(terms[0], prefix=True), SEARCH_LIMIT + 1]
+    return _SEARCH_QUERY.format(match=match), params
+
+
+def _search_establishments(terms: List[str]) -> List[Dict]:
+    """Return establishments matching every term, best first, at most SEARCH_LIMIT + 1."""
+    with _db_cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute(*search_query(terms))
         return cur.fetchall()
 
 
@@ -682,6 +778,26 @@ def establishment(establishment_id):
         days=days,
         first_date=days[-1][0],
         last_date=days[0][0],
+    )
+
+
+@app.route("/search")
+def search():
+    """Render restaurant search results for ?q=.
+
+    Queries the database only when q has a word of SEARCH_MIN_TERM or more
+    characters; otherwise the page shows a hint.
+    """
+    q = _CONTROL_CHARS_RE.sub(" ", request.args.get("q") or "").strip()[:SEARCH_MAX_LEN]
+    terms = search_terms(q)
+    results = _search_establishments(terms) if terms else []
+    return render_template(
+        "search.html",
+        q=q,
+        terms=terms,
+        results=results[:SEARCH_LIMIT],
+        more=len(results) > SEARCH_LIMIT,
+        limit=SEARCH_LIMIT,
     )
 
 

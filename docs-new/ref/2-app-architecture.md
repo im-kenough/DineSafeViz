@@ -39,6 +39,7 @@ threads on port 8000.
 | `/inspections`        | One quarter (`?year=&q=`), grouped by day and establishment.                                           |
 | `/inspections/month`  | One month as an HTML fragment, loaded when you expand an older month.                                  |
 | `/establishment/<id>` | Every inspection for one establishment ID, newest first. 404 for a malformed or unknown ID.            |
+| `/search`             | Restaurants whose name or address contains every word of `?q=` (3+ characters each), up to 50.         |
 | `/dashboard`          | The inspections dashboard (Grafana) in an iframe (`/analytics/d/dinesafe/dinesafe-inspections?kiosk`). |
 | `/info`               | What the severities and results mean.                                                                  |
 | `/healthz`            | Liveness.                                                                                              |
