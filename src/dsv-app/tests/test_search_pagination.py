@@ -175,8 +175,8 @@ def test_pager_links_are_nofollow(client):
     links = re.findall(r"<a [^>]*>", pager)
     assert links
     assert len(links) == len([a for a in links if re.search(r'rel="[^"]*nofollow"', a)])
-    assert re.search(r'<a class="nav-btn" href="/search\?q=pizza&amp;page=1" rel="prev nofollow" aria-label="Previous page">‹</a>', pager)
-    assert re.search(r'<a class="nav-btn" href="/search\?q=pizza&amp;page=3" rel="next nofollow" aria-label="Next page">›</a>', pager)
+    assert '<a class="nav-btn" href="/search?q=pizza&amp;page=1" rel="prev nofollow" aria-label="Previous page">‹</a>' in pager
+    assert '<a class="nav-btn" href="/search?q=pizza&amp;page=3" rel="next nofollow" aria-label="Next page">›</a>' in pager
     assert '<a class="nav-btn" href="/search?q=pizza&amp;page=1" rel="nofollow">1</a>' in pager
     assert '<a class="nav-btn" href="/search?q=pizza&amp;page=3" rel="nofollow">3</a>' in pager
 
@@ -223,9 +223,12 @@ def test_pager_links_escape_script(client):
 
 # -- CSS -----------------------------------------------------------------------
 
+def _css():
+    return re.sub(r"/\*.*?\*/", "", _STYLE_CSS.read_text(), flags=re.S)
+
+
 def _css_rule(selector):
-    css = re.sub(r"/\*.*?\*/", "", _STYLE_CSS.read_text(), flags=re.S)
-    for selectors, body in re.findall(r"([^{}]+)\{([^}]*)\}", css):
+    for selectors, body in re.findall(r"([^{}]+)\{([^}]*)\}", _css()):
         if selector in (" ".join(s.split()) for s in selectors.split(",")):
             return body
     return None
@@ -254,7 +257,7 @@ def test_pager_buttons_are_tap_sized():
 
 
 def test_pager_buttons_rule_is_not_in_media_block():
-    css = re.sub(r"/\*.*?\*/", "", _STYLE_CSS.read_text(), flags=re.S)
+    css = _css()
     match = re.search(r"(?:^|[}\s])\.pager \.nav-btn\s*\{", css)
     assert match is not None
     before = css[:match.start()]
