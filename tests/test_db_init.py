@@ -143,3 +143,36 @@ def test_app_can_read_load_log_but_not_write(ready_db):
     assert login(ready_db, "dinesafe_app", APP_PW, "SELECT count(*) FROM load_log").returncode == 0
     result = login(ready_db, "dinesafe_app", APP_PW, "DELETE FROM load_log")
     assert "permission denied" in result.stderr
+
+
+SEARCH_INDEXES = (
+    "inspections_establishment_name_trgm_idx",
+    "inspections_establishment_address_trgm_idx",
+    "inspections_establishment_id_idx",
+)
+
+
+def test_pg_trgm_is_installed(ready_db):
+    result = psql(ready_db, "SELECT extname FROM pg_extension WHERE extname = 'pg_trgm'")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "pg_trgm"
+
+
+def test_search_indexes_exist(ready_db):
+    result = psql(ready_db, "SELECT indexname FROM pg_indexes WHERE tablename = 'inspections'")
+    assert result.returncode == 0, result.stderr
+    assert set(SEARCH_INDEXES) <= set(result.stdout.split())
+
+
+# The test table is empty, so sequential scans are turned off to see which
+# index the planner picks for each of the app's lookups.
+@pytest.mark.parametrize("where, index", [
+    ("establishment_name ILIKE '%pizza%'", "inspections_establishment_name_trgm_idx"),
+    ("establishment_address ILIKE '%queen%'", "inspections_establishment_address_trgm_idx"),
+    ("establishment_id = '001Vo000013QjdPIAS'", "inspections_establishment_id_idx"),
+])
+def test_app_role_lookups_use_search_indexes(ready_db, where, index):
+    sql = f"SET enable_seqscan = off; EXPLAIN SELECT id FROM inspections WHERE {where}"
+    result = login(ready_db, "dinesafe_app", APP_PW, sql)
+    assert result.returncode == 0, result.stderr
+    assert index in result.stdout
