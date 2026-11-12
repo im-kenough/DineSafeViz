@@ -15,6 +15,13 @@ grouped by primary actors.
 - The end user goes to the website.
 - The end user navigates to the inspections dashboard (Grafana) page.
 
+### UC-USR-04: View a restaurant's inspection history
+
+- The end user selects a restaurant's name on the inspections page.
+- The site shows every inspection for that restaurant, newest first.
+- A restaurant open before and after 2023 has two histories, one per
+  establishment ID, because the city changed its IDs in 2023.
+
 ## Sysadmin use cases
 
 These operational use cases focus on the infrastructure, reliability, and

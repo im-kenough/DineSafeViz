@@ -10,6 +10,7 @@ to avoid a DB round-trip on every page load.
 """
 import calendar
 import os
+import re
 import threading
 import collections
 import itertools
@@ -63,6 +64,10 @@ RECENT_YEARS = 4
 _stats_cache = {"data": None, "fetched_at": None}
 _stats_cache_lock = threading.Lock()
 _STATS_TTL = timedelta(days=5)
+
+# Numeric IDs (historical rows) or 18-character IDs (2023 onward). Anything
+# else 404s before it reaches the database.
+_ESTABLISHMENT_ID_RE = re.compile(r"[A-Za-z0-9]{1,32}")
 
 
 # ---------------------------------------------------------------------------
@@ -218,6 +223,23 @@ def _fetch_inspections(start: date, end: date) -> List[Dict]:
             " FROM inspections"
             " WHERE inspection_date BETWEEN %s AND %s",
             (start, end),
+        )
+        return cur.fetchall()
+
+
+def _fetch_establishment(establishment_id: str) -> List[Dict]:
+    """Fetch every row for one establishment, in any order."""
+    with _db_cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute(
+            "SELECT inspection_date, establishment_status, action, infraction_details,"
+            "       establishment_name, establishment_address, establishment_type,"
+            "       street, unit, postal_code,"
+            "       outcome, outcome_date, amount_fined,"
+            "       establishment_id, severity,"
+            "       infraction_category"
+            " FROM inspections"
+            " WHERE establishment_id = %s",
+            (establishment_id,),
         )
         return cur.fetchall()
 
@@ -449,6 +471,25 @@ def build_days(rows: List[Dict], start: date, end: date) -> List[Tuple[date, Lis
     return days
 
 
+def build_history(rows: List[Dict]) -> List[Tuple[date, List[Dict]]]:
+    """Group one establishment's rows into one entry per inspection, newest first.
+
+    Same shape as build_days, so _days.html renders it, but with only the
+    dates that have an inspection.
+
+    Args:
+        rows: Every row for a single establishment.
+
+    Returns:
+        A list of (date, [establishment]) tuples ordered newest first. Each
+        list holds the one grouped establishment from group_establishments.
+    """
+    by_date = collections.defaultdict(list)
+    for row in rows:
+        by_date[row["inspection_date"]].append(row)
+    return [(d, group_establishments(by_date[d])) for d in sorted(by_date, reverse=True)]
+
+
 def group_establishments(rows: List[Dict]) -> List[Dict]:
     """Group one day's infraction rows into one entry per establishment.
 
@@ -619,6 +660,29 @@ def inspections_month():
     start, end = months[m]
     rows = _fetch_inspections(start, end)
     return render_template("_days.html", days=build_days(rows, start, end))
+
+
+@app.route("/establishment/<establishment_id>")
+def establishment(establishment_id):
+    """Render every inspection for one establishment, newest first.
+
+    Returns:
+        The history page, or 404 if the ID is malformed (checked before any
+        query) or has no rows.
+    """
+    if not _ESTABLISHMENT_ID_RE.fullmatch(establishment_id):
+        abort(404)
+    rows = _fetch_establishment(establishment_id)
+    if not rows:
+        abort(404)
+    days = build_history(rows)
+    return render_template(
+        "establishment.html",
+        est=days[0][1][0],
+        days=days,
+        first_date=days[-1][0],
+        last_date=days[0][0],
+    )
 
 
 @app.route("/dashboard")

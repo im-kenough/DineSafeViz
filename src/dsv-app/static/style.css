@@ -238,6 +238,15 @@ th {
 }
 .est-card:last-child { margin-bottom: 0; }
 .est-location { display: flex; flex-direction: column; gap: 0.15rem; }
+/* restaurant name links to its history page; underlined so it reads as a link on touch screens */
+.est-link {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-underline-offset: 0.2em;
+}
+.est-link:hover { color: var(--accent); }
+.est-link:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .est-type, .inf-meta { color: var(--text-muted); }
 .label { color: var(--text-muted); font-weight: 600; margin-right: 0.35rem; }
 .est-status { margin-bottom: 0.4rem; }
