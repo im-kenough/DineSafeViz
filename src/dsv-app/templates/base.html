@@ -1,4 +1,5 @@
 {% from "_icons.html" import icon, icon_sprite -%}
+{% from "_search.html" import search_form -%}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -52,6 +53,8 @@
         </details>
         <a href="{{ url_for('dashboard') }}" class="nav-btn {{ 'active' if request.endpoint == 'dashboard' else '' }}">Dashboard</a>
         <a href="{{ url_for('info') }}" class="nav-btn {{ 'active' if request.endpoint == 'info' else '' }}">Info</a>
+        {# The home page has its own, larger form in the hero. #}
+        {% if request.endpoint != 'home' %}{{ search_form('nav-q', 'nav-search', q or '') }}{% endif %}
         <div class="social-links">
             <a class="nav-btn icon-btn" href="https://github.com/im-kenough/DineSafeViz" target="_blank" rel="noopener" aria-label="DineSafeViz on GitHub (opens in new tab)">
                 {{ icon("github") }}

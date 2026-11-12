@@ -15,6 +15,13 @@ grouped by primary actors.
 - The end user goes to the website.
 - The end user navigates to the inspections dashboard (Grafana) page.
 
+### UC-USR-03: Search for a restaurant
+
+- The end user types part of a restaurant's name or address in the search
+  box, in the top nav or on the home page.
+- The site lists up to 50 matching restaurants with their latest result.
+- The end user selects one to see its inspection history (UC-USR-04).
+
 ### UC-USR-04: View a restaurant's inspection history
 
 - The end user selects a restaurant's name on the inspections page.
