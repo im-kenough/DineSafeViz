@@ -159,3 +159,20 @@ def test_nul_in_query_returns_200(client):
     with patch("app.psycopg2.connect", return_value=conn):
         resp = client.get("/search?q=abc%00")
     assert resp.status_code == 200
+
+
+def test_null_name_renders_dash_not_none(client):
+    html, _, _ = _search(client, "pizza", [_result(name=None)])
+    assert "<strong>—</strong>" in html
+    assert "<strong>None</strong>" not in html
+
+
+def test_longdate_filter():
+    f = app_module.app.jinja_env.filters["longdate"]
+    assert f(date(2026, 10, 3)) == "October 3, 2026"
+    assert f(date(2026, 1, 15)) == "January 15, 2026"
+
+
+def test_search_result_last_inspected_long_date(client):
+    html, _, _ = _search(client, "pizza", [_result()])
+    assert "October 3, 2026" in html

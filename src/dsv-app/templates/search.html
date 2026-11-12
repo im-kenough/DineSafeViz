@@ -19,12 +19,12 @@
         <li>
             <a class="result-card {{ status_class.get(r.establishment_status, '') }}" href="{{ url_for('establishment', establishment_id=r.establishment_id) }}">
                 <span class="result-place">
-                    <strong>{{ r.establishment_name }}</strong>
+                    <strong>{{ r.establishment_name or '—' }}</strong>
                     <span>{{ r.street }}{% if r.unit %} {{ r.unit }}{% endif %}</span>
                     {% if r.establishment_type %}<span class="est-type">{{ r.establishment_type }}</span>{% endif %}
                 </span>
                 <span class="result-latest">
-                    <span><span class="label">Last inspected</span> {{ r.last_inspected.strftime('%B %-d, %Y') }}</span>
+                    <span><span class="label">Last inspected</span> {{ r.last_inspected | longdate }}</span>
                     <strong>{{ r.establishment_status | upper }}</strong>
                     <span class="est-type">{{ r.inspection_count }} inspection{{ 's' if r.inspection_count != 1 }} since {{ r.first_inspected.year }}</span>
                 </span>

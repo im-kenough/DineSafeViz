@@ -358,6 +358,11 @@ footer {
     color: var(--text-muted);
 }
 
+/* ── below desktop (≤ 1023px): the search drops under the tabs ── */
+@media (max-width: 1023px) {
+    .nav-search { max-width: none; margin-left: 0; }
+}
+
 /* ── mobile (≤ 600px: all phones in portrait) ───────────── */
 @media (max-width: 600px) {
     body {
@@ -373,7 +378,7 @@ footer {
     .dropdown > summary { padding: 0.5rem 0.35rem; }
     .social-links { margin-left: 0; }
     /* search gets its own full-width row under the tabs */
-    .nav-search { flex: 1 1 100%; max-width: none; margin-left: 0; }
+    .nav-search { flex: 1 1 100%; }
     /* slimmer side padding so the placeholder fits on 320px phones */
     .hero-search input { padding-inline: 0.75rem; }
 
@@ -402,6 +407,7 @@ footer {
     .infractions th:first-child { width: 5.5rem; }
     .infractions th, .infractions td { padding: 0.3rem 0.4rem; }
     .infractions th { white-space: normal; }
+    .infractions td { overflow-wrap: anywhere; }
 }
 
 /* ── tablet (601px – 1023px: iPad portrait, phone landscape) */
@@ -411,9 +417,10 @@ footer {
         padding: 0 1.25rem;
     }
 
-    /* search gets its own full-width row under the tabs; the icons stay on the first row */
-    .nav-search { order: 1; flex-basis: 100%; max-width: none; margin-left: 0; }
-    .nav-search + .social-links { margin-left: auto; }
+    /* search takes its own row under the tabs, with the icons after it in both DOM and visual order.
+       The basis leaves 10rem for the icons (3 x 44px + gaps = 9.25rem), so the search wraps
+       below the tabs but the icons still fit beside it. */
+    .nav-search { flex: 1 1 calc(100% - 10rem); }
 }
 
 /* ── touch widths (≤ 1279px: mobile, tablet, iPad landscape) */

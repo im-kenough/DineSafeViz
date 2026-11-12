@@ -285,9 +285,12 @@ latest AS (
     ORDER BY i.establishment_id, i.inspection_date DESC, i.id DESC
 ),
 page AS (
-    SELECT latest.*, establishment_name ILIKE %s AS prefix_match
+    SELECT latest.*, ROW_NUMBER() OVER (
+               ORDER BY COALESCE(establishment_name ILIKE %s, false) DESC,
+                        last_inspected DESC, establishment_name, establishment_id
+           ) AS rank
     FROM latest
-    ORDER BY prefix_match DESC, last_inspected DESC, establishment_name, establishment_id
+    ORDER BY rank
     LIMIT %s
 )
 SELECT page.establishment_id, page.establishment_name, page.street, page.unit,
@@ -299,8 +302,7 @@ FROM page CROSS JOIN LATERAL (
            MAX(establishment_type) AS establishment_type
     FROM inspections WHERE establishment_id = page.establishment_id
 ) totals
-ORDER BY page.prefix_match DESC, page.last_inspected DESC,
-         page.establishment_name, page.establishment_id
+ORDER BY page.rank
 """)
 
 
@@ -706,6 +708,7 @@ app.jinja_env.globals.update(
     search_max_len=SEARCH_MAX_LEN,
     search_limit=SEARCH_LIMIT,
 )
+app.jinja_env.filters["longdate"] = lambda d: d.strftime("%B %-d, %Y")
 
 
 # ---------------------------------------------------------------------------
