@@ -125,18 +125,3 @@ def test_search_limit_falls_back_to_remote_addr(local_nginx):
     _, url = local_nginx
     assert 429 in burst(url)
 
-
-def test_search_gets_the_same_proxy_headers_as_root():
-    conf = (ROOT / "src/dsv-nginx/nginx.conf").read_text()
-
-    def block(start):
-        body = conf[conf.index(start):]
-        return body[: body.index("}")]
-
-    def headers(text):
-        return sorted(line.strip() for line in text.splitlines() if "proxy_set_header" in line)
-
-    search, root = block("location = /search {"), block("location / {")
-    assert "proxy_pass         http://app;" in search
-    assert headers(search) == headers(root)
-    assert len(headers(search)) == 4

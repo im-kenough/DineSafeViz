@@ -2,6 +2,6 @@
 {% block title %}DineSafeViz - {{ est.establishment_name }}{% endblock %}
 {% block content %}
     {% set count = days | length %}
-    <h2 class="page-heading">{{ est.establishment_name or '—' }}<span class="heading-dates">{{ est.street }}{% if est.unit %} {{ est.unit }}{% endif %}, Toronto, ON · {% if count == 1 %}1 inspection, {{ last_date.strftime('%B %-d, %Y') }}{% else %}{{ count }} inspections, {{ first_date.strftime('%B %-d, %Y') }} to {{ last_date.strftime('%B %-d, %Y') }}{% endif %}</span></h2>
+    <h2 class="page-heading">{{ est.establishment_name or '—' }}<span class="heading-dates">{{ est.street }}{% if est.unit %} {{ est.unit }}{% endif %}, Toronto, ON · {{ count }} inspection{{ 's' if count != 1 }}, {% if count > 1 %}{{ days[-1][0].strftime('%B %-d, %Y') }} to {% endif %}{{ days[0][0].strftime('%B %-d, %Y') }}</span></h2>
 {% include "_days.html" %}
 {% endblock %}

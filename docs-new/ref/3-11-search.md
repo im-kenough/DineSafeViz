@@ -85,18 +85,21 @@ address.
 
 ### The search query
 
-One SQL statement, `_SEARCH_QUERY`, works in three steps:
+One SQL statement, `_SEARCH_QUERY`, works in four steps:
 
 1. **`ids`:** find each `establishment_id` with a row where every word is in
    the name or the address. The trigram indexes do this.
 2. **`latest`:** for each ID, take its newest row for the name, street, unit,
    status, and date. The `establishment_id` index finds the rows.
-3. **`totals`:** for each ID, across all its rows, count the inspections and
-   find the first date and the type.
+3. **`page`:** sort the latest rows and keep the first 51. Names that start
+   with the first word sort first, then the most recently inspected, then name
+   and ID.
+4. **`totals`:** for each of those 51 IDs, across all its rows, count the
+   inspections and find the first date and the type.
 
-Names that start with the first word sort first, then the most recently
-inspected, then name and ID. The query asks for 51 rows, so the page can say
-"50+" when there are more.
+The sort needs only the latest rows, so `totals` runs for one page, not for
+every match. The query asks for 51 rows, so the page can say "50+" when there
+are more.
 
 The SQL text never contains user input. `psycopg2.sql` repeats one fixed
 `WHERE` fragment per word, and each word goes in as a query parameter.
