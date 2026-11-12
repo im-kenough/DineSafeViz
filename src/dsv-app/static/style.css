@@ -321,9 +321,23 @@ th {
 .inf-counts td { text-align: right; }
 
 /* ── search results ─────────────────────────────────────── */
-.results { list-style: none; margin: 0; padding: 0; }
+/* 3/2/1 column grid (see the media blocks); spacing comes from gap alone */
+.results {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.6rem;
+}
+/* cards in a row stretch to the tallest one */
+.results > li { display: grid; }
+/* cards are too narrow to sit place and latest inspection side by side, so they stack */
 .result-card {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+    margin-bottom: 0;
+    overflow-wrap: anywhere;
     background: var(--surface);
     color: var(--text);
     text-decoration: none;
@@ -332,7 +346,7 @@ th {
 .result-place,
 .result-latest { display: flex; flex-direction: column; gap: 0.15rem; }
 .result-place strong { color: var(--accent); }
-.result-latest { text-align: right; }
+.result-latest { text-align: left; }
 
 /* ── status accents ─────────────────────────────────────── */
 .status-closed,      .sev-crucial     { border-left-color: var(--dinesafe-red); }
@@ -346,7 +360,7 @@ th {
     border-radius: 4px;
     color: var(--text);
 }
-.result-latest .status-badge { align-self: flex-end; }
+.result-latest .status-badge { align-self: flex-start; }
 .status-closed      .status-badge { border-color: var(--dinesafe-red); }
 .status-conditional .status-badge { border-color: var(--dinesafe-yellow); }
 .status-pass        .status-badge { border-color: var(--dinesafe-green); }
@@ -408,6 +422,7 @@ footer {
 /* ── below desktop (≤ 1023px): the search drops under the tabs ── */
 @media (max-width: 1023px) {
     .nav-search { max-width: none; margin-left: 0; }
+    .results { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* ── mobile (≤ 600px: all phones in portrait) ───────────── */
@@ -447,10 +462,9 @@ footer {
     .timeline .short { display: inline; }
     .toggle-icon { margin-right: 0; font-size: 1.25rem; line-height: 1; }
 
-    /* cards stack: location above results, latest inspection under the place */
+    /* cards stack: location above results; search results go to one column */
     .est-card, .result-card { grid-template-columns: 1fr; gap: 0.4rem; padding: 0.5rem 0.6rem; }
-    .result-latest { text-align: left; }
-    .result-latest .status-badge { align-self: flex-start; }
+    .results { grid-template-columns: minmax(0, 1fr); }
     /* narrow severity column so category/details get the width */
     .infractions { table-layout: fixed; }
     .infractions th:first-child { width: 5.5rem; }
