@@ -261,6 +261,29 @@ th {
 .inf-counts th, .inf-counts td { padding: 0.15rem 0.4rem; }
 .inf-counts td { text-align: right; }
 
+/* ── search results ─────────────────────────────────────── */
+.results { list-style: none; margin: 0; padding: 0; }
+.result-card {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 1rem;
+    border: 1px solid var(--border);
+    border-left: 6px solid var(--border);
+    border-radius: 6px;
+    padding: 0.6rem 0.9rem;
+    margin-bottom: 0.6rem;
+    background: var(--surface);
+    color: var(--text);
+    text-decoration: none;
+    font-size: clamp(0.8rem, 0.9vw, 1.05rem);
+}
+.result-card:hover { background: var(--surface-2); }
+.result-card:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.result-place,
+.result-latest { display: flex; flex-direction: column; gap: 0.15rem; }
+.result-place strong { color: var(--accent); }
+.result-latest { text-align: right; }
+
 /* ── status accents ─────────────────────────────────────── */
 .status-closed,      .sev-crucial     { border-left-color: var(--dinesafe-red); }
 .status-conditional, .sev-significant { border-left-color: var(--dinesafe-yellow); }
@@ -354,6 +377,9 @@ footer {
 
     /* establishment card stacks location above results */
     .est-card { grid-template-columns: 1fr; gap: 0.4rem; padding: 0.5rem 0.6rem; }
+    /* result card stacks the latest inspection under the place */
+    .result-card { grid-template-columns: 1fr; gap: 0.4rem; padding: 0.5rem 0.6rem; }
+    .result-latest { text-align: left; }
     /* narrow severity column so category/details get the width */
     .infractions { table-layout: fixed; }
     .infractions th:first-child { width: 5.5rem; }
