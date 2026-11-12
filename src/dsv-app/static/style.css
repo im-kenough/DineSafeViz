@@ -87,11 +87,20 @@ h2.page-heading {
     color: var(--text);
 }
 /* date range sits under the quarter as a subtitle */
-.heading-dates {
+.heading-dates,
+.heading-address {
     display: block;
     font-size: 1rem;
     font-weight: 500;
-    color: var(--text-muted);
+}
+.heading-dates { color: var(--text-muted); }
+/* establishment address above its muted inspections line */
+.heading-address { color: var(--text); }
+
+/* search heading and results, set off from the nav by a divider */
+.results-section {
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
 }
 
 /* ── nav button (shared by tabs, social links, picker, timeline) */
@@ -401,7 +410,8 @@ footer {
     .picker-grid .nav-btn { padding: 0.5rem 0.6rem; }
 
     h2.page-heading { font-size: 1.15rem; }
-    .heading-dates { font-size: 0.9rem; }
+    .heading-dates,
+    .heading-address { font-size: 0.9rem; }
 
     /* timeline fits one line: short month names, year-less quarters, icon-only toggle */
     .timeline { gap: 0.25rem; margin: 0 -0.75rem 1rem; padding: 0.4rem 0.75rem; }
