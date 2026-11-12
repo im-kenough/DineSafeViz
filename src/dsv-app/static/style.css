@@ -35,7 +35,7 @@
     --surface-2:       #1d2028;
     --border:          #262a35;
     --text:            #dde1ec;
-    --text-muted:      #7a8094;
+    --text-muted:      #83899d;
     --accent:          #4a7aff;
 
     /* official DineSafe sign colours (sampled from static/imgs);
@@ -167,9 +167,14 @@ h2.page-heading {
 
 /* ── tabs ───────────────────────────────────────────────── */
 .tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+/* top nav buttons sized to a 44px tap target (padding included), label centred */
 .tabs > a,
 .dropdown > summary {
-    display: block;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
     text-align: center;
 }
 
