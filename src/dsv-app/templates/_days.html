@@ -37,7 +37,7 @@
             <div class="est-results">
 
                 <!-- Over all inspection status -->
-                <div class="est-status"><span class="label">Inspection Status</span> <strong>{{ (est.establishment_status or '—')|upper }}</strong><br><br></div>
+                <div class="est-status"><span class="label">Inspection Status</span> <strong class="status-badge">{{ (est.establishment_status or '—')|upper }}</strong><br><br></div>
                 {% if est.infractions %}
 
                 <!-- Infractions table -->

@@ -303,6 +303,18 @@ th {
 .status-closed,      .sev-crucial     { border-left-color: var(--dinesafe-red); }
 .status-conditional, .sev-significant { border-left-color: var(--dinesafe-yellow); }
 .status-pass,        .sev-minor       { border-left-color: var(--dinesafe-green); }
+/* status text gets a border in the card's status colour; text stays --text for contrast */
+.status-badge {
+    display: inline-block;
+    padding: 0.05rem 0.45rem;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+}
+.result-latest .status-badge { align-self: flex-end; }
+.status-closed      .status-badge { border-color: var(--dinesafe-red); }
+.status-conditional .status-badge { border-color: var(--dinesafe-yellow); }
+.status-pass        .status-badge { border-color: var(--dinesafe-green); }
 
 /* ── footer ─────────────────────────────────────────────── */
 footer {
@@ -402,6 +414,7 @@ footer {
     /* cards stack: location above results, latest inspection under the place */
     .est-card, .result-card { grid-template-columns: 1fr; gap: 0.4rem; padding: 0.5rem 0.6rem; }
     .result-latest { text-align: left; }
+    .result-latest .status-badge { align-self: flex-start; }
     /* narrow severity column so category/details get the width */
     .infractions { table-layout: fixed; }
     .infractions th:first-child { width: 5.5rem; }

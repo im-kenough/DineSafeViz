@@ -25,7 +25,7 @@
                 </span>
                 <span class="result-latest">
                     <span><span class="label">Last inspected</span> {{ r.last_inspected | longdate }}</span>
-                    <strong>{{ r.establishment_status | upper }}</strong>
+                    <strong class="status-badge">{{ r.establishment_status | upper }}</strong>
                     <span class="est-type">{{ r.inspection_count }} inspection{{ 's' if r.inspection_count != 1 }} since {{ r.first_inspected.year }}</span>
                 </span>
             </a>
