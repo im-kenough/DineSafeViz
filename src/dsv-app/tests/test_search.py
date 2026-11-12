@@ -135,3 +135,27 @@ def test_search_page_is_noindex_with_title(client):
     html, _, _ = _search(client, "pizza", [_result()])
     assert '<meta name="robots" content="noindex">' in html
     assert "<title>DineSafeViz - Search</title>" in html
+
+
+@pytest.mark.parametrize("q", ["abc\x00", "\x00abc", "abc\x1f\x7f"])
+def test_control_characters_are_stripped_before_searching(client, q):
+    # psycopg2 refuses NUL in a parameter (ValueError, so a 500); strip it first.
+    html, connect, cur = _search(client, q)
+    connect.assert_called_once()
+    _, params = cur.execute.call_args.args
+    assert params == ["%abc%", "%abc%", "abc%", 51]
+    assert 'No restaurants match "abc".' in html
+
+
+def test_nul_in_query_returns_200(client):
+    conn = rows_conn([])
+
+    def execute(_query, params):
+        # Real psycopg2 raises this for a NUL in any string parameter.
+        if any("\x00" in p for p in params if isinstance(p, str)):
+            raise ValueError("A string literal cannot contain NUL (0x00) characters.")
+
+    conn.cursor.return_value.execute.side_effect = execute
+    with patch("app.psycopg2.connect", return_value=conn):
+        resp = client.get("/search?q=abc%00")
+    assert resp.status_code == 200

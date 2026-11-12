@@ -78,6 +78,10 @@ _STATS_TTL = timedelta(days=5)
 # else 404s before it reaches the database.
 _ESTABLISHMENT_ID_RE = re.compile(r"[A-Za-z0-9]{1,32}")
 
+# C0 and C1 control characters, stripped from search queries. psycopg2 refuses
+# a NUL in a parameter (ValueError, so a 500), and none belong in a name.
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+
 
 # ---------------------------------------------------------------------------
 # Database access
@@ -784,7 +788,7 @@ def search():
     Queries the database only when q has a word of SEARCH_MIN_TERM or more
     characters; otherwise the page shows a hint.
     """
-    q = (request.args.get("q") or "").strip()[:SEARCH_MAX_LEN]
+    q = _CONTROL_CHARS_RE.sub(" ", request.args.get("q") or "").strip()[:SEARCH_MAX_LEN]
     terms = search_terms(q)
     results = _search_establishments(terms) if terms else []
     return render_template(
