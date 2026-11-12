@@ -129,6 +129,14 @@ h2.page-heading {
     border-top: 1px solid var(--border);
 }
 .nav-btn.disabled { color: var(--text-muted); border-color: var(--border); pointer-events: none; }
+/* pager buttons sized to a 44x44 tap target, label centred */
+.pager .nav-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+}
 .nav-btn:focus-visible,
 .est-link:focus-visible,
 .result-card:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }

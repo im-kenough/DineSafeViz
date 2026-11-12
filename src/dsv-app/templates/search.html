@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}DineSafeViz - Search{% endblock %}
 {% block head %}
-    <meta name="robots" content="noindex">
+    <meta name="robots" content="noindex, nofollow">
 {% endblock %}
 {% block content %}
     {% set hint = 'Search by restaurant name or address, like pizza or queen.' %}
@@ -36,11 +36,11 @@
         </ul>
         {% if pages > 1 %}
         <nav class="pager" aria-label="Search result pages">
-            {% if page > 1 %}<a class="nav-btn" href="{{ url_for('search', q=q, page=page - 1) }}" rel="prev" aria-label="Previous page">‹</a>{% else %}<span class="nav-btn disabled" aria-disabled="true" aria-label="Previous page">‹</span>{% endif %}
+            {% if page > 1 %}<a class="nav-btn" href="{{ url_for('search', q=q, page=page - 1) }}" rel="prev nofollow" aria-label="Previous page">‹</a>{% else %}<span class="nav-btn disabled" aria-disabled="true" aria-label="Previous page">‹</span>{% endif %}
             {% for p in window %}
-            {% if p is none %}<span>…</span>{% elif p == page %}<span class="nav-btn active" aria-current="page">{{ p }}</span>{% else %}<a class="nav-btn" href="{{ url_for('search', q=q, page=p) }}">{{ p }}</a>{% endif %}
+            {% if p is none %}<span aria-hidden="true">…</span>{% elif p == page %}<span class="nav-btn active" aria-current="page">{{ p }}</span>{% else %}<a class="nav-btn" href="{{ url_for('search', q=q, page=p) }}" rel="nofollow">{{ p }}</a>{% endif %}
             {% endfor %}
-            {% if page < pages %}<a class="nav-btn" href="{{ url_for('search', q=q, page=page + 1) }}" rel="next" aria-label="Next page">›</a>{% else %}<span class="nav-btn disabled" aria-disabled="true" aria-label="Next page">›</span>{% endif %}
+            {% if page < pages %}<a class="nav-btn" href="{{ url_for('search', q=q, page=page + 1) }}" rel="next nofollow" aria-label="Next page">›</a>{% else %}<span class="nav-btn disabled" aria-disabled="true" aria-label="Next page">›</span>{% endif %}
         </nav>
         {% endif %}
         {% endif %}
