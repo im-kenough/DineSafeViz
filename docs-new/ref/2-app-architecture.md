@@ -33,15 +33,16 @@ flowchart LR
 The Flask app is `src/dsv-app/app.py`. Gunicorn runs it with 1 worker and 4
 threads on port 8000.
 
-| Route                | Returns                                                                                                |
-| -------------------- | ------------------------------------------------------------------------------------------------------ |
-| `/`                  | Home page with total inspections and years of data.                                                    |
-| `/inspections`       | One quarter (`?year=&q=`), grouped by day and establishment.                                           |
-| `/inspections/month` | One month as an HTML fragment, loaded when you expand an older month.                                  |
-| `/dashboard`         | The inspections dashboard (Grafana) in an iframe (`/analytics/d/dinesafe/dinesafe-inspections?kiosk`). |
-| `/info`              | What the severities and results mean.                                                                  |
-| `/healthz`           | Liveness.                                                                                              |
-| `/readyz`            | Readiness. Checks the database connection.                                                             |
+| Route                 | Returns                                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------------------------ |
+| `/`                   | Home page with total inspections and years of data.                                                    |
+| `/inspections`        | One quarter (`?year=&q=`), grouped by day and establishment.                                           |
+| `/inspections/month`  | One month as an HTML fragment, loaded when you expand an older month.                                  |
+| `/establishment/<id>` | Every inspection for one establishment ID, newest first. 404 for a malformed or unknown ID.            |
+| `/dashboard`          | The inspections dashboard (Grafana) in an iframe (`/analytics/d/dinesafe/dinesafe-inspections?kiosk`). |
+| `/info`               | What the severities and results mean.                                                                  |
+| `/healthz`            | Liveness.                                                                                              |
+| `/readyz`             | Readiness. Checks the database connection.                                                             |
 
 ## Access
 
