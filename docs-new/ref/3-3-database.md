@@ -1,18 +1,18 @@
 ## Database schema
 
-`src/dsv-db/init.sql` and `src/dsv-db/migrations/001_load_log.sql` define two
-tables in the `public` schema of the `dinesafe` database. No foreign key
+`src/dsv-db/init.sql` and the migrations in `src/dsv-db/migrations/` define
+two tables in the `public` schema of the `dinesafe` database. No foreign key
 links them.
 
 ```mermaid
 erDiagram
     inspections {
         SERIAL id PK
-        TEXT establishment_id
+        TEXT establishment_id "indexed"
         TEXT inspection_id
-        TEXT establishment_name
+        TEXT establishment_name "indexed"
         TEXT establishment_type
-        TEXT establishment_address
+        TEXT establishment_address "indexed"
         TEXT infraction_details
         TEXT infraction_category
         DATE inspection_date "indexed"
@@ -50,29 +50,29 @@ fields repeat on every row. About 136 MB on disk: 120 MB table, 15 MB indexes
 In the **Read by** column, *dashboard* means the inspections dashboard
 (Grafana).
 
-| Column                     | Type             | `NULL` when                        | Read by               |
-| -------------------------- | ---------------- | ---------------------------------- | --------------------- |
-| `id`                       | SERIAL PK        | Never                              | —                     |
-| `establishment_id`         | TEXT             | Never                              | App, stats, dashboard |
-| `inspection_id`            | TEXT             | Recent rows                        | —                     |
-| `establishment_name`       | TEXT             | Never                              | App                   |
-| `establishment_type`       | TEXT             | Recent rows                        | App, dashboard        |
-| `establishment_address`    | TEXT             | Never                              | App (sort tiebreak)   |
-| `infraction_details`       | TEXT             | Clean inspection                   | App, dashboard        |
-| `infraction_category`      | TEXT             | Historical rows, clean inspection  | App, dashboard        |
-| `inspection_date`          | DATE             | Never                              | App, stats, dashboard |
-| `severity`                 | TEXT             | Clean inspection                   | App, dashboard        |
-| `action`                   | TEXT             | Recent rows, clean inspection      | App                   |
-| `outcome`                  | TEXT             | No prosecution (about 99% of rows) | App                   |
-| `outcome_date`             | TEXT             | Historical rows, no outcome        | App                   |
-| `amount_fined`             | TEXT             | No fine                            | App                   |
-| `latitude`, `longitude`    | DOUBLE PRECISION | Never                              | —                     |
-| `unique_id`                | TEXT             | Historical rows                    | —                     |
-| `establishment_status`     | TEXT             | Never                              | App, dashboard        |
-| `min_inspections_per_year` | TEXT             | Recent rows                        | —                     |
-| `street`                   | TEXT             | Never                              | App                   |
-| `unit`                     | TEXT             | No unit found (about 78% of rows)  | App                   |
-| `postal_code`              | TEXT             | Historical rows, recent `None`     | App                   |
+| Column                     | Type             | `NULL` when                        | Read by                     |
+| -------------------------- | ---------------- | ---------------------------------- | --------------------------- |
+| `id`                       | SERIAL PK        | Never                              | —                           |
+| `establishment_id`         | TEXT             | Never                              | App, stats, dashboard       |
+| `inspection_id`            | TEXT             | Recent rows                        | —                           |
+| `establishment_name`       | TEXT             | Never                              | App, search                 |
+| `establishment_type`       | TEXT             | Recent rows                        | App, dashboard              |
+| `establishment_address`    | TEXT             | Never                              | App (sort tiebreak, search) |
+| `infraction_details`       | TEXT             | Clean inspection                   | App, dashboard              |
+| `infraction_category`      | TEXT             | Historical rows, clean inspection  | App, dashboard              |
+| `inspection_date`          | DATE             | Never                              | App, stats, dashboard       |
+| `severity`                 | TEXT             | Clean inspection                   | App, dashboard              |
+| `action`                   | TEXT             | Recent rows, clean inspection      | App                         |
+| `outcome`                  | TEXT             | No prosecution (about 99% of rows) | App                         |
+| `outcome_date`             | TEXT             | Historical rows, no outcome        | App                         |
+| `amount_fined`             | TEXT             | No fine                            | App                         |
+| `latitude`, `longitude`    | DOUBLE PRECISION | Never                              | —                           |
+| `unique_id`                | TEXT             | Historical rows                    | —                           |
+| `establishment_status`     | TEXT             | Never                              | App, dashboard              |
+| `min_inspections_per_year` | TEXT             | Recent rows                        | —                           |
+| `street`                   | TEXT             | Never                              | App                         |
+| `unit`                     | TEXT             | No unit found (about 78% of rows)  | App                         |
+| `postal_code`              | TEXT             | Historical rows, recent `None`     | App                         |
 
 - "Never" is observed in the data, not enforced: every column except `id` is
   nullable.
@@ -100,12 +100,20 @@ One row per successful seed or refresh. The newest row records what's loaded.
 
 ### Indexes and constraints
 
-The schema is minimal: one secondary index and no data constraints on
-`inspections`.
+The schema has four secondary indexes and no data constraints on
+`inspections`. Migration `002_search_indexes.sql` adds three of them and
+the `pg_trgm` extension they use.
 
-- `inspections_inspection_date_idx` on `inspection_date`. Every app, refresh,
-  and inspections dashboard (Grafana) query
-  filters on it.
+- `inspections_inspection_date_idx` on `inspection_date`. Every app,
+  refresh, and inspections dashboard (Grafana) query filters on it.
+- `inspections_establishment_name_trgm_idx` and
+  `inspections_establishment_address_trgm_idx`: GIN trigram indexes on
+  `establishment_name` and `establishment_address`. They let search's
+  `ILIKE '%word%'` skip the full-table scan. Words shorter than 3
+  characters can't use them, so search ignores those words.
+- `inspections_establishment_id_idx` on `establishment_id`. Search and the
+  restaurant page (`/establishment/<id>`) read all of a restaurant's rows
+  by ID.
 - Primary keys on both `id` columns. No unique, `NOT NULL`, or `CHECK`
   constraints on `inspections`.
 
