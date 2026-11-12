@@ -129,8 +129,9 @@ h2.page-heading {
     border-top: 1px solid var(--border);
 }
 .nav-btn.disabled { color: var(--text-muted); border-color: var(--border); pointer-events: none; }
-/* pager buttons sized to a 44x44 tap target, label centred */
+/* pager buttons sized to a 44x44 tap target (padding included), label centred */
 .pager .nav-btn {
+    box-sizing: border-box;
     display: inline-flex;
     align-items: center;
     justify-content: center;
