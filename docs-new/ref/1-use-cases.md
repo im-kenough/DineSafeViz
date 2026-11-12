@@ -17,7 +17,7 @@ grouped by primary actors.
 
 ### UC-USR-04: View a restaurant's inspection history
 
-- The end user selects a restaurant's name on the inspections page or in
+- The end user selects a restaurant's name on the inspections page.
   search results.
 - The site shows every inspection for that restaurant, newest first.
 - A restaurant open before and after 2023 has two histories, one per
