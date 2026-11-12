@@ -45,6 +45,8 @@ threads on port 8000.
 | `/healthz`            | Liveness.                                                                                              |
 | `/readyz`             | Readiness. Checks the database connection.                                                             |
 
+For how search finds restaurants, see [Restaurant search](3-11-search.md).
+
 ## Access
 
 Each service connects to Postgres with its own role. The inspections dashboard

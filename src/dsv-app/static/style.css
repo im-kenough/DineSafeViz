@@ -141,6 +141,28 @@ h2.page-heading {
     text-align: center;
 }
 
+/* ── search form (nav and home hero) ────────────────────── */
+.search-form { display: flex; gap: 0.5rem; }
+.search-form input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: clamp(0.9rem, 1vw, 1.15rem);
+}
+.search-form input::placeholder { color: var(--text-muted); }
+.search-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.search-form button { font-family: inherit; cursor: pointer; }
+/* nav: the form takes over .social-links' job of pushing the icons right */
+.nav-search { margin-left: auto; width: clamp(12rem, 22vw, 20rem); }
+.nav-search + .social-links { margin-left: 0; }
+.hero-search { max-width: 36rem; margin: 1.5rem auto 0; }
+.hero-search input { padding: 0.75rem 1rem; }
+
 /* ── day box ────────────────────────────────────────────── */
 .day-box {
     border: 1px solid var(--border);
@@ -357,6 +379,8 @@ footer {
     .tabs > a,
     .dropdown > summary { padding: 0.5rem 0.35rem; }
     .social-links { margin-left: 0; }
+    /* search gets its own full-width row under the tabs */
+    .nav-search { flex: 1 1 100%; width: auto; margin-left: 0; }
 
     /* picker spans the nav width instead of hanging off the Inspections tab */
     .dropdown { position: static; }
@@ -399,6 +423,8 @@ footer {
 @media (max-width: 1023px) {
     .link-label { display: none; }
     .social-links .nav-btn { min-width: 44px; min-height: 44px; }
+    .search-form input,
+    .search-form button { min-height: 44px; }
 }
 
 /* ── QHD spacing ────────────────────────────────────────── */

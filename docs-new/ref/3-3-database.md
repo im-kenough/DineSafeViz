@@ -117,6 +117,8 @@ the `pg_trgm` extension they use.
 - Primary keys on both `id` columns. No unique, `NOT NULL`, or `CHECK`
   constraints on `inspections`.
 
+For how search uses these indexes, see [Restaurant search](3-11-search.md).
+
 ### Roles and grants
 
 Three roles. The pipeline and readers never use the superuser.

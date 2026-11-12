@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
+{% from "_search.html" import search_form %}
 {% block head %}
     <style>
         .home-shell {
@@ -142,6 +143,7 @@
         <section class="hero">
             <h2>Find restaurants that pass inspection</h2>
             <p>Explore Toronto Public Health's food safety data <span class="hero-stats">{{ "{:,}".format(stats.total_inspections) }} inspections over {{ stats.years_of_data }} years</span></p>
+            {{ search_form('hero-q', 'hero-search') }}
         </section>
 
         <section class="day-box explore" aria-labelledby="explore-heading">

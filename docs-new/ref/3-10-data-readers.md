@@ -18,6 +18,8 @@ Two services read Postgres, both as `dinesafe_app`: `SELECT` only, with a
 - Connections are plaintext, on the internal `backend` network only.
 - Both read the `dinesafe_app` password from a Key Vault secret, via
   `.env`.
+- `/search` and `/establishment/<id>` read by restaurant, not by date. See
+  [Restaurant search](3-11-search.md).
 
 ### When Postgres is down
 
