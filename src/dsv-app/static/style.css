@@ -144,7 +144,7 @@ h2.page-heading {
 }
 
 /* ── search form (nav and home hero) ────────────────────── */
-.search-form { display: flex; gap: 0.5rem; }
+.search-form { display: flex; gap: 0.5rem; min-width: 0; }
 .search-form input {
     flex: 1 1 auto;
     min-width: 0;
@@ -159,8 +159,8 @@ h2.page-heading {
 .search-form input::placeholder { color: var(--text-muted); }
 .search-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .search-form button { font-family: inherit; cursor: pointer; }
-/* nav: the form takes over .social-links' job of pushing the icons right */
-.nav-search { margin-left: auto; width: clamp(12rem, 22vw, 20rem); }
+/* nav: the form fills the gap after the tabs and takes over .social-links' job of pushing the icons right */
+.nav-search { flex: 1 1 18rem; max-width: 30rem; margin-left: auto; }
 .nav-search + .social-links { margin-left: 0; }
 .hero-search { max-width: 36rem; margin: 1.5rem auto 0; }
 .hero-search input { padding: 0.75rem 1rem; }
@@ -373,7 +373,9 @@ footer {
     .dropdown > summary { padding: 0.5rem 0.35rem; }
     .social-links { margin-left: 0; }
     /* search gets its own full-width row under the tabs */
-    .nav-search { flex: 1 1 100%; width: auto; margin-left: 0; }
+    .nav-search { flex: 1 1 100%; max-width: none; margin-left: 0; }
+    /* slimmer side padding so the placeholder fits on 320px phones */
+    .hero-search input { padding-inline: 0.75rem; }
 
     /* picker spans the nav width instead of hanging off the Inspections tab */
     .dropdown { position: static; }
@@ -399,6 +401,7 @@ footer {
     .infractions { table-layout: fixed; }
     .infractions th:first-child { width: 5.5rem; }
     .infractions th, .infractions td { padding: 0.3rem 0.4rem; }
+    .infractions th { white-space: normal; }
 }
 
 /* ── tablet (601px – 1023px: iPad portrait, phone landscape) */
@@ -407,13 +410,17 @@ footer {
         margin: 1.25rem auto;
         padding: 0 1.25rem;
     }
+
+    /* search gets its own full-width row under the tabs; the icons stay on the first row */
+    .nav-search { order: 1; flex-basis: 100%; max-width: none; margin-left: 0; }
+    .nav-search + .social-links { margin-left: auto; }
 }
 
-/* ── below desktop (≤ 1023px: mobile + tablet) ──────────── */
-/* nav social links drop their labels; icons sized to a 44x44 tap target */
-@media (max-width: 1023px) {
+/* ── touch widths (≤ 1279px: mobile, tablet, iPad landscape) */
+/* nav social links drop their labels so the search fits; icons sized to a 44x44 tap target */
+@media (max-width: 1279px) {
     .link-label { display: none; }
-    .social-links .nav-btn { min-width: 44px; min-height: 44px; }
+    .social-links .nav-btn { min-width: 44px; min-height: 44px; padding: 0; }
     .search-form input,
     .search-form button { min-height: 44px; }
 }
