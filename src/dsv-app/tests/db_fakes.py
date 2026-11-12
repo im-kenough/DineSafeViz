@@ -25,6 +25,16 @@ def rows_conn(rows):
     return conn
 
 
+def search_conn(rows, total=None):
+    """A fake connection answering /search: the count query's fetchone(), then fetchall().
+
+    total defaults to len(rows), as for a search with one page of results.
+    """
+    conn = rows_conn(rows)
+    conn.cursor.return_value.fetchone.return_value = {"total": len(rows) if total is None else total}
+    return conn
+
+
 def stats_conn(total, min_date, max_date):
     """A fake connection answering the home-stats query with one row."""
     conn = fake_conn()

@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 
 import app as app_module
-from db_fakes import rows_conn
+from db_fakes import search_conn
 
 HINT = "Search by restaurant name or address, like pizza or queen."
 
@@ -26,7 +26,7 @@ def _result(n=1, name="Pizza Pizza", status="Pass", est_type="Restaurant", unit=
 
 def _search(client, q, rows=()):
     """GET /search?q=... with a fake DB. Returns (html, connect mock, cursor mock)."""
-    conn = rows_conn(list(rows))
+    conn = search_conn(list(rows))
     query_string = None if q is None else {"q": q}
     with patch("app.psycopg2.connect", return_value=conn) as connect:
         resp = client.get("/search", query_string=query_string)
@@ -100,29 +100,25 @@ def test_result_without_type_hides_type(client):
     assert '<span class="est-type">Restaurant</span>' not in html
 
 
-def test_more_than_limit_shows_first_fifty(client):
-    rows = [_result(n) for n in range(app_module.SEARCH_LIMIT + 1)]
-    html, _, _ = _search(client, "pizza", rows)
-    assert html.count('class="result-card') == 50
-    assert "50+ restaurants. Showing the first 50. Add a word to narrow it down." in html
-
-
 def test_no_matches_shows_message_and_hint(client):
     html, _, _ = _search(client, "zzzz")
+    assert '<span class="heading-dates">0 restaurants</span>' in html
     assert 'No restaurants match "zzzz".' in html
     assert HINT in html
 
 
 def test_search_sql_has_no_user_input(client):
-    _, _, cur = _search(client, "Pizza'; DROP TABLE inspections;--")
-    query, params = cur.execute.call_args.args
-    text = query.as_string(None)
-    assert "drop table" not in text.lower()
-    assert "pizza" not in text
-    # 4 words, 2 patterns each, then the prefix pattern and the limit.
-    assert text.count("%s") == 10
+    _, _, cur = _search(client, "Pizza'; DROP TABLE inspections;--", [_result()])
+    (count, count_params), (query, params) = (c.args for c in cur.execute.call_args_list)
+    for sql_text in (count.as_string(None), query.as_string(None)):
+        assert "drop table" not in sql_text.lower()
+        assert "pizza" not in sql_text
+    # 4 words, 2 patterns each; the page adds the prefix pattern, limit and offset.
+    assert count.as_string(None).count("%s") == 8
+    assert count_params == params[:8]
+    assert query.as_string(None).count("%s") == 11
     assert params[:2] == ["%pizza';%", "%pizza';%"]
-    assert params[-2:] == ["pizza';%", 51]
+    assert params[-3:] == ["pizza';%", 50, 0]
 
 
 def test_query_is_html_escaped(client):
@@ -143,12 +139,12 @@ def test_control_characters_are_stripped_before_searching(client, q):
     html, connect, cur = _search(client, q)
     connect.assert_called_once()
     _, params = cur.execute.call_args.args
-    assert params == ["%abc%", "%abc%", "abc%", 51]
+    assert params == ["%abc%", "%abc%"]
     assert 'No restaurants match "abc".' in html
 
 
 def test_nul_in_query_returns_200(client):
-    conn = rows_conn([])
+    conn = search_conn([])
 
     def execute(_query, params):
         # Real psycopg2 raises this for a NUL in any string parameter.

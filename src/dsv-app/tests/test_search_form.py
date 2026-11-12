@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from db_fakes import rows_conn
+from db_fakes import search_conn
 
 
 def test_nav_has_search_form(client):
@@ -25,13 +25,13 @@ def test_404_page_has_nav_form(client):
 
 
 def test_search_page_prefills_nav_input(client):
-    with patch("app.psycopg2.connect", return_value=rows_conn([])):
+    with patch("app.psycopg2.connect", return_value=search_conn([])):
         html = client.get("/search?q=pizza+queen").data.decode()
     assert 'id="nav-q" name="q" value="pizza queen"' in html
 
 
 def test_nav_input_value_is_escaped(client):
-    with patch("app.psycopg2.connect", return_value=rows_conn([])):
+    with patch("app.psycopg2.connect", return_value=search_conn([])):
         html = client.get("/search", query_string={"q": '"><b>pizza'}).data.decode()
     assert '"><b>pizza' not in html
     assert 'value="&#34;&gt;&lt;b&gt;pizza"' in html

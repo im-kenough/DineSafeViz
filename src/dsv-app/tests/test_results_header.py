@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 import app as app_module
-from db_fakes import rows_conn
+from db_fakes import search_conn
 
 _STYLE_CSS = Path(__file__).resolve().parent.parent / "static" / "style.css"
 EST_ID = "001Vo000013QjdPIAS"
@@ -50,8 +50,8 @@ def _inspection(day, name="Pizza Pizza", unit=None):
     }
 
 
-def _get(client, url, rows=()):
-    with patch("app.psycopg2.connect", return_value=rows_conn(list(rows))):
+def _get(client, url, rows=(), total=None):
+    with patch("app.psycopg2.connect", return_value=search_conn(list(rows), total)):
         resp = client.get(url)
     assert resp.status_code == 200
     return resp.data.decode()
@@ -82,20 +82,20 @@ def _media_block(query):
     return css[start:i - 1]
 
 
-@pytest.mark.parametrize("q, rows", [
-    ("", []),
-    ("ab c", []),
-    ("zzzz", []),
-    ("pizza", [_search_result(1), _search_result(2)]),
-    ("pizza", [_search_result(n) for n in range(app_module.SEARCH_LIMIT + 1)]),
+@pytest.mark.parametrize("q, rows, total", [
+    ("", [], None),
+    ("ab c", [], None),
+    ("zzzz", [], None),
+    ("pizza", [_search_result(1), _search_result(2)], None),
+    ("pizza", [_search_result(n) for n in range(app_module.SEARCH_LIMIT)], 157),
 ], ids=["empty", "short-words", "no-matches", "results", "more-than-limit"])
-def test_search_content_inside_results_section(client, q, rows):
-    html = _get(client, f"/search?q={q}", rows)
+def test_search_content_inside_results_section(client, q, rows, total):
+    html = _get(client, f"/search?q={q}", rows, total)
     assert html.count('<section class="results-section">') == 1
     start = html.index('<section class="results-section">')
     end = html.index("</section>", start)
     assert start < html.index('<h2 class="page-heading">') < end
-    for tag in ('<p class="no-data">', '<ul class="results">'):
+    for tag in ('<p class="no-data">', '<ul class="results">', '<nav class="pager"'):
         if tag in html:
             assert start < html.index(tag) < end
 

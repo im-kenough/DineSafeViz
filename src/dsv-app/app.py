@@ -268,11 +268,16 @@ def _fetch_establishment(establishment_id: str) -> List[Dict]:
 # One per search word: the word is in the name or the address.
 _SEARCH_MATCH = sql.SQL("(establishment_name ILIKE %s OR establishment_address ILIKE %s)")
 
+# How many establishments match, for the heading and the page count.
+_SEARCH_COUNT_QUERY = sql.SQL(
+    "SELECT COUNT(DISTINCT establishment_id) AS total FROM inspections WHERE {match}"
+)
+
 # Finds the matching establishment IDs, then summarizes all of each one's rows:
 # a match on one row (say, before a rename) still counts every inspection.
 # Names starting with the first word rank first, then the most recently
-# inspected, then name and ID so the order is stable. Ranking and LIMIT need
-# only each one's latest row, so the totals are counted for the page alone.
+# inspected, then name and ID so the order is stable. Ranking and LIMIT/OFFSET
+# need only each one's latest row, so the totals are counted for the page alone.
 _SEARCH_QUERY = sql.SQL("""
 WITH ids AS (
     SELECT DISTINCT establishment_id FROM inspections WHERE {match}
@@ -291,7 +296,7 @@ page AS (
            ) AS rank
     FROM latest
     ORDER BY rank
-    LIMIT %s
+    LIMIT %s OFFSET %s
 )
 SELECT page.establishment_id, page.establishment_name, page.street, page.unit,
        page.establishment_status, page.last_inspected,
@@ -329,27 +334,77 @@ def like_pattern(term: str, prefix: bool = False) -> str:
     return f"{escaped}%" if prefix else f"%{escaped}%"
 
 
-def search_query(terms: List[str]) -> Tuple[sql.Composed, List]:
-    """Build the search SQL and its parameters for one or more terms.
-
-    The SQL repeats the constant _SEARCH_MATCH once per term; the terms
-    themselves travel only as parameters. Asks for SEARCH_LIMIT + 1 rows so
-    the page can tell there are more.
-    """
+def _search_match(terms: List[str]) -> Tuple[sql.Composed, List]:
+    """The WHERE clause for terms (the constant _SEARCH_MATCH once per term) and its params."""
     match = sql.SQL(" AND ").join([_SEARCH_MATCH] * len(terms))
     params: List = []
     for term in terms:
         pattern = like_pattern(term)
         params += [pattern, pattern]
-    params += [like_pattern(terms[0], prefix=True), SEARCH_LIMIT + 1]
+    return match, params
+
+
+def search_count_query(terms: List[str]) -> Tuple[sql.Composed, List]:
+    """Build the SQL and parameters counting the establishments that match terms."""
+    match, params = _search_match(terms)
+    return _SEARCH_COUNT_QUERY.format(match=match), params
+
+
+def search_query(terms: List[str], page: int = 1) -> Tuple[sql.Composed, List]:
+    """Build the search SQL and its parameters for one page of results.
+
+    The SQL repeats the constant _SEARCH_MATCH once per term; the terms, the
+    page size and the offset travel only as parameters.
+    """
+    match, params = _search_match(terms)
+    params += [like_pattern(terms[0], prefix=True), SEARCH_LIMIT, (page - 1) * SEARCH_LIMIT]
     return _SEARCH_QUERY.format(match=match), params
 
 
-def _search_establishments(terms: List[str]) -> List[Dict]:
-    """Return establishments matching every term, best first, at most SEARCH_LIMIT + 1."""
+def page_count(total: int) -> int:
+    """Number of SEARCH_LIMIT-sized pages that hold total results."""
+    return -(-total // SEARCH_LIMIT)
+
+
+def parse_page(raw: Optional[str]) -> int:
+    """Return the page number in raw, or 1 if it is missing, 0, or not plain ASCII digits."""
+    raw = raw or ""
+    if not (raw.isascii() and raw.isdigit()):
+        return 1
+    try:
+        return int(raw) or 1
+    except ValueError:  # longer than sys.get_int_max_str_digits()
+        return 1
+
+
+def page_window(page: int, pages: int) -> List[Optional[int]]:
+    """Page numbers for the pager: the first, the last, and page's neighbours.
+
+    None marks a gap of two or more pages; a gap of one page shows that page.
+    """
+    shown = sorted(p for p in {1, page - 1, page, page + 1, pages} if 1 <= p <= pages)
+    window: List[Optional[int]] = []
+    for p in shown:
+        if window and p - window[-1] == 2:
+            window.append(p - 1)
+        elif window and p - window[-1] > 2:
+            window.append(None)
+        window.append(p)
+    return window
+
+
+def _search_establishments(terms: List[str], page: int) -> Tuple[int, List[Dict]]:
+    """Return how many establishments match every term, and the page's rows, best first.
+
+    Skips the page query when there are no matches or page is past the end.
+    """
     with _db_cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute(*search_query(terms))
-        return cur.fetchall()
+        cur.execute(*search_count_query(terms))
+        total = cur.fetchone()["total"]
+        if page > page_count(total):
+            return total, []
+        cur.execute(*search_query(terms, page))
+        return total, cur.fetchall()
 
 
 # ---------------------------------------------------------------------------
@@ -706,7 +761,6 @@ app.jinja_env.globals.update(
     status_class=STATUS_CLASS,
     search_min_term=SEARCH_MIN_TERM,
     search_max_len=SEARCH_MAX_LEN,
-    search_limit=SEARCH_LIMIT,
 )
 app.jinja_env.filters["longdate"] = lambda d: d.strftime("%B %-d, %Y")
 
@@ -803,20 +857,25 @@ def establishment(establishment_id):
 
 @app.route("/search")
 def search():
-    """Render restaurant search results for ?q=.
+    """Render restaurant search results for ?q=, SEARCH_LIMIT per ?page=.
 
     Queries the database only when q has a word of SEARCH_MIN_TERM or more
     characters; otherwise the page shows a hint.
     """
     q = _CONTROL_CHARS_RE.sub(" ", request.args.get("q") or "").strip()[:SEARCH_MAX_LEN]
     terms = search_terms(q)
-    results = _search_establishments(terms) if terms else []
+    page = parse_page(request.args.get("page"))
+    total, results = _search_establishments(terms, page) if terms else (0, [])
+    pages = page_count(total)
     return render_template(
         "search.html",
         q=q,
         terms=terms,
-        results=results[:SEARCH_LIMIT],
-        more=len(results) > SEARCH_LIMIT,
+        total=total,
+        results=results,
+        page=page,
+        pages=pages,
+        window=page_window(page, pages),
     )
 
 
