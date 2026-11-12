@@ -36,9 +36,15 @@ updates:
     groups:
       docker-minor-patch:
         update-types: ["minor", "patch"]
+    # The project standardizes on Python 3.14.* (docs-new/ref/20-dependencies.md),
+    # so only patch releases come through.
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   # Upstream images pinned in the Compose files. Postgres major versions need
-  # a data migration, not just a new tag, so they're ignored.
+  # a data migration, not just a new tag, so they're ignored. Grafana and
+  # nginx majors need a manual review of breaking changes.
   - package-ecosystem: "docker-compose"
     directory: "/"
     schedule:
@@ -51,6 +57,38 @@ updates:
     ignore:
       - dependency-name: "postgres"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "grafana/grafana"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "nginx"
+        update-types: ["version-update:semver-major"]
+
+  # Terraform providers and lock files for both stacks. Provider majors have
+  # breaking changes, so they're ignored.
+  - package-ecosystem: "terraform"
+    directories:
+      - "/infra/terraform/landing-zone"
+      - "/infra/rug/terraform"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      terraform-minor-patch:
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # Hook revisions in .pre-commit-config.yaml (gitleaks, pre-commit-hooks)
+  - package-ecosystem: "pre-commit"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      pre-commit-minor-patch:
+        update-types: ["minor", "patch"]
 
   # Update GitHub Actions versions in workflows files
   - package-ecosystem: "github-actions"
