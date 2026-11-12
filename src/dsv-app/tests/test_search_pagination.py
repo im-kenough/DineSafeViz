@@ -250,7 +250,7 @@ def test_pager_css():
 def test_pager_buttons_are_tap_sized():
     body = _css_rule(".pager .nav-btn")
     assert body is not None
-    for decl in ("min-width: 44px", "min-height: 44px", "display: inline-flex",
+    for decl in ("box-sizing: border-box", "min-width: 44px", "min-height: 44px", "display: inline-flex",
                  "align-items: center", "justify-content: center"):
         assert decl in body
     assert "#" not in body
