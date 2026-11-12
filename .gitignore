@@ -260,6 +260,22 @@ src/dsv-pipeline/**/*.zip
 **/.terraform/
 **/*.tfstate*
 **/terraform.tfvars
+# Secret variable files, plan files, and crash logs can hold secret values.
+# The per-environment infra/terraform/envs/<env>/*.tfvars files hold only
+# non-secret settings and are committed, as are the *.tfvars.example files.
+**/*.secret.tfvars
+**/*.tfvars.json
+**/*.auto.tfvars
+**/*.tfplan
+**/tfplan
+**/crash.log
+**/crash.*.log
+**/override.tf
+**/override.tf.json
+**/*_override.tf
+**/*_override.tf.json
+**/.terraformrc
+**/terraform.rc
 
 # Packer
 infra/packer/variables.pkrvars.hcl

@@ -9,3 +9,20 @@ repos:
     rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e # frozen: v8.30.1
     hooks:
       - id: gitleaks
+  # Blocks private keys (PEM and SSH) that gitleaks rules can miss.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # frozen: v6.0.0
+    hooks:
+      - id: detect-private-key
+        # These hold REPLACE_WITH_... or dummy placeholder keys, not real ones.
+        exclude: '^(infra/rug/ansible/vault/example-secrets\.yml|docs/rug/.*\.md)$'
+  # Blocks Terraform state, secret variable, and plan files even if someone
+  # force-adds them past .gitignore. The committed envs/<env>/*.tfvars and
+  # *.tfvars.example files stay allowed.
+  - repo: local
+    hooks:
+      - id: forbid-terraform-secret-files
+        name: forbid Terraform state, secret tfvars, and plan files
+        language: fail
+        entry: Terraform state, secret variable, or plan files can hold secrets. Remove them from the commit.
+        files: '(\.tfstate(\.[^/]*)?|(^|/)terraform\.tfvars|\.secret\.tfvars|\.auto\.tfvars|\.tfvars\.json|\.tfplan|(^|/)tfplan|(^|/)crash(\.[^/]*)?\.log|(^|/)\.terraformrc|(^|/)terraform\.rc)$'
