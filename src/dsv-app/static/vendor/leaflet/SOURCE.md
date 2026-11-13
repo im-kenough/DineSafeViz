@@ -18,4 +18,4 @@ a7837102824184820dfa198d1ebcd109ff6d0ff9a2672a074b9a1b4d147d04c6  leaflet.css
 ```
 
 To upgrade, download the new tarball, check its npm integrity, copy the same
-three files, and update this page and the test.
+three files, and update this page.
