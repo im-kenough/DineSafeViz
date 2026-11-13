@@ -36,11 +36,11 @@ published images, networks, hardening, and memory limits.
 
 | Service         | Image                                 | Networks (VM)       | Memory (VM) | Role                                                       |
 | --------------- | ------------------------------------- | ------------------- | ----------- | ---------------------------------------------------------- |
-| `dsv-tunnel`    | `cloudflare/cloudflared:2026.10.0`    | `edge`              | 64 MiB      | Outbound tunnel to Cloudflare. VM only.                    |
-| `dsv-nginx`     | `nginx:1.31.0-alpine-slim`            | `edge`, `backend`   | 64 MiB      | Reverse proxy for the app and `/analytics/`.               |
+| `dsv-tunnel`    | `cloudflare/cloudflared:2026.11.0`    | `edge`              | 64 MiB      | Outbound tunnel to Cloudflare. VM only.                    |
+| `dsv-nginx`     | `nginx:1.31.8-alpine3.24-slim`        | `edge`, `backend`   | 64 MiB      | Reverse proxy for the app and `/analytics/`.               |
 | `dsv-app`       | `ghcr.io/im-kenough/dsv-app`          | `backend`           | 192 MiB     | Flask app. Read-only database role.                        |
-| `dsv-db`        | `postgres:18.6-alpine3.24`            | `backend`           | 320 MiB     | Postgres with the `inspections` and `load_log` tables.     |
-| `dsv-analytics` | `grafana/grafana:13.2.3`              | `backend`           | 320 MiB     | Dashboard. Read-only database role.                        |
+| `dsv-db`        | `postgres:18.7-alpine3.24`            | `backend`           | 320 MiB     | Postgres with the `inspections` and `load_log` tables.     |
+| `dsv-analytics` | `grafana/grafana:13.3.1`              | `backend`           | 320 MiB     | Dashboard. Read-only database role.                        |
 | `dsv-pipeline`  | `ghcr.io/im-kenough/dsv-pipeline`     | `egress`, `backend` | 256 MiB     | On demand: `ingest`, `load`, or `run`. Profile `pipeline`. |
 
 Locally, Compose builds `dsv-app` and `dsv-pipeline` from `src/dsv-app` and

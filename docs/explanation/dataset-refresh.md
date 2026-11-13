@@ -365,7 +365,7 @@ option you choose.
   every run." Since PR #252, `data.py fetch` downloads it, and `refresh.py`
   has no network code.
 - `docs/ref/data-mapping.md` names the database image `postgres:17.10`.
-  `docker-compose.yml` runs `postgres:18.6`.
+  `docker-compose.yml` runs `postgres:18.7`.
 - `docs/ref/spec.md` describes flow C as a "nightly ETL refresh" and the
   dataset as "~100k rows." The timer runs on business-day mornings, and the
   table holds about 516,000 rows.
