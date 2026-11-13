@@ -230,11 +230,12 @@ def _db_cursor(connect_timeout: int = 5, **cursor_kwargs):
         cursor.release()
 
 
-# Every column _days.html renders, for the date-range and per-establishment fetches.
+# Every column _days.html renders, plus the map's coordinates, for the
+# date-range and per-establishment fetches.
 _INSPECTION_SELECT = (
     "SELECT inspection_date, establishment_status, action, infraction_details,"
     "       establishment_name, establishment_address, establishment_type,"
-    "       street, unit, postal_code,"
+    "       street, unit, postal_code, latitude, longitude,"
     "       outcome, outcome_date, amount_fined,"
     "       establishment_id, severity,"
     "       infraction_category"
@@ -714,6 +715,16 @@ def build_history(rows: List[Dict]) -> List[Tuple[date, List[Dict]]]:
     return [(d, group_establishments(by_date[d])) for d in sorted(by_date, reverse=True)]
 
 
+def establishment_pin(rows: List[Dict]) -> Optional[Dict]:
+    """The map pin for one establishment's rows: its newest row with
+    coordinates, or None when no row has them."""
+    located = [r for r in rows if r.get("latitude") is not None and r.get("longitude") is not None]
+    if not located:
+        return None
+    newest = max(located, key=lambda r: r["inspection_date"])
+    return map_pin({**newest, "last_inspected": newest["inspection_date"]})
+
+
 def group_establishments(rows: List[Dict]) -> List[Dict]:
     """Group one day's infraction rows into one entry per establishment.
 
@@ -916,7 +927,10 @@ def establishment(establishment_id):
     if not rows:
         abort(404)
     days = build_history(rows)
-    return render_template("establishment.html", est=days[0][1][0], days=days)
+    pin = establishment_pin(rows)
+    return render_template(
+        "establishment.html", est=days[0][1][0], days=days, map_pins=[pin] if pin else [],
+    )
 
 
 @app.route("/search")
