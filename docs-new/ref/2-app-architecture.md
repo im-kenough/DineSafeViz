@@ -47,6 +47,12 @@ threads on port 8000.
 
 For how search finds restaurants, see [Restaurant search](3-11-search.md).
 
+The search and restaurant pages draw maps with Leaflet 1.9.4. Its files are
+vendored in `src/dsv-app/static/vendor/leaflet/`, pinned by checksum in
+`SOURCE.md`, so the site loads no third-party script. Visitors' browsers
+fetch the map tiles from `tile.openstreetmap.org`; the server makes no
+outbound requests for maps.
+
 ## Access
 
 Each service connects to Postgres with its own role. The inspections dashboard
