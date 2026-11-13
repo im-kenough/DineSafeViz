@@ -162,9 +162,8 @@ two results. Each result's first and latest dates tell them apart.
 ## Map
 
 The results page shows a map of Toronto above the list, with one pin for
-every matching restaurant, not just the current page. The restaurant page
-shows a map with one pin. Both use Leaflet 1.9.4, vendored in
-`src/dsv-app/static/vendor/leaflet/`.
+every matching restaurant, not just the current page. It uses Leaflet 1.9.4,
+vendored in `src/dsv-app/static/vendor/leaflet/`.
 
 - **Pins:** the map query matches the same IDs as the list and sorts them the
   same way. It takes each restaurant's latest row for the name and status,
