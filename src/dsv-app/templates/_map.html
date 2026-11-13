@@ -1,0 +1,12 @@
+{# Leaflet maps (static/map.js). map_head() goes in {% block head %}; the
+   container starts hidden, so pages look unchanged without JavaScript. #}
+{% macro map_head() -%}
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
+    <script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='map.js') }}" defer></script>
+{%- endmacro %}
+
+{% macro map_box(pins, label, extra_class, single=False) -%}
+    <div id="map" class="map {{ extra_class }}" role="region" aria-label="{{ label }}"{% if single %} data-single{% endif %} hidden></div>
+    <script type="application/json" id="map-data">{{ pins | tojson }}</script>
+{%- endmacro %}

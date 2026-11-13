@@ -10,3 +10,16 @@ def test_search_doc_describes_count_and_pages():
         assert phrase in text
     for stale in ("Up to 50", "first 51", "51 IDs", "50+"):
         assert stale not in text
+
+
+def test_search_doc_describes_the_map():
+    text = DOC.read_text()
+    for phrase in ("## Map", "SEARCH_MAP_LIMIT", "1,000", "tile.openstreetmap.org", "IP address"):
+        assert phrase in text
+    assert "filters, or maps" not in text
+
+
+def test_search_doc_map_covers_only_the_results_page():
+    # The restaurant-page map is Map 3, not built yet.
+    text = DOC.read_text()
+    assert "restaurant page shows a map" not in " ".join(text.split())

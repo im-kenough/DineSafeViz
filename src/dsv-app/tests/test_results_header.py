@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 import app as app_module
-from db_fakes import search_conn
+from db_fakes import rows_conn, search_conn
 
 _STYLE_CSS = Path(__file__).resolve().parent.parent / "static" / "style.css"
 EST_ID = "001Vo000013QjdPIAS"
@@ -51,7 +51,9 @@ def _inspection(day, name="Pizza Pizza", unit=None):
 
 
 def _get(client, url, rows=(), total=None):
-    with patch("app.psycopg2.connect", return_value=search_conn(list(rows), total)):
+    rows = list(rows)
+    conn = search_conn(rows, total) if url.startswith("/search") else rows_conn(rows)
+    with patch("app.psycopg2.connect", return_value=conn):
         resp = client.get(url)
     assert resp.status_code == 200
     return resp.data.decode()

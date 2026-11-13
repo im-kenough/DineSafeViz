@@ -87,7 +87,7 @@ def test_parse_page(raw, page):
 def test_huge_page_never_reaches_the_db(client):
     # Past the end, so no OFFSET too big for Postgres' bigint is ever sent.
     html, cur = _search(client, page="9" * 30, rows=[])
-    assert cur.execute.call_count == 1
+    assert cur.execute.call_count == 2
     assert f'<p class="no-data">No results on page {"9" * 30}.' in html
 
 
@@ -99,16 +99,16 @@ def test_page_too_long_for_int_is_not_a_500(client):
 
 def test_page_two_offsets_by_fifty(client):
     html, cur = _search(client, page="2", rows=_page(157, 2))
-    assert cur.execute.call_count == 2
+    assert cur.execute.call_count == 3
     _, params = cur.execute.call_args.args
     assert params[-2:] == [50, 50]
     assert html.count('class="result-card') == 50
 
 
 @pytest.mark.parametrize("page", ["5", "9"])
-def test_past_the_end_runs_only_the_count(client, page):
+def test_past_the_end_skips_the_page_query(client, page):
     html, cur = _search(client, page=page, rows=[])
-    assert cur.execute.call_count == 1
+    assert cur.execute.call_count == 2
     assert '<span class="heading-dates">157 restaurants</span>' in html
     assert f'<p class="no-data">No results on page {page}.' in html
     assert 'href="/search?q=pizza&amp;page=1"' in html

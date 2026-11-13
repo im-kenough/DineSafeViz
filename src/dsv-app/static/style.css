@@ -350,6 +350,29 @@ th {
 .result-place strong { color: var(--accent); }
 .result-latest { text-align: left; }
 
+/* ── maps (static/map.js) ───────────────────────────────── */
+.map {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 0.6rem;
+    background: var(--surface);
+}
+.map[hidden] { display: none; }
+.map-results { height: 50vh; min-height: 300px; }
+/* never more than a third of the screen, so the history stays in view */
+.map-single { height: 33vh; }
+.map-note { color: var(--text-muted); margin: 0 0 0.6rem; }
+/* popups match the dark cards; the .map prefix outranks leaflet.css */
+.map .leaflet-popup-content-wrapper,
+.map .leaflet-popup-tip { background: var(--surface); color: var(--text); }
+.map .leaflet-popup-content { margin: 0; }
+.map .map-popup { color: var(--text); min-width: 12rem; margin: 0; }
+/* 44x44 tap targets; .leaflet-container outranks leaflet.css, which loads after this file */
+.map.leaflet-container .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; }
+.map.leaflet-container a.leaflet-popup-close-button { width: 44px; height: 44px; font-size: 22px; line-height: 44px; }
+/* keep the card clear of the close button */
+.map .leaflet-popup-content-wrapper { padding-right: 44px; }
+
 /* ── status accents ─────────────────────────────────────── */
 .status-closed,      .sev-crucial     { border-left-color: var(--dinesafe-red); }
 .status-conditional, .sev-significant { border-left-color: var(--dinesafe-yellow); }
@@ -473,6 +496,11 @@ footer {
     .infractions th, .infractions td { padding: 0.3rem 0.4rem; }
     .infractions th { white-space: normal; }
     .infractions td { overflow-wrap: anywhere; }
+
+    /* map popup fits beside the zoom buttons (map.js pans 60px clear of them):
+       close button above the card, card capped to the map's width less that gap */
+    .map .leaflet-popup-content-wrapper { padding: 44px 1px 1px; }
+    .map .leaflet-popup-content { max-width: calc(100vw - 100px); }
 }
 
 /* ── tablet (601px – 1023px: iPad portrait, phone landscape) */

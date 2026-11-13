@@ -1,7 +1,9 @@
 {% extends "base.html" %}
+{% from "_map.html" import map_head, map_box %}
 {% block title %}DineSafeViz - Search{% endblock %}
 {% block head %}
     <meta name="robots" content="noindex, nofollow">
+    {% if map_pins %}{{ map_head() }}{% endif %}
 {% endblock %}
 {% block content %}
     {% set hint = 'Search by restaurant name or address, like pizza or queen.' %}
@@ -11,6 +13,13 @@
         <p class="no-data">{{ hint if not q else 'Type a word of at least %d characters.' % search_min_term }}</p>
         {% else %}
         <h2 class="page-heading">Results for "{{ q }}"<span class="heading-dates">{{ total }} restaurant{{ 's' if total != 1 }}</span></h2>
+        {% if map_pins %}
+        {% set shown = map_pins | length %}
+        {{ map_box(map_pins, 'Map of %d restaurant%s. The list below has the same results.' % (shown, '' if shown == 1 else 's'), 'map-results') }}
+        {% if total > shown %}
+        <p class="map-note">Showing {{ '{:,}'.format(shown) }} of {{ '{:,}'.format(total) }} on the map. Add a word to narrow it down.</p>
+        {% endif %}
+        {% endif %}
         {% if not total %}
         <p class="no-data">No restaurants match "{{ q }}". {{ hint }}</p>
         {% elif not results %}

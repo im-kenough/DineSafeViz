@@ -109,8 +109,10 @@ def test_no_matches_shows_message_and_hint(client):
 
 def test_search_sql_has_no_user_input(client):
     _, _, cur = _search(client, "Pizza'; DROP TABLE inspections;--", [_result()])
-    (count, count_params), (query, params) = (c.args for c in cur.execute.call_args_list)
-    for sql_text in (count.as_string(None), query.as_string(None)):
+    (count, count_params), (pins, pin_params), (query, params) = (
+        c.args for c in cur.execute.call_args_list
+    )
+    for sql_text in (count.as_string(None), pins.as_string(None), query.as_string(None)):
         assert "drop table" not in sql_text.lower()
         assert "pizza" not in sql_text
     # 4 words, 2 patterns each; the page adds the prefix pattern, limit and offset.
@@ -119,6 +121,9 @@ def test_search_sql_has_no_user_input(client):
     assert query.as_string(None).count("%s") == 11
     assert params[:2] == ["%pizza';%", "%pizza';%"]
     assert params[-3:] == ["pizza';%", 50, 0]
+    # The map query adds the prefix pattern and the pin limit.
+    assert pins.as_string(None).count("%s") == 10
+    assert pin_params == count_params + ["pizza';%", 1000]
 
 
 def test_query_is_html_escaped(client):
