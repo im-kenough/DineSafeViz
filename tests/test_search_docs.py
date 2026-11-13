@@ -19,7 +19,8 @@ def test_search_doc_describes_the_map():
     assert "filters, or maps" not in text
 
 
-def test_search_doc_map_covers_only_the_results_page():
-    # The restaurant-page map is Map 3, not built yet.
-    text = DOC.read_text()
-    assert "restaurant page shows a map" not in " ".join(text.split())
+def test_search_doc_describes_the_restaurant_map():
+    text = " ".join(DOC.read_text().split())
+    assert "restaurant page shows a map with one pin" in text
+    assert "newest row that has coordinates" in text
+    assert "`establishment_pin()`" in text

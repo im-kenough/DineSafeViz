@@ -1,7 +1,12 @@
 {% extends "base.html" %}
+{% from "_map.html" import map_head, map_box %}
 {% block title %}DineSafeViz - {{ est.establishment_name }}{% endblock %}
+{% block head %}
+    {% if map_pins %}{{ map_head() }}{% endif %}
+{% endblock %}
 {% block content %}
     {% set count = days | length %}
     <h2 class="page-heading">{{ est.establishment_name or '—' }}<span class="heading-address">{{ est.street }}{% if est.unit %} {{ est.unit }}{% endif %}, Toronto, ON</span><span class="heading-dates">{{ count }} inspection{{ 's' if count != 1 }}, {% if count > 1 %}{{ days[-1][0] | longdate }} to {% endif %}{{ days[0][0] | longdate }}</span></h2>
+    {% if map_pins %}{{ map_box(map_pins, 'Map of ' ~ (est.establishment_name or 'this restaurant'), 'map-single', single=True) }}{% endif %}
 {% include "_days.html" %}
 {% endblock %}
