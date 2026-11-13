@@ -19,12 +19,11 @@ jobs:
   claude-review:
     name: Claude review
     # Drafts wait for ready_for_review. Fork PRs get no secrets, so skip them.
-    # The action refuses bot actors, and Dependabot runs get no Actions
-    # secrets, so skip Dependabot too.
+    # claude-code-action refuses bot actors, so skip bots (e.g. Dependabot).
     if: >-
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      github.actor != 'dependabot[bot]'
+      !endsWith(github.actor, '[bot]')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

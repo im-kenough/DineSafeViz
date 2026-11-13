@@ -15,11 +15,11 @@ jobs:
   label:
     name: Claude label
     # Fork PRs get no secrets. PRs opened with a label already keep it, so
-    # the one-label rule holds. Dependabot labels its own PRs, but not always
-    # by the `opened` event, and the action refuses bot actors anyway.
+    # the one-label rule holds. claude-code-action refuses bot actors, so
+    # skip bots (e.g. Dependabot).
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
-      github.actor != 'dependabot[bot]' &&
+      !endsWith(github.actor, '[bot]') &&
       toJSON(github.event.pull_request.labels) == '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 10
