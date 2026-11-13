@@ -69,15 +69,15 @@ flowchart LR
     cf([Cloudflare]) <-. "outbound tunnel" .-> tunnel
 
     subgraph edge["edge network"]
-        tunnel["dsv-tunnel<br/>cloudflare/cloudflared:2026.10.0<br/>metrics :2000"]
+        tunnel["dsv-tunnel<br/>cloudflare/cloudflared:2026.11.0<br/>metrics :2000"]
     end
 
-    nginx["dsv-nginx<br/>nginx:1.31.0-alpine-slim<br/>:80"]
+    nginx["dsv-nginx<br/>nginx:1.31.8-alpine3.24-slim<br/>:80"]
 
     subgraph backend["backend network: internal, 172.30.10.0/24"]
         app["dsv-app<br/>ghcr.io/im-kenough/dsv-app<br/>:8000"]
-        analytics["dsv-analytics<br/>Inspections dashboard (Grafana)<br/>grafana/grafana:13.2.3<br/>172.30.10.30:3000"]
-        db[("dsv-db<br/>postgres:18.6-alpine3.24<br/>:5432")]
+        analytics["dsv-analytics<br/>Inspections dashboard (Grafana)<br/>grafana/grafana:13.3.1<br/>172.30.10.30:3000"]
+        db[("dsv-db<br/>postgres:18.7-alpine3.24<br/>:5432")]
     end
 
     pipeline["dsv-pipeline<br/>ghcr.io/im-kenough/dsv-pipeline<br/>profile: pipeline"]

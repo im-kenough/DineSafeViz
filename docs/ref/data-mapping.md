@@ -22,7 +22,7 @@ The source of truth is the code:
 The database is built in two stages. Postgres creates an empty schema, and
 then a one-shot container fills it.
 
-1. `dsv-db` (`postgres:18.6`) starts. On the first start only, when the
+1. `dsv-db` (`postgres:18.7`) starts. On the first start only, when the
    `dsv-db-data` volume is empty, Postgres runs `init.sql` and
    `set-passwords.sh` from `/docker-entrypoint-initdb.d/`, in that order.
    With the migrations that `deploy.sh` applies next, they create:
