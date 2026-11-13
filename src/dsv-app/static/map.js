@@ -34,7 +34,7 @@
         place.appendChild(el('strong', '', p.name));
         place.appendChild(el('span', '', p.addr));
         var latest = el('span', 'result-latest');
-        latest.appendChild(el('strong', 'status-badge', p.status.toUpperCase()));
+        latest.appendChild(el('strong', 'status-badge', (p.status || '').toUpperCase()));
         latest.appendChild(el('span', '', 'Last inspected ' + p.last));
         a.appendChild(place);
         a.appendChild(latest);
@@ -58,7 +58,8 @@
             fillColor: colours[p.cls] || '#83899d',
             fillOpacity: 0.9
         }).addTo(map);
-        if (!single) marker.bindPopup(function () { return card(p); });
+        // Auto-pan keeps an opened popup clear of the 44px zoom buttons (style.css).
+        if (!single) marker.bindPopup(function () { return card(p); }, { autoPanPaddingTopLeft: [60, 10] });
     });
 
     if (single) map.setView([pins[0].lat, pins[0].lng], 16);

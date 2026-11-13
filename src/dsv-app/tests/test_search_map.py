@@ -8,7 +8,8 @@ from unittest.mock import patch
 import app as app_module
 from db_fakes import search_conn
 
-_STYLE_CSS = Path(__file__).resolve().parent.parent / "static" / "style.css"
+_STATIC = Path(__file__).resolve().parent.parent / "static"
+_STYLE_CSS = _STATIC / "style.css"
 
 
 def _pin_row(n=1, name="Starbucks", status="Pass", unit=None, lat=43.65, lng=-79.38):
@@ -70,6 +71,21 @@ def test_map_pin_shape():
 def test_map_pin_without_name_uses_dash():
     with app_module.app.test_request_context():
         assert app_module.map_pin(_pin_row(name=None))["name"] == "—"
+
+
+def test_map_pin_survives_null_street_status_and_date():
+    row = _pin_row(status=None) | {"street": None, "last_inspected": None}
+    with app_module.app.test_request_context():
+        pin = app_module.map_pin(row)
+        assert app_module.map_pin(row | {"unit": "Unit 2"})["addr"] == "Unit 2"
+    assert (pin["addr"], pin["status"], pin["cls"], pin["last"]) == ("", None, "", "—")
+
+
+def test_map_js_guards_status_and_pads_popups_clear_of_zoom():
+    js = (_STATIC / "map.js").read_text()
+    assert "(p.status || '').toUpperCase()" in js
+    # Auto-pan leaves room for the 44px zoom buttons in the top-left corner.
+    assert "autoPanPaddingTopLeft: [60, 10]" in js
 
 
 def test_results_page_has_map_and_pins(client):

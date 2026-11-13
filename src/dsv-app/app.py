@@ -404,10 +404,10 @@ def map_pin(row: Dict) -> Dict:
         "lat": row["latitude"],
         "lng": row["longitude"],
         "name": row["establishment_name"] or "—",
-        "addr": row["street"] + (f" {row['unit']}" if row["unit"] else ""),
+        "addr": " ".join(part for part in (row["street"], row["unit"]) if part),
         "status": row["establishment_status"],
         "cls": STATUS_CLASS.get(row["establishment_status"], ""),
-        "last": longdate(row["last_inspected"]),
+        "last": longdate(row["last_inspected"]) if row["last_inspected"] else "—",
         "url": url_for("establishment", establishment_id=row["establishment_id"]),
     }
 
