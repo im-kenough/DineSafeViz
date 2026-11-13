@@ -158,9 +158,26 @@ def test_map_query_params(client):
     assert app_module.SEARCH_MAP_LIMIT == 1000
 
 
-def _css_rule(selector):
-    """The bodies of every style.css rule whose selector list includes selector."""
-    css = re.sub(r"/\*.*?\*/", "", _STYLE_CSS.read_text(), flags=re.S)
+def _css():
+    """style.css without comments."""
+    return re.sub(r"/\*.*?\*/", "", _STYLE_CSS.read_text(), flags=re.S)
+
+
+def _media_block(query):
+    """The rules inside style.css's @media query { ... } block."""
+    css = _css()
+    start = css.index(f"@media {query} {{") + len(f"@media {query} {{")
+    depth = 1
+    for end in range(start, len(css)):
+        depth += {"{": 1, "}": -1}.get(css[end], 0)
+        if not depth:
+            return css[start:end]
+    raise AssertionError(f"unclosed @media {query}")
+
+
+def _css_rule(selector, css=None):
+    """The bodies of every rule in css (default: style.css) whose selector list includes selector."""
+    css = _css() if css is None else css
     return " ".join(
         body for selectors, body in re.findall(r"([^{}]+)\{([^}]*)\}", css)
         if selector in (" ".join(s.split()) for s in selectors.split(","))
@@ -181,3 +198,11 @@ def test_map_popup_close_is_tap_sized_and_clear_of_the_card():
         assert decl in body
     # The card sits left of the close button, not under it.
     assert "padding-right: 44px" in _css_rule(".map .leaflet-popup-content-wrapper")
+
+
+def test_phone_popup_fits_beside_the_zoom_buttons():
+    # At 320px the map is 294px inside; the popup gets 60px left pan padding,
+    # so the close button moves above the card and the card is capped.
+    phone = _media_block("(max-width: 600px)")
+    assert "padding: 44px 1px 1px" in _css_rule(".map .leaflet-popup-content-wrapper", phone)
+    assert "max-width: calc(100vw - 100px)" in _css_rule(".map .leaflet-popup-content", phone)

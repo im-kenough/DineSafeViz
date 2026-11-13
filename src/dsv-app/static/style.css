@@ -496,6 +496,11 @@ footer {
     .infractions th, .infractions td { padding: 0.3rem 0.4rem; }
     .infractions th { white-space: normal; }
     .infractions td { overflow-wrap: anywhere; }
+
+    /* map popup fits beside the zoom buttons (map.js pans 60px clear of them):
+       close button above the card, card capped to the map's width less that gap */
+    .map .leaflet-popup-content-wrapper { padding: 44px 1px 1px; }
+    .map .leaflet-popup-content { max-width: calc(100vw - 100px); }
 }
 
 /* ── tablet (601px – 1023px: iPad portrait, phone landscape) */
