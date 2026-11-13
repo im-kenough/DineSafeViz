@@ -52,9 +52,9 @@ def _home_explore(client):
 
 
 def test_search_input_border_uses_text_muted():
-    decls = _decls(_rule(_style_rules(), ".search-form input"))
-    assert decls["border"] == "1px solid var(--text-muted)"
-    assert "var(--border)" not in _rule(_style_rules(), ".search-form input")
+    body = _rule(_style_rules(), ".search-form input")
+    assert _decls(body)["border"] == "1px solid var(--text-muted)"
+    assert "var(--border)" not in body
 
 
 def test_hero_search_button_is_filled_with_accent():
@@ -110,14 +110,15 @@ def test_nav_card_hover_and_focus_highlight_whole_card(client):
 
 def test_no_new_hex_colours(client):
     assert not _HEX.search(_HOME_HTML.read_text())
+    style_rules = _style_rules()
     # hex colours in style.css live only in :root and the two pre-existing hover rules
-    with_hex = [selectors for selectors, body in _style_rules() if _HEX.search(body)]
+    with_hex = [selectors for selectors, body in style_rules if _HEX.search(body)]
     assert with_hex == [
         (":root",),
         (".nav-btn.active", ".nav-btn:hover:not(.active)"),
         (".timeline .month-link.current:hover",),
     ]
-    new_rules = [_rule(_style_rules(), ".hero-search button"), _rule(_home_rules(client), ".nav-cta")]
+    new_rules = [_rule(style_rules, ".hero-search button"), _rule(_home_rules(client), ".nav-cta")]
     for body in new_rules:
         for prop, value in _decls(body).items():
             if "color" in prop or prop == "background":
