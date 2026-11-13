@@ -367,6 +367,11 @@ th {
 .map .leaflet-popup-tip { background: var(--surface); color: var(--text); }
 .map .leaflet-popup-content { margin: 0; }
 .map .map-popup { color: var(--text); min-width: 12rem; margin: 0; }
+/* 44x44 tap targets; .leaflet-container outranks leaflet.css, which loads after this file */
+.map.leaflet-container .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; }
+.map.leaflet-container a.leaflet-popup-close-button { width: 44px; height: 44px; font-size: 22px; line-height: 44px; }
+/* keep the card clear of the close button */
+.map .leaflet-popup-content-wrapper { padding-right: 44px; }
 
 /* ── status accents ─────────────────────────────────────── */
 .status-closed,      .sev-crucial     { border-left-color: var(--dinesafe-red); }

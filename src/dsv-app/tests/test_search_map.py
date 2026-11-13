@@ -2,10 +2,13 @@
 import json
 import re
 from datetime import date
+from pathlib import Path
 from unittest.mock import patch
 
 import app as app_module
 from db_fakes import search_conn
+
+_STYLE_CSS = Path(__file__).resolve().parent.parent / "static" / "style.css"
 
 
 def _pin_row(n=1, name="Starbucks", status="Pass", unit=None, lat=43.65, lng=-79.38):
@@ -137,3 +140,28 @@ def test_map_query_params(client):
     assert "starbucks" not in pins_sql.as_string(None)
     assert pin_params == ["%starbucks%", "%starbucks%", "starbucks%", app_module.SEARCH_MAP_LIMIT]
     assert app_module.SEARCH_MAP_LIMIT == 1000
+
+
+def _css_rule(selector):
+    """The bodies of every style.css rule whose selector list includes selector."""
+    css = re.sub(r"/\*.*?\*/", "", _STYLE_CSS.read_text(), flags=re.S)
+    return " ".join(
+        body for selectors, body in re.findall(r"([^{}]+)\{([^}]*)\}", css)
+        if selector in (" ".join(s.split()) for s in selectors.split(","))
+    )
+
+
+# leaflet.css loads after style.css, so these selectors need the extra
+# .leaflet-container class to outrank Leaflet's own 26-30px controls.
+def test_map_zoom_buttons_are_tap_sized():
+    body = _css_rule(".map.leaflet-container .leaflet-control-zoom a")
+    for decl in ("width: 44px", "height: 44px", "line-height: 44px"):
+        assert decl in body
+
+
+def test_map_popup_close_is_tap_sized_and_clear_of_the_card():
+    body = _css_rule(".map.leaflet-container a.leaflet-popup-close-button")
+    for decl in ("width: 44px", "height: 44px", "line-height: 44px"):
+        assert decl in body
+    # The card sits left of the close button, not under it.
+    assert "padding-right: 44px" in _css_rule(".map .leaflet-popup-content-wrapper")
