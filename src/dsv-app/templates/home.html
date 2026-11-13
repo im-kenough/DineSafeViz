@@ -100,6 +100,15 @@
             color: inherit;
             text-decoration: none;
         }
+        /* inset shadow doubles the 1px border to 2px without shifting the layout */
+        .nav-card:hover,
+        .nav-card:focus-visible {
+            box-shadow: inset 0 0 0 1px var(--accent);
+        }
+        .nav-card:focus-visible {
+            outline: 2px solid var(--text);
+            outline-offset: 2px;
+        }
         .nav-card:hover h3,
         .nav-card:focus-visible h3 {
             color: var(--accent);
@@ -111,6 +120,14 @@
         .nav-card p {
             margin: 0;
             color: var(--text-muted);
+        }
+        .nav-cta {
+            display: inline-block;
+            margin-top: 0.75rem;
+            color: var(--text);
+            font-weight: 600;
+            text-decoration: underline;
+            text-decoration-color: var(--accent);
         }
         @media (max-width: 800px) {
             .nav-grid {
@@ -154,10 +171,12 @@
                 <a href="{{ url_for('index') }}" class="day-box nav-card">
                     <h3>Inspections</h3>
                     <p>See every inspection, quarter by quarter, down to the day.</p>
+                    <span class="nav-cta">View inspections <span aria-hidden="true">→</span></span>
                 </a>
                 <a href="{{ url_for('dashboard') }}" class="day-box nav-card">
                     <h3>Dashboard</h3>
                     <p>See how inspection results change over time across the city.</p>
+                    <span class="nav-cta">Open dashboard <span aria-hidden="true">→</span></span>
                 </a>
             </div>
         </section>
