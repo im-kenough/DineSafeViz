@@ -19,8 +19,11 @@ grouped by primary actors.
 
 - The end user types part of a restaurant's name or address in the search
   box, in the top nav or on the home page.
-- The site lists up to 50 matching restaurants with their latest result.
-- The end user selects one to see its inspection history (UC-USR-04).
+- The site shows a map of Toronto with a pin for every matching restaurant
+  (up to 1,000), then lists them 50 per page with their latest result.
+- The end user can zoom the map and tap a pin to see that restaurant's card.
+- The end user selects one, from the list or a pin's card, to see its
+  inspection history (UC-USR-04).
 
 ### UC-USR-04: View a restaurant's inspection history
 

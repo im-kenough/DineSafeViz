@@ -25,13 +25,16 @@ def rows_conn(rows):
     return conn
 
 
-def search_conn(rows, total=None):
-    """A fake connection answering /search: the count query's fetchone(), then fetchall().
+def search_conn(rows, total=None, pins=()):
+    """A fake connection answering /search: the count query's fetchone(), then
+    fetchall() for the map pins, then fetchall() for the page.
 
     total defaults to len(rows), as for a search with one page of results.
     """
-    conn = rows_conn(rows)
-    conn.cursor.return_value.fetchone.return_value = {"total": len(rows) if total is None else total}
+    conn = fake_conn()
+    cur = conn.cursor.return_value
+    cur.fetchone.return_value = {"total": len(rows) if total is None else total}
+    cur.fetchall.side_effect = [list(pins), rows]
     return conn
 
 

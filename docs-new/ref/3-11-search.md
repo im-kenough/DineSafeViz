@@ -18,8 +18,8 @@ had.
 | Fast            | Target: under 50 ms of database time for a typical search, on about 508,000 rows.               |
 | Safe            | Read-only `dinesafe_app` with a 10-second timeout. Input is capped and sent only as parameters. |
 
-Search doesn't do search as you type, fuzzy matching, filters, or maps. Each
-can be added later without changing this design.
+Search doesn't do search as you type, fuzzy matching, or filters. Each can
+be added later without changing this design.
 
 ## Pages
 
@@ -159,15 +159,41 @@ The city moved to new establishment IDs in 2023. The table doesn't store the
 old-to-new mapping, so a restaurant open before and after 2023 can appear as
 two results. Each result's first and latest dates tell them apart.
 
+## Map
+
+The results page shows a map of Toronto above the list, with one pin for
+every matching restaurant, not just the current page. The restaurant page
+shows a map with one pin. Both use Leaflet 1.9.4, vendored in
+`src/dsv-app/static/vendor/leaflet/`.
+
+- **Pins:** the map query matches the same IDs as the list and sorts them the
+  same way. It takes each restaurant's latest row for the name and status,
+  and its newest row that has coordinates for the location. It returns up to
+  `SEARCH_MAP_LIMIT` (1,000) pins. Past that, a note under the map says how
+  many are shown.
+- **Data:** the route writes the pins into the page as a JSON block
+  (`{{ map_pins | tojson }}`). There's no map endpoint. `static/map.js`
+  builds the map and the popups from that block.
+- **Tiles:** visitors' browsers fetch map tiles from
+  `tile.openstreetmap.org`, following the OpenStreetMap tile usage policy.
+  OpenStreetMap sees the visitor's IP address and which part of the map
+  they view. The server makes no outbound requests for maps.
+- **Without JavaScript:** the map container stays hidden, and the list works
+  as before.
+
 ## Code map
 
 The feature lives in these files.
 
-| File                                           | Role                                                                                                                                                                                                        |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/dsv-db/migrations/002_search_indexes.sql` | The extension and the three indexes.                                                                                                                                                                        |
-| `src/dsv-app/app.py`                           | `search_terms()`, `like_pattern()`, `search_count_query()`, `search_query()`, `parse_page()`, `page_window()`, `_search_establishments()`, `_fetch_establishment()`, `build_history()`, and the two routes. |
-| `src/dsv-app/templates/_search.html`           | The search form, shared by the nav and the home hero.                                                                                                                                                       |
-| `src/dsv-app/templates/search.html`            | The results page.                                                                                                                                                                                           |
-| `src/dsv-app/templates/establishment.html`     | The restaurant page.                                                                                                                                                                                        |
-| `tests/test_search_sql.py`                     | Runs the count and search queries against the real Postgres image.                                                                                                                                          |
+| File                                           | Role                                                                                                                                                                                                                                           |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/dsv-db/migrations/002_search_indexes.sql` | The extension and the three indexes.                                                                                                                                                                                                           |
+| `src/dsv-app/app.py`                           | `search_terms()`, `like_pattern()`, `search_count_query()`, `search_query()`, `search_map_query()`, `map_pin()`, `parse_page()`, `page_window()`, `_search_establishments()`, `_fetch_establishment()`, `build_history()`, and the two routes. |
+| `src/dsv-app/templates/_search.html`           | The search form, shared by the nav and the home hero.                                                                                                                                                                                          |
+| `src/dsv-app/templates/search.html`            | The results page.                                                                                                                                                                                                                              |
+| `src/dsv-app/templates/establishment.html`     | The restaurant page.                                                                                                                                                                                                                           |
+| `tests/test_search_sql.py`                     | Runs the count and search queries against the real Postgres image.                                                                                                                                                                             |
+| `src/dsv-app/templates/_map.html`              | The map container, its JSON block, and the Leaflet tags.                                                                                                                                                                                       |
+| `src/dsv-app/static/map.js`                    | Builds the map, pins, and popups.                                                                                                                                                                                                              |
+| `src/dsv-app/static/vendor/leaflet/`           | Leaflet 1.9.4, pinned by checksum in `SOURCE.md`.                                                                                                                                                                                              |
+| `tests/test_search_map_sql.py`                 | Runs the map query against the real Postgres image.                                                                                                                                                                                            |

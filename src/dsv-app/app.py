@@ -24,7 +24,7 @@ from psycopg2.errors import QueryCanceled
 from psycopg2.extensions import TRANSACTION_STATUS_IDLE
 from psycopg2.extras import RealDictCursor
 from psycopg2.pool import PoolError
-from flask import Flask, abort, render_template, request
+from flask import Flask, abort, render_template, request, url_for
 
 app = Flask(__name__)
 
@@ -70,11 +70,12 @@ SEVERITY_ORDER = {
 RECENT_YEARS = 4
 
 # Search: query length cap, shortest word a trigram index can help with,
-# most words matched, and most results shown.
+# most words matched, most results shown per page, and most pins on the map.
 SEARCH_MAX_LEN = 100
 SEARCH_MIN_TERM = 3
 SEARCH_MAX_TERMS = 5
 SEARCH_LIMIT = 50
+SEARCH_MAP_LIMIT = 1000
 
 _stats_cache = {"data": None, "fetched_at": None}
 _stats_cache_lock = threading.Lock()
@@ -311,6 +312,35 @@ ORDER BY page.rank
 """)
 
 
+# Every matching establishment's latest row, plus the coordinates from its
+# newest row that has them, in the same order as _SEARCH_QUERY, for the map.
+# Establishments with no coordinates on any row are left out.
+_SEARCH_MAP_QUERY = sql.SQL("""
+WITH ids AS (
+    SELECT DISTINCT establishment_id FROM inspections WHERE {match}
+),
+latest AS (
+    SELECT DISTINCT ON (i.establishment_id)
+           i.establishment_id, i.establishment_name, i.street, i.unit,
+           i.establishment_status, i.inspection_date AS last_inspected
+    FROM inspections i JOIN ids USING (establishment_id)
+    ORDER BY i.establishment_id, i.inspection_date DESC, i.id DESC
+),
+located AS (
+    SELECT DISTINCT ON (i.establishment_id)
+           i.establishment_id, i.latitude, i.longitude
+    FROM inspections i JOIN ids USING (establishment_id)
+    WHERE i.latitude IS NOT NULL AND i.longitude IS NOT NULL
+    ORDER BY i.establishment_id, i.inspection_date DESC, i.id DESC
+)
+SELECT latest.*, located.latitude, located.longitude
+FROM latest JOIN located USING (establishment_id)
+ORDER BY COALESCE(latest.establishment_name ILIKE %s, false) DESC,
+         latest.last_inspected DESC, latest.establishment_name, latest.establishment_id
+LIMIT %s
+""")
+
+
 def search_terms(raw: Optional[str]) -> List[str]:
     """Split a search query into the words to match.
 
@@ -361,6 +391,27 @@ def search_query(terms: List[str], page: int = 1) -> Tuple[sql.Composed, List]:
     return _SEARCH_QUERY.format(match=match), params
 
 
+def search_map_query(terms: List[str]) -> Tuple[sql.Composed, List]:
+    """Build the map SQL and its parameters: up to SEARCH_MAP_LIMIT located matches."""
+    match, params = _search_match(terms)
+    params += [like_pattern(terms[0], prefix=True), SEARCH_MAP_LIMIT]
+    return _SEARCH_MAP_QUERY.format(match=match), params
+
+
+def map_pin(row: Dict) -> Dict:
+    """One map pin for static/map.js: where, what the popup card shows, and its link."""
+    return {
+        "lat": row["latitude"],
+        "lng": row["longitude"],
+        "name": row["establishment_name"] or "—",
+        "addr": row["street"] + (f" {row['unit']}" if row["unit"] else ""),
+        "status": row["establishment_status"],
+        "cls": STATUS_CLASS.get(row["establishment_status"], ""),
+        "last": longdate(row["last_inspected"]),
+        "url": url_for("establishment", establishment_id=row["establishment_id"]),
+    }
+
+
 def page_count(total: int) -> int:
     """Number of SEARCH_LIMIT-sized pages that hold total results."""
     return -(-total // SEARCH_LIMIT)
@@ -393,18 +444,24 @@ def page_window(page: int, pages: int) -> List[Optional[int]]:
     return window
 
 
-def _search_establishments(terms: List[str], page: int) -> Tuple[int, List[Dict]]:
-    """Return how many establishments match every term, and the page's rows, best first.
+def _search_establishments(terms: List[str], page: int) -> Tuple[int, List[Dict], List[Dict]]:
+    """Return how many establishments match every term, the page's rows, best
+    first, and the map's rows.
 
-    Skips the page query when there are no matches or page is past the end.
+    Skips the map and page queries when there are no matches, and the page
+    query when page is past the end.
     """
     with _db_cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(*search_count_query(terms))
         total = cur.fetchone()["total"]
+        if not total:
+            return 0, [], []
+        cur.execute(*search_map_query(terms))
+        pins = cur.fetchall()
         if page > page_count(total):
-            return total, []
+            return total, [], pins
         cur.execute(*search_query(terms, page))
-        return total, cur.fetchall()
+        return total, cur.fetchall(), pins
 
 
 # ---------------------------------------------------------------------------
@@ -762,7 +819,14 @@ app.jinja_env.globals.update(
     search_min_term=SEARCH_MIN_TERM,
     search_max_len=SEARCH_MAX_LEN,
 )
-app.jinja_env.filters["longdate"] = lambda d: d.strftime("%B %-d, %Y")
+
+
+def longdate(d: date) -> str:
+    """Format d like "October 3, 2026"."""
+    return d.strftime("%B %-d, %Y")
+
+
+app.jinja_env.filters["longdate"] = longdate
 
 
 # ---------------------------------------------------------------------------
@@ -865,7 +929,7 @@ def search():
     q = _CONTROL_CHARS_RE.sub(" ", request.args.get("q") or "").strip()[:SEARCH_MAX_LEN]
     terms = search_terms(q)
     page = parse_page(request.args.get("page"))
-    total, results = _search_establishments(terms, page) if terms else (0, [])
+    total, results, pins = _search_establishments(terms, page) if terms else (0, [], [])
     pages = page_count(total)
     return render_template(
         "search.html",
@@ -876,6 +940,7 @@ def search():
         page=page,
         pages=pages,
         window=page_window(page, pages),
+        map_pins=[map_pin(r) for r in pins],
     )
 
 

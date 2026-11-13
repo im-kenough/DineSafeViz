@@ -350,6 +350,24 @@ th {
 .result-place strong { color: var(--accent); }
 .result-latest { text-align: left; }
 
+/* ── maps (static/map.js) ───────────────────────────────── */
+.map {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 0.6rem;
+    background: var(--surface);
+}
+.map[hidden] { display: none; }
+.map-results { height: 50vh; min-height: 300px; }
+/* never more than a third of the screen, so the history stays in view */
+.map-single { height: 33vh; }
+.map-note { color: var(--text-muted); margin: 0 0 0.6rem; }
+/* popups match the dark cards; the .map prefix outranks leaflet.css */
+.map .leaflet-popup-content-wrapper,
+.map .leaflet-popup-tip { background: var(--surface); color: var(--text); }
+.map .leaflet-popup-content { margin: 0; }
+.map .map-popup { color: var(--text); min-width: 12rem; margin: 0; }
+
 /* ── status accents ─────────────────────────────────────── */
 .status-closed,      .sev-crucial     { border-left-color: var(--dinesafe-red); }
 .status-conditional, .sev-significant { border-left-color: var(--dinesafe-yellow); }
