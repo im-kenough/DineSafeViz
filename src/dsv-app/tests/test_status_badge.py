@@ -9,7 +9,6 @@ from db_fakes import EST_ID, inspection_row, rows_conn, search_conn, search_row
 from style_css import css_rule
 
 
-
 def _get(client, url, rows):
     conn = search_conn(rows) if url.startswith("/search") else rows_conn(rows)
     with patch("app.psycopg2.connect", return_value=conn):

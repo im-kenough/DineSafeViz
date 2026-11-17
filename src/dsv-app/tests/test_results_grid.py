@@ -7,7 +7,7 @@ import pytest
 
 import app as app_module
 from db_fakes import search_conn, search_row
-from style_css import STYLE_CSS, block_end, css_decls, css_rules, media_block
+from style_css import block_end, css_decls, css_rules, css_text, media_block
 
 _GRID_SELECTORS = (".results", ".results > li", ".result-card")
 
@@ -22,8 +22,8 @@ def _search(client, q="pizza", page=None, total=157, rows=()):
 
 @cache
 def _top_level_css():
-    """style.css with every @media block removed, so only base rules remain."""
-    css = STYLE_CSS.read_text()
+    """style.css without comments or @media blocks, so only base rules remain."""
+    css = css_text()
     while (at := css.find("@media")) != -1:
         css = css[:at] + css[block_end(css, css.index("{", at) + 1):]
     return css

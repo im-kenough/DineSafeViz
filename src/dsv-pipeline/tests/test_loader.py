@@ -1,4 +1,3 @@
-
 import pytest
 
 from fakes import historical_csv, historical_row, recent_csv, recent_row
