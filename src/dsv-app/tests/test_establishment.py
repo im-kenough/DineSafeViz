@@ -47,6 +47,15 @@ def test_establishment_page_with_one_inspection(client):
     assert "1 inspection, October 3, 2026" in resp.data.decode()
 
 
+def test_establishment_page_without_address_has_no_stray_comma(client):
+    row = inspection_row(date(2026, 10, 3), street=None, establishment_address=None)
+    resp, _ = _get(client, f"/establishment/{EST_ID}", [row])
+    html = resp.data.decode()
+    assert resp.status_code == 200
+    assert "heading-address" not in html
+    assert ", Toronto, ON" not in html
+
+
 def test_unknown_id_is_404(client):
     resp, connect = _get(client, "/establishment/12345", [])
     assert resp.status_code == 404

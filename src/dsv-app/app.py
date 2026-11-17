@@ -379,27 +379,34 @@ def search_count_query(terms: List[str]) -> Tuple[sql.Composed, List]:
     return _SEARCH_COUNT_QUERY.format(match=match), params
 
 
+def _ranked_search(template: sql.Composable, terms: List[str], *tail) -> Tuple[sql.Composed, List]:
+    """Fill template's {latest} and {rank}; return it with params for terms, rank and tail.
+
+    The rank parameter (the first term as a prefix) comes right after the
+    match parameters, so the page and map queries stay on the same rows.
+    """
+    match, params = _search_match(terms)
+    params += [like_pattern(terms[0], prefix=True), *tail]
+    return template.format(latest=_SEARCH_LATEST.format(match=match), rank=_SEARCH_RANK), params
+
+
 def search_query(terms: List[str], page: int = 1) -> Tuple[sql.Composed, List]:
     """Build the search SQL and its parameters for one page of results.
 
     The SQL repeats the constant _SEARCH_MATCH once per term; the terms, the
     page size and the offset travel only as parameters.
     """
-    match, params = _search_match(terms)
-    params += [like_pattern(terms[0], prefix=True), SEARCH_LIMIT, (page - 1) * SEARCH_LIMIT]
-    return _SEARCH_QUERY.format(latest=_SEARCH_LATEST.format(match=match), rank=_SEARCH_RANK), params
+    return _ranked_search(_SEARCH_QUERY, terms, SEARCH_LIMIT, (page - 1) * SEARCH_LIMIT)
 
 
 def search_map_query(terms: List[str]) -> Tuple[sql.Composed, List]:
     """Build the map SQL and its parameters: up to SEARCH_MAP_LIMIT located matches."""
-    match, params = _search_match(terms)
-    params += [like_pattern(terms[0], prefix=True), SEARCH_MAP_LIMIT]
-    return _SEARCH_MAP_QUERY.format(latest=_SEARCH_LATEST.format(match=match), rank=_SEARCH_RANK), params
+    return _ranked_search(_SEARCH_MAP_QUERY, terms, SEARCH_MAP_LIMIT)
 
 
 def street_line(row: Dict) -> str:
     """A row's street and unit, like "123 Queen St W Unit 2", skipping empty parts."""
-    return " ".join(part for part in (row["street"], row["unit"]) if part)
+    return " ".join(part for part in (row.get("street"), row.get("unit")) if part)
 
 
 def map_pin(row: Dict) -> Dict:

@@ -5,7 +5,8 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 from db_helpers import (
-    APP_PW, DB_DIR, MIGRATOR_PW, ROLE_PASSWORDS, docker, migrate, psql, run_migration, start_db, wait_ready,
+    APP_PW, DB_DIR, MIGRATOR_PW, ROLE_PASSWORDS, docker, migrate, migrated_db, psql, run_migration, start_db,
+    wait_ready,
 )
 
 SET_PASSWORDS = DB_DIR / "set-passwords.sh"
@@ -27,6 +28,15 @@ def db():
     yield _start
     for name in names:
         docker("rm", "-f", name, check=False)
+
+
+@pytest.fixture(scope="module")
+def own_db():
+    """A migrated container for the tests that change roles, grants or the
+    schema, so a regression they catch can't break other modules' tests on
+    the shared ready_db."""
+    with migrated_db() as name:
+        yield name
 
 
 def test_set_passwords_is_executable():
@@ -82,28 +92,28 @@ def test_new_volume_waits_for_a_migration(db):
     assert result.stdout.strip() == "0"
 
 
-def test_migration_runs_again_without_errors(ready_db):
+def test_migration_runs_again_without_errors(own_db):
     for _ in range(2):
-        result = migrate(ready_db)
+        result = migrate(own_db)
         assert result.returncode == 0, result.stderr
 
 
 # Each file is one transaction: a failure part-way leaves no REVOKE without
 # its GRANT, so a load running alongside sees the old grants or the new ones.
-def test_failed_migration_rolls_back_the_whole_file(ready_db):
+def test_failed_migration_rolls_back_the_whole_file(own_db):
     result = run_migration(
-        ready_db, "REVOKE ALL ON TABLE load_log FROM dinesafe_migrator; SELECT 1/0;"
+        own_db, "REVOKE ALL ON TABLE load_log FROM dinesafe_migrator; SELECT 1/0;"
     )
     assert result.returncode != 0
-    result = login(ready_db, "dinesafe_migrator", MIGRATOR_PW, "SELECT count(*) FROM load_log")
+    result = login(own_db, "dinesafe_migrator", MIGRATOR_PW, "SELECT count(*) FROM load_log")
     assert result.returncode == 0, result.stderr
 
 
 # A deploy and the pipeline timer can migrate at once. Without a lock, two
 # concurrent GRANTs on one table fail with "tuple concurrently updated".
-def test_concurrent_migrations_all_succeed(ready_db):
+def test_concurrent_migrations_all_succeed(own_db):
     with ThreadPoolExecutor(max_workers=6) as pool:
-        results = list(pool.map(lambda _: migrate(ready_db), range(12)))
+        results = list(pool.map(lambda _: migrate(own_db), range(12)))
     assert [r.stderr for r in results if r.returncode != 0] == []
 
 
@@ -126,8 +136,8 @@ def test_migrator_can_load(ready_db):
     "DROP TABLE load_log",
     "UPDATE inspections SET severity = 'x'",
 ])
-def test_migrator_can_do_nothing_else(ready_db, sql):
-    result = login(ready_db, "dinesafe_migrator", MIGRATOR_PW, sql)
+def test_migrator_can_do_nothing_else(own_db, sql):
+    result = login(own_db, "dinesafe_migrator", MIGRATOR_PW, sql)
     assert result.returncode != 0
     assert "permission denied" in result.stderr or "must be owner" in result.stderr
 

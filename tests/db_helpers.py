@@ -4,7 +4,7 @@ import re
 import subprocess
 import time
 import uuid
-from contextlib import closing
+from contextlib import closing, contextmanager
 
 import psycopg2
 
@@ -81,6 +81,19 @@ def migrate(name):
         if result.returncode != 0:
             return result
     return result
+
+
+@contextmanager
+def migrated_db():
+    """A started, ready, fully migrated container with ROLE_PASSWORDS, removed on exit."""
+    name = start_db(ROLE_PASSWORDS)
+    try:
+        assert wait_ready(name), docker("logs", name).stderr
+        result = migrate(name)
+        assert result.returncode == 0, result.stderr
+        yield name
+    finally:
+        docker("rm", "-f", name, check=False)
 
 
 @functools.cache

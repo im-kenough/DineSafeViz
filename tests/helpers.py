@@ -48,6 +48,8 @@ def host_env():
 def ignored(path):
     """True if a .gitignore rule matches path (relative to ROOT), tracked or not."""
     result = subprocess.run(["git", "check-ignore", "--no-index", "-q", path], cwd=ROOT)
+    # 0 is ignored and 1 is not. Anything else (128) is a git error, not an answer.
+    assert result.returncode in (0, 1), f"git check-ignore failed on {path}"
     return result.returncode == 0
 
 

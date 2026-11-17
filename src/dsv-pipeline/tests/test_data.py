@@ -13,8 +13,8 @@ from fakes import (
     HIST_HEADER, RECENT_HEADER, FakeOpener, FakeResponse, FakeStore, b64md5, write_csv,
 )
 from data import (
-    KEEP_RECENT, MIN_HISTORICAL_ROWS, MIN_RECENT_ROWS, BlobStore, DataError, check_fresh,
-    folders, http_download, ingest, md5_b64, newest_historical, newest_recent,
+    KEEP_RECENT, MIN_HISTORICAL_ROWS, MIN_RECENT_ROWS, BlobStore, DataError, _open_member,
+    check_fresh, folders, http_download, ingest, md5_b64, newest_historical, newest_recent,
     prune_recent, resolve_resources, validate_csv,
 )
 from dinesafe_csv import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP
@@ -398,6 +398,16 @@ class TestIngest:
             ingest(store, resolve=resolver(), now=NOW,
                    download=downloader(tmp_path, compression=compression, patch_zip=patch_zip))
         assert store.uploads == []
+
+    def test_open_member_passes_body_errors_through(self, tmp_path):
+        # Only zf.open is translated; a RuntimeError from the caller's body
+        # (e.g. a failed Blob upload) must not be reported as a bad ZIP member.
+        zpath = tmp_path / "z.zip"
+        with _zipfile.ZipFile(zpath, "w") as zf:
+            zf.writestr("a.csv", "x")
+        with _zipfile.ZipFile(zpath) as zf, pytest.raises(RuntimeError, match="upload failed"):
+            with _open_member(zf, zf.getinfo("a.csv")):
+                raise RuntimeError("upload failed")
 
     def test_member_shorter_than_its_header_is_a_data_error(self, tmp_path):
         # A stored member whose central file_size overstates its data: zipfile

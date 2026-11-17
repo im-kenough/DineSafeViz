@@ -1,26 +1,18 @@
 """The results-page map: pin data, container, scripts, and the over-limit note."""
 import json
 import re
-from datetime import date
 from unittest.mock import patch
 
 import app as app_module
 from db_fakes import search_conn, search_row
 from style_css import STYLE_CSS, css_rules, media_block
 
+MAP_JS = STYLE_CSS.with_name("map.js")
+
 
 def _pin_row(n=1, name="Starbucks", status="Pass", unit=None, lat=43.65, lng=-79.38):
     """One row as returned by the map query's RealDictCursor."""
-    return {
-        "establishment_id": f"001Vo0000000000{n:03d}",
-        "establishment_name": name,
-        "street": "123 Queen St W",
-        "unit": unit,
-        "establishment_status": status,
-        "last_inspected": date(2026, 10, 3),
-        "latitude": lat,
-        "longitude": lng,
-    }
+    return search_row(n, name, status, unit=unit) | {"latitude": lat, "longitude": lng}
 
 
 def _get(client, pins, total=None, rows=None, query_string=None):
@@ -64,7 +56,7 @@ def test_map_pin_survives_null_street_status_and_date():
 
 
 def test_map_js_guards_status_and_pads_popups_clear_of_zoom():
-    js = (STYLE_CSS.parent / "map.js").read_text()
+    js = MAP_JS.read_text()
     assert "(p.status || '').toUpperCase()" in js
     # Auto-pan leaves room for the 44px zoom buttons in the top-left corner.
     assert "autoPanPaddingTopLeft: [60, 10]" in js
@@ -140,7 +132,7 @@ def test_map_query_params(client):
     assert app_module.SEARCH_MAP_LIMIT == 1000
 
 
-def _css_rule(selector, css=None):
+def _css_bodies(selector, css=None):
     """The bodies of every rule in css (default: style.css) whose selector list includes selector."""
     return " ".join(body for selectors, body in css_rules(css) if selector in selectors)
 
@@ -148,22 +140,22 @@ def _css_rule(selector, css=None):
 # leaflet.css loads after style.css, so these selectors need the extra
 # .leaflet-container class to outrank Leaflet's own 26-30px controls.
 def test_map_zoom_buttons_are_tap_sized():
-    body = _css_rule(".map.leaflet-container .leaflet-control-zoom a")
+    body = _css_bodies(".map.leaflet-container .leaflet-control-zoom a")
     for decl in ("width: 44px", "height: 44px", "line-height: 44px"):
         assert decl in body
 
 
 def test_map_popup_close_is_tap_sized_and_clear_of_the_card():
-    body = _css_rule(".map.leaflet-container a.leaflet-popup-close-button")
+    body = _css_bodies(".map.leaflet-container a.leaflet-popup-close-button")
     for decl in ("width: 44px", "height: 44px", "line-height: 44px"):
         assert decl in body
     # The card sits left of the close button, not under it.
-    assert "padding-right: 44px" in _css_rule(".map .leaflet-popup-content-wrapper")
+    assert "padding-right: 44px" in _css_bodies(".map .leaflet-popup-content-wrapper")
 
 
 def test_phone_popup_fits_beside_the_zoom_buttons():
     # At 320px the map is 294px inside; the popup gets 60px left pan padding,
     # so the close button moves above the card and the card is capped.
     phone = media_block("(max-width: 600px)")
-    assert "padding: 44px 1px 1px" in _css_rule(".map .leaflet-popup-content-wrapper", phone)
-    assert "max-width: calc(100vw - 100px)" in _css_rule(".map .leaflet-popup-content", phone)
+    assert "padding: 44px 1px 1px" in _css_bodies(".map .leaflet-popup-content-wrapper", phone)
+    assert "max-width: calc(100vw - 100px)" in _css_bodies(".map .leaflet-popup-content", phone)

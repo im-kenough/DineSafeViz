@@ -4,8 +4,7 @@ import shutil
 
 import pytest
 
-from db_helpers import ROLE_PASSWORDS, migrate, start_db, wait_ready
-from helpers import FAKES, ROOT, SECRETS, docker
+from helpers import FAKES, ROOT, SECRETS
 
 
 @pytest.fixture
@@ -51,14 +50,12 @@ def vm_repo(tmp_path, fake_env):
 
 @pytest.fixture(scope="session")
 def ready_db():
-    """A started, ready, fully migrated Postgres container, shared by every DB
-    test in the run and removed at the end. Fixtures that add rows clear the
-    tables first."""
-    name = start_db(ROLE_PASSWORDS)
-    try:
-        assert wait_ready(name), docker("logs", name).stderr
-        result = migrate(name)
-        assert result.returncode == 0, result.stderr
+    """A started, ready, fully migrated Postgres container, shared by the DB
+    tests in the run and removed at the end. Fixtures that add rows clear the
+    tables first. Tests that change roles, grants or the schema use their own
+    container instead (own_db in test_db_init.py)."""
+    # Imported here so only DB tests need psycopg2 and db_helpers' file parsing.
+    from db_helpers import migrated_db
+
+    with migrated_db() as name:
         yield name
-    finally:
-        docker("rm", "-f", name, check=False)

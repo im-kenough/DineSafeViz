@@ -18,8 +18,8 @@
         'status-conditional': css.getPropertyValue('--dinesafe-yellow').trim(),
         'status-pass': css.getPropertyValue('--dinesafe-green').trim()
     };
-    var outline = css.getPropertyValue('--bg').trim();
-    var noStatus = css.getPropertyValue('--text-muted').trim();
+    var outline = css.getPropertyValue('--bg').trim() || '#0e1016';
+    var noStatus = css.getPropertyValue('--text-muted').trim() || '#83899d';
     var single = box.hasAttribute('data-single');
 
     function el(tag, className, text) {

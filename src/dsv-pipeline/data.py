@@ -309,12 +309,14 @@ def _scan_bytes(raw, name, limit=None):
 
 @contextlib.contextmanager
 def _open_member(zf, info):
-    """zf.open(info), raising DataError for a member that can't be read."""
+    """zf.open(info), raising DataError for a member that can't be opened.
+    Errors raised in the caller's with-body pass through unchanged."""
     try:
-        with zf.open(info) as raw:
-            yield raw
+        raw = zf.open(info)
     except ZIP_MEMBER_ERRORS as e:
         raise DataError(f"historical ZIP member {info.filename} is unreadable: {e}") from e
+    with raw:
+        yield raw
 
 
 def _scan_member(zf, info, name):
@@ -350,9 +352,12 @@ def _download_historical(url, tmp, download):
             # overwritten, so two members can't share a file name.
             if base in staged:
                 raise DataError(f"the historical ZIP has more than one {base}")
-            encoding, md5, size = _scan_member(zf, info, base)
-            with _open_member(zf, info) as raw, io.TextIOWrapper(raw, encoding=encoding, newline="") as text:
-                validate_csv(text, HISTORICAL_COLUMN_MAP, MIN_HISTORICAL_ROWS, name=base)
+            try:
+                encoding, md5, size = _scan_member(zf, info, base)
+                with _open_member(zf, info) as raw, io.TextIOWrapper(raw, encoding=encoding, newline="") as text:
+                    validate_csv(text, HISTORICAL_COLUMN_MAP, MIN_HISTORICAL_ROWS, name=base)
+            except ZIP_MEMBER_ERRORS as e:  # corrupt bytes surface on read, not open
+                raise DataError(f"historical ZIP member {info.filename} is unreadable: {e}") from e
             staged[base] = (base, info, md5, size)
     if not staged:
         raise DataError("the historical ZIP has no CSV files")

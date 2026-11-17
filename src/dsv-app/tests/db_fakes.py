@@ -11,7 +11,7 @@ def inspection_row(day=date(2024, 2, 14), status="Pass", details=None, severity=
                    name="Pizza Pizza", street="123 Queen St W", unit=None, **columns):
     """One row as app._INSPECTION_SELECT returns it (the /inspections and
     restaurant page queries). columns overrides any other column by name."""
-    return {
+    row = {
         "inspection_date": day,
         "establishment_status": status,
         "action": None,
@@ -30,7 +30,9 @@ def inspection_row(day=date(2024, 2, 14), status="Pass", details=None, severity=
         "establishment_id": EST_ID,
         "severity": severity,
         "infraction_category": None,
-    } | columns
+    }
+    assert columns.keys() <= row.keys(), f"unknown columns: {sorted(columns.keys() - row.keys())}"
+    return row | columns
 
 
 def search_row(n=1, name="Pizza Pizza", status="Pass", est_type=None, unit=None):
