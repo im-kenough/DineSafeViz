@@ -56,7 +56,8 @@ STATUS_ORDER = {
     "Conditional Pass": 1,
     "Pass": 2,
 }
-# CSS class for each status's card accent (_days.html, search.html).
+# CSS class for each status: the card accent (_days.html, search.html) and the
+# map pin colour (map_pin, static/map.js).
 STATUS_CLASS = {
     "Closed": "status-closed",
     "Conditional Pass": "status-conditional",
@@ -275,12 +276,9 @@ _SEARCH_COUNT_QUERY = sql.SQL(
     "SELECT COUNT(DISTINCT establishment_id) AS total FROM inspections WHERE {match}"
 )
 
-# Finds the matching establishment IDs, then summarizes all of each one's rows:
-# a match on one row (say, before a rename) still counts every inspection.
-# Names starting with the first word rank first, then the most recently
-# inspected, then name and ID so the order is stable. Ranking and LIMIT/OFFSET
-# need only each one's latest row, so the totals are counted for the page alone.
-_SEARCH_QUERY = sql.SQL("""
+# The matching establishment IDs, and each one's latest row. The page and map
+# queries both start with these, so they see the same matches.
+_SEARCH_LATEST = sql.SQL("""
 WITH ids AS (
     SELECT DISTINCT establishment_id FROM inspections WHERE {match}
 ),
@@ -290,12 +288,23 @@ latest AS (
            i.establishment_status, i.inspection_date AS last_inspected
     FROM inspections i JOIN ids USING (establishment_id)
     ORDER BY i.establishment_id, i.inspection_date DESC, i.id DESC
-),
+)""")
+
+# Results order, for the list and the map: names starting with the first word
+# first, then the most recently inspected, then name and ID so the order is
+# stable.
+_SEARCH_RANK = sql.SQL(
+    "COALESCE(establishment_name ILIKE %s, false) DESC,"
+    " last_inspected DESC, establishment_name, establishment_id"
+)
+
+# One page of results, summarizing all of each one's rows: a match on one row
+# (say, before a rename) still counts every inspection. Ranking and
+# LIMIT/OFFSET need only each one's latest row, so the totals are counted for
+# the page alone.
+_SEARCH_QUERY = sql.SQL("""{latest},
 page AS (
-    SELECT latest.*, ROW_NUMBER() OVER (
-               ORDER BY COALESCE(establishment_name ILIKE %s, false) DESC,
-                        last_inspected DESC, establishment_name, establishment_id
-           ) AS rank
+    SELECT latest.*, ROW_NUMBER() OVER (ORDER BY {rank}) AS rank
     FROM latest
     ORDER BY rank
     LIMIT %s OFFSET %s
@@ -314,19 +323,9 @@ ORDER BY page.rank
 
 
 # Every matching establishment's latest row, plus the coordinates from its
-# newest row that has them, in the same order as _SEARCH_QUERY, for the map.
-# Establishments with no coordinates on any row are left out.
-_SEARCH_MAP_QUERY = sql.SQL("""
-WITH ids AS (
-    SELECT DISTINCT establishment_id FROM inspections WHERE {match}
-),
-latest AS (
-    SELECT DISTINCT ON (i.establishment_id)
-           i.establishment_id, i.establishment_name, i.street, i.unit,
-           i.establishment_status, i.inspection_date AS last_inspected
-    FROM inspections i JOIN ids USING (establishment_id)
-    ORDER BY i.establishment_id, i.inspection_date DESC, i.id DESC
-),
+# newest row that has them, for the map. Establishments with no coordinates on
+# any row are left out.
+_SEARCH_MAP_QUERY = sql.SQL("""{latest},
 located AS (
     SELECT DISTINCT ON (i.establishment_id)
            i.establishment_id, i.latitude, i.longitude
@@ -336,8 +335,7 @@ located AS (
 )
 SELECT latest.*, located.latitude, located.longitude
 FROM latest JOIN located USING (establishment_id)
-ORDER BY COALESCE(latest.establishment_name ILIKE %s, false) DESC,
-         latest.last_inspected DESC, latest.establishment_name, latest.establishment_id
+ORDER BY {rank}
 LIMIT %s
 """)
 
@@ -389,14 +387,19 @@ def search_query(terms: List[str], page: int = 1) -> Tuple[sql.Composed, List]:
     """
     match, params = _search_match(terms)
     params += [like_pattern(terms[0], prefix=True), SEARCH_LIMIT, (page - 1) * SEARCH_LIMIT]
-    return _SEARCH_QUERY.format(match=match), params
+    return _SEARCH_QUERY.format(latest=_SEARCH_LATEST.format(match=match), rank=_SEARCH_RANK), params
 
 
 def search_map_query(terms: List[str]) -> Tuple[sql.Composed, List]:
     """Build the map SQL and its parameters: up to SEARCH_MAP_LIMIT located matches."""
     match, params = _search_match(terms)
     params += [like_pattern(terms[0], prefix=True), SEARCH_MAP_LIMIT]
-    return _SEARCH_MAP_QUERY.format(match=match), params
+    return _SEARCH_MAP_QUERY.format(latest=_SEARCH_LATEST.format(match=match), rank=_SEARCH_RANK), params
+
+
+def street_line(row: Dict) -> str:
+    """A row's street and unit, like "123 Queen St W Unit 2", skipping empty parts."""
+    return " ".join(part for part in (row["street"], row["unit"]) if part)
 
 
 def map_pin(row: Dict) -> Dict:
@@ -405,7 +408,7 @@ def map_pin(row: Dict) -> Dict:
         "lat": row["latitude"],
         "lng": row["longitude"],
         "name": row["establishment_name"] or "—",
-        "addr": " ".join(part for part in (row["street"], row["unit"]) if part),
+        "addr": street_line(row),
         "status": row["establishment_status"],
         "cls": STATUS_CLASS.get(row["establishment_status"], ""),
         "last": longdate(row["last_inspected"]) if row["last_inspected"] else "—",
@@ -838,6 +841,7 @@ def longdate(d: date) -> str:
 
 
 app.jinja_env.filters["longdate"] = longdate
+app.jinja_env.filters["street_line"] = street_line
 
 
 # ---------------------------------------------------------------------------

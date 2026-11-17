@@ -1,4 +1,3 @@
-import io
 
 import pytest
 
@@ -346,10 +345,6 @@ class TestCsvEncoding:
         p = tmp_path / "a.csv"
         p.write_bytes("caf\xe9\n".encode("cp1252"))
         assert csv_encoding(str(p)) == "cp1252"
-
-    def test_accepts_a_binary_stream(self):
-        assert csv_encoding(io.BytesIO(b"a,b\n")) == "utf-8-sig"
-        assert csv_encoding(io.BytesIO("caf\xe9\n".encode("cp1252"))) == "cp1252"
 
 
 class FakeCursor:

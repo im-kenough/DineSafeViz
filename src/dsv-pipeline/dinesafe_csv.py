@@ -1,7 +1,6 @@
 """DineSafe source CSV format: file names, column maps, and encoding."""
 
 import codecs
-import os
 
 RECENT_NAME = "Dinesafe.csv"
 
@@ -77,25 +76,20 @@ class EncodingDetector:
         return "utf-8-sig" if self.utf8 else "cp1252"
 
 
-def csv_encoding(source):
-    """Return the encoding of a DineSafe CSV file or binary stream: utf-8-sig,
-    else cp1252.
+def csv_encoding(path):
+    """Return the encoding of a DineSafe CSV file: utf-8-sig, else cp1252.
 
     DineSafe exports mix encodings across files (the recent CSV and the 2001 to
     2022 historical files are UTF-8, dinesafe_hist_2023.csv is Windows-1252), so
     try UTF-8 first and fall back to cp1252. utf-8-sig also accepts a BOM.
-    Checks the input in chunks, so it never holds the whole file in memory.
-    A stream is consumed (to EOF, or to the first non-UTF-8 byte) and not
-    rewound; the caller must reopen or seek it before reading it again.
+    Checks the file in chunks, so it never holds the whole file in memory.
     """
-    if isinstance(source, (str, os.PathLike)):
-        with open(source, "rb") as f:
-            return csv_encoding(f)
     detector = EncodingDetector()
-    for chunk in iter(lambda: source.read(1 << 20), b""):
-        detector.feed(chunk)
-        if not detector.utf8:
-            break  # already decided
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            detector.feed(chunk)
+            if not detector.utf8:
+                break  # already decided
     return detector.result()
 
 

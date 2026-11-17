@@ -8,7 +8,7 @@ import shutil
 
 import pytest
 
-from helpers import FAKES, ROOT, calls, ran, run
+from helpers import ROOT, calls, ran, run
 
 INFRA = ROOT / "infra"
 GEN_IMPORTS = INFRA / "terraform" / "landing-zone" / "gen-imports.sh"
@@ -25,19 +25,6 @@ STG_OVERRIDE = (
     'terraform {\n  backend "local" {\n'
     '    path = "../envs/stg/landing-zone.bootstrap.tfstate"\n  }\n}\n'
 )
-
-
-@pytest.fixture
-def fake_env(tmp_path):
-    """PATH with the fakes first, and the log they append to."""
-    log = tmp_path / "calls.log"
-    log.touch()
-    env = {
-        "PATH": f"{FAKES}{os.pathsep}{os.environ['PATH']}",
-        "HOME": str(tmp_path),
-        "FAKE_LOG": str(log),
-    }
-    return env, log
 
 
 @pytest.fixture
@@ -123,7 +110,7 @@ def test_migrate_refuses_another_envs_bootstrap(infra, fake_env):
     assert "ERROR: the bootstrap in progress isn't for ENV=prod." in result.stderr
     assert override.read_text() == STG_OVERRIDE
     override.unlink()
-    assert not any(line.startswith("terraform") for line in calls(log))
+    assert not ran(calls(log), "terraform")
 
 
 def test_help_lists_bootstrap_and_migrate():

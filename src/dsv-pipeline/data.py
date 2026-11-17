@@ -9,6 +9,7 @@ because the folder names are UTC timestamps.
 
 import base64
 import collections
+import contextlib
 import csv
 import datetime
 import hashlib
@@ -85,15 +86,9 @@ class DataError(Exception):
 # HTTP and file utilities
 # ---------------------------------------------------------------------------
 
-def md5_b64(source):
-    """Return the base64 MD5 of a file or binary stream, the encoding Blob uses
-    for Content-MD5. A stream is read to EOF and not rewound."""
-    if isinstance(source, (str, os.PathLike)):
-        with open(source, "rb") as f:
-            return md5_b64(f)
-    digest = hashlib.md5(usedforsecurity=False)  # integrity checksum, not security
-    for chunk in iter(lambda: source.read(1 << 20), b""):
-        digest.update(chunk)
+def md5_b64(data):
+    """Return the base64 MD5 of bytes, the encoding Blob uses for Content-MD5."""
+    digest = hashlib.md5(data, usedforsecurity=False)  # integrity checksum, not security
     return base64.b64encode(digest.digest()).decode()
 
 
@@ -312,12 +307,22 @@ def _scan_bytes(raw, name, limit=None):
     return detector.result(), base64.b64encode(digest.digest()).decode(), size
 
 
+@contextlib.contextmanager
+def _open_member(zf, info):
+    """zf.open(info), raising DataError for a member that can't be read."""
+    try:
+        with zf.open(info) as raw:
+            yield raw
+    except ZIP_MEMBER_ERRORS as e:
+        raise DataError(f"historical ZIP member {info.filename} is unreadable: {e}") from e
+
+
 def _scan_member(zf, info, name):
     """_scan_bytes over a ZIP member, enforcing MAX_HISTORICAL_BYTES and
     checking the decompressed size against the header's file_size."""
     if info.file_size > MAX_HISTORICAL_BYTES:
         raise DataError(f"{name}: {info.file_size} bytes, more than the {MAX_HISTORICAL_BYTES} limit")
-    with zf.open(info) as raw:
+    with _open_member(zf, info) as raw:
         encoding, md5, size = _scan_bytes(raw, name, MAX_HISTORICAL_BYTES)
     if size != info.file_size:
         raise DataError(f"{name}: {size} bytes decompressed, but the ZIP header says {info.file_size}")
@@ -345,12 +350,9 @@ def _download_historical(url, tmp, download):
             # overwritten, so two members can't share a file name.
             if base in staged:
                 raise DataError(f"the historical ZIP has more than one {base}")
-            try:
-                encoding, md5, size = _scan_member(zf, info, base)
-                with zf.open(info) as raw, io.TextIOWrapper(raw, encoding=encoding, newline="") as text:
-                    validate_csv(text, HISTORICAL_COLUMN_MAP, MIN_HISTORICAL_ROWS, name=base)
-            except ZIP_MEMBER_ERRORS as e:
-                raise DataError(f"historical ZIP member {info.filename} is unreadable: {e}") from e
+            encoding, md5, size = _scan_member(zf, info, base)
+            with _open_member(zf, info) as raw, io.TextIOWrapper(raw, encoding=encoding, newline="") as text:
+                validate_csv(text, HISTORICAL_COLUMN_MAP, MIN_HISTORICAL_ROWS, name=base)
             staged[base] = (base, info, md5, size)
     if not staged:
         raise DataError("the historical ZIP has no CSV files")
@@ -405,16 +407,13 @@ def ingest(store, force=False, historical=False, resolve=resolve_resources,
         if staged_historical:
             with zipfile.ZipFile(zip_path) as zf:
                 for name, info, md5, size in staged_historical:
-                    try:
-                        with zf.open(info) as body:
-                            store.upload(f"{HISTORICAL_PREFIX}{stamp}/{name}", body, md5, length=size)
-                    except ZIP_MEMBER_ERRORS as e:
-                        raise DataError(f"historical ZIP member {info.filename} is unreadable: {e}") from e
+                    with _open_member(zf, info) as body:
+                        store.upload(f"{HISTORICAL_PREFIX}{stamp}/{name}", body, md5, length=size)
             os.remove(zip_path)
             store.upload(
                 f"{HISTORICAL_PREFIX}{stamp}/{SUCCESS_MARKER}",
                 io.BytesIO(b""),
-                md5_b64(io.BytesIO(b"")),
+                md5_b64(b""),
                 length=0,
             )
             print(f"Uploaded {len(staged_historical)} historical files to {HISTORICAL_PREFIX}{stamp}/")
@@ -428,12 +427,10 @@ def ingest(store, force=False, historical=False, resolve=resolve_resources,
     return name
 
 
-def prune_recent(store, keep=KEEP_RECENT):
-    """Delete recent/ folders beyond the newest `keep`. Never deletes the newest."""
-    if keep < 1:
-        raise ValueError("keep must be at least 1")
+def prune_recent(store):
+    """Delete recent/ folders beyond the newest KEEP_RECENT. Never deletes the newest."""
     blobs = store.list(RECENT_PREFIX)
-    old = folders(blobs, RECENT_PREFIX)[:-keep]
+    old = folders(blobs, RECENT_PREFIX)[:-KEEP_RECENT]
     for folder in old:
         for name in sorted(n for n in blobs if n.startswith(f"{RECENT_PREFIX}{folder}/")):
             store.delete(name)

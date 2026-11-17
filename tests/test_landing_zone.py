@@ -4,7 +4,7 @@ import subprocess
 
 import pytest
 
-from helpers import ROOT
+from helpers import ROOT, ignored
 
 TF = ROOT / "infra" / "terraform"
 LZ = TF / "landing-zone"
@@ -23,14 +23,7 @@ def settings(path):
 
 def resource_body(text, rtype, name):
     """Body of `resource "rtype" "name" { ... }`, matched by brace depth."""
-    match = re.search(rf'resource "{rtype}" "{name}" {{', text)
-    assert match, f"{rtype}.{name} not found"
-    depth, start = 1, match.end()
-    for i in range(start, len(text)):
-        depth += {"{": 1, "}": -1}.get(text[i], 0)
-        if depth == 0:
-            return text[start:i]
-    raise AssertionError(f"{rtype}.{name} is not closed")
+    return block_body(text, f'resource "{rtype}" "{name}"')
 
 
 @pytest.mark.parametrize("env, account", [("stg", "stdsvstg01tfstate"), ("prod", "stdsvprod01tfstate")])
@@ -175,15 +168,9 @@ def test_budget_emails_are_sensitive():
 def test_secret_tfvars_example(env):
     path = TF / "envs" / env / "landing-zone.secret.tfvars.example"
     assert settings(path) == {"budget_contact_emails": '["you@example.com"]'}
-    result = subprocess.run(
-        ["git", "check-ignore", "--no-index", "-q", path.relative_to(ROOT)], cwd=ROOT
-    )
-    assert result.returncode == 1
+    assert not ignored(path.relative_to(ROOT))
     # The real file next to it stays ignored.
-    result = subprocess.run(
-        ["git", "check-ignore", "--no-index", "-q", path.with_suffix("").relative_to(ROOT)], cwd=ROOT
-    )
-    assert result.returncode == 0
+    assert ignored(path.with_suffix("").relative_to(ROOT))
 
 
 def test_outputs():

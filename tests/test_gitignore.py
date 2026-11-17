@@ -1,16 +1,7 @@
 """Real environment files stay out of git wherever they are; examples don't."""
-import subprocess
-
 import pytest
 
-from helpers import ROOT
-
-
-def ignored(path):
-    result = subprocess.run(
-        ["git", "check-ignore", "--no-index", "-q", path], cwd=ROOT
-    )
-    return result.returncode == 0
+from helpers import ignored
 
 
 @pytest.mark.parametrize("path", [

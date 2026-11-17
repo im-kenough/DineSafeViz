@@ -4,12 +4,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from db_helpers import DB_DIR, docker, migrate, migrated_db, psql, run_migration, start_db, wait_ready
+from db_helpers import (
+    APP_PW, DB_DIR, MIGRATOR_PW, ROLE_PASSWORDS, docker, migrate, psql, run_migration, start_db, wait_ready,
+)
 
 SET_PASSWORDS = DB_DIR / "set-passwords.sh"
-# A quote and a dollar sign prove the psql quoting in set-passwords.sh.
-APP_PW = "app'pw$x"
-MIGRATOR_PW = "migrator-pw"
 
 
 def login(name, user, password, sql="SELECT 1"):
@@ -28,12 +27,6 @@ def db():
     yield _start
     for name in names:
         docker("rm", "-f", name, check=False)
-
-
-@pytest.fixture(scope="module")
-def ready_db():
-    with migrated_db({"DSV_DB_APP_PASSWORD": APP_PW, "DSV_DB_MIGRATOR_PASSWORD": MIGRATOR_PW}) as name:
-        yield name
 
 
 def test_set_passwords_is_executable():
@@ -68,7 +61,7 @@ def test_app_role_is_still_read_only(ready_db):
 
 @pytest.mark.parametrize("missing", ["DSV_DB_APP_PASSWORD", "DSV_DB_MIGRATOR_PASSWORD"])
 def test_init_fails_when_a_password_is_unset(db, missing):
-    env = {"DSV_DB_APP_PASSWORD": APP_PW, "DSV_DB_MIGRATOR_PASSWORD": MIGRATOR_PW}
+    env = dict(ROLE_PASSWORDS)
     del env[missing]
     name = db(env)
     assert wait_ready(name) is False
@@ -80,7 +73,7 @@ def test_init_fails_when_a_password_is_unset(db, missing):
 # from apply_migrations in scripts/lib.sh, which deploy.sh and every
 # pipeline.sh load run first.
 def test_new_volume_waits_for_a_migration(db):
-    name = db({"DSV_DB_APP_PASSWORD": APP_PW, "DSV_DB_MIGRATOR_PASSWORD": MIGRATOR_PW})
+    name = db(ROLE_PASSWORDS)
     assert wait_ready(name), docker("logs", name).stderr
     assert "load_log" in psql(name, "SELECT count(*) FROM load_log").stderr
     assert migrate(name).returncode == 0
@@ -164,7 +157,7 @@ def test_search_indexes_exist(ready_db):
     assert set(SEARCH_INDEXES) <= set(result.stdout.split())
 
 
-# The test table is empty, so sequential scans are turned off to see which
+# The test table is tiny, so sequential scans are turned off to see which
 # index the planner picks for each of the app's lookups.
 @pytest.mark.parametrize("where, index", [
     ("establishment_name ILIKE '%pizza%'", "inspections_establishment_name_trgm_idx"),

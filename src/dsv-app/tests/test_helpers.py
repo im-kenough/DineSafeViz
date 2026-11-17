@@ -2,12 +2,13 @@ from datetime import date
 from unittest.mock import patch
 
 import psycopg2
+import pytest
 
 import app as app_module
 from db_fakes import stats_conn
 from app import (
     DATA_START, build_days, get_adjacent_quarters, get_data_range, get_quarter_bounds, get_quarter_months,
-    get_valid_quarters, get_valid_years, parse_year_quarter, sort_rows,
+    get_valid_quarters, get_valid_years, parse_year_quarter, quarter_of, sort_rows,
 )
 
 # A DB range narrower than 2001..today: starts mid-Q2 2010, ends in Q1 2025.
@@ -15,28 +16,14 @@ FIRST = date(2010, 6, 1)
 LAST = date(2025, 2, 1)
 
 
-def test_q1_full_quarter():
-    start, end = get_quarter_bounds(2024, 1, FIRST)
-    assert start == date(2024, 1, 1)
-    assert end == date(2024, 3, 31)
-
-
-def test_q2_full_quarter():
-    start, end = get_quarter_bounds(2024, 2, FIRST)
-    assert start == date(2024, 4, 1)
-    assert end == date(2024, 6, 30)
-
-
-def test_q3_full_quarter():
-    start, end = get_quarter_bounds(2024, 3, FIRST)
-    assert start == date(2024, 7, 1)
-    assert end == date(2024, 9, 30)
-
-
-def test_q4_full_quarter():
-    start, end = get_quarter_bounds(2024, 4, FIRST)
-    assert start == date(2024, 10, 1)
-    assert end == date(2024, 12, 31)
+@pytest.mark.parametrize("q, start, end", [
+    (1, date(2024, 1, 1), date(2024, 3, 31)),
+    (2, date(2024, 4, 1), date(2024, 6, 30)),
+    (3, date(2024, 7, 1), date(2024, 9, 30)),
+    (4, date(2024, 10, 1), date(2024, 12, 31)),
+])
+def test_full_quarter(q, start, end):
+    assert get_quarter_bounds(2024, q, FIRST) == (start, end)
 
 
 def test_first_quarter_start_clips_to_first_inspection():
@@ -47,7 +34,7 @@ def test_first_quarter_start_clips_to_first_inspection():
 
 def test_end_does_not_exceed_today():
     today = date.today()
-    start, end = get_quarter_bounds(today.year, (today.month - 1) // 3 + 1, FIRST)
+    start, end = get_quarter_bounds(today.year, quarter_of(today.month), FIRST)
     assert end <= today
 
 
@@ -66,7 +53,7 @@ def test_quarter_months_clipped_to_first_inspection():
 
 def test_quarter_months_stop_at_today():
     today = date.today()
-    months = get_quarter_months(today.year, (today.month - 1) // 3 + 1, FIRST)
+    months = get_quarter_months(today.year, quarter_of(today.month), FIRST)
     assert months[0] == (today.replace(day=1), today)
 
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Test double for docker, used through PATH by tests/test_deploy.py.
+# Test double for docker, used through PATH by tests/test_deploy.py and
+# tests/test_pipeline_sh.py.
 echo "docker $*" >> "${FAKE_LOG:-/dev/null}"
 case "$1 $2" in
   "manifest inspect")
@@ -28,7 +29,7 @@ case "$1 $2" in
       echo "${FAKE_DB_HAS_ROWS:-t}"
       exit 0
     fi
-    # deploy.sh: a migration piped into psql
+    # lib.sh's apply_migrations (deploy.sh, pipeline.sh): a migration piped into psql
     if [[ $* == *"ON_ERROR_STOP"* ]]; then
       cat >/dev/null
       exit "${FAKE_MIGRATE_EXIT:-0}"

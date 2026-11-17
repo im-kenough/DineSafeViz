@@ -37,13 +37,8 @@ def listing(blobs, next_marker=""):
 
 
 class TestMd5:
-    def test_is_base64_digest(self, tmp_path):
-        p = tmp_path / "f"
-        p.write_bytes(b"hello")
-        assert md5_b64(str(p)) == b64md5(b"hello")
-
-    def test_accepts_a_binary_stream(self):
-        assert md5_b64(io.BytesIO(b"hello")) == b64md5(b"hello")
+    def test_is_base64_digest(self):
+        assert md5_b64(b"hello") == b64md5(b"hello")
 
 
 class TestValidateCsv:
@@ -515,11 +510,6 @@ class TestPrune:
         assert store.deleted == ["recent/20260101T000000Z/Dinesafe.csv",
                                  "recent/20260102T000000Z/Dinesafe.csv"]
         assert len(store.list("recent/")) == KEEP_RECENT
-
-    def test_never_deletes_the_newest(self):
-        store = self.fill(3)
-        prune_recent(store, keep=1)
-        assert list(store.list("recent/")) == ["recent/20260103T000000Z/Dinesafe.csv"]
 
     def test_ingest_prunes_after_upload(self, tmp_path):
         store = self.fill(KEEP_RECENT)

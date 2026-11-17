@@ -2,6 +2,8 @@ import json
 import re
 from pathlib import Path
 
+from style_css import STYLE_CSS
+
 
 def test_dashboard_returns_200(client):
     resp = client.get("/dashboard")
@@ -24,7 +26,6 @@ def test_dashboard_has_home_link(client):
 # The Grafana dashboard can't read CSS variables, so its status colours are
 # hard-coded copies of the --dinesafe-* tokens in style.css. Keep them in sync.
 _APP_DIR = Path(__file__).resolve().parent.parent
-_STYLE_CSS = _APP_DIR / "static" / "style.css"
 _DASHBOARD_JSON = _APP_DIR.parent / "dsv-analytics" / "provisioning" / "dashboards" / "dinesafe.json"
 _STATUS_TOKENS = {"Pass": "green", "Conditional Pass": "yellow", "Closed": "red"}
 # Matches the .sev-* classes in style.css.
@@ -32,7 +33,7 @@ _SEVERITY_TOKENS = {"Crucial": "red", "Significant": "yellow", "Minor": "green"}
 
 
 def _css_status_colours():
-    tokens = dict(re.findall(r"--dinesafe-(\w+):\s*(#[0-9A-Fa-f]{6})", _STYLE_CSS.read_text()))
+    tokens = dict(re.findall(r"--dinesafe-(\w+):\s*(#[0-9A-Fa-f]{6})", STYLE_CSS.read_text()))
     return {key: tokens[name].upper() for key, name in {**_STATUS_TOKENS, **_SEVERITY_TOKENS}.items()}
 
 

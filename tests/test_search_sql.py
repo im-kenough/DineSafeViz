@@ -1,18 +1,14 @@
 """The app's search SQL against the real Postgres image, migrated."""
 import sys
-from contextlib import closing
 from datetime import date, timedelta
 
-import psycopg2
 import pytest
 
-from db_helpers import container_ip, migrated_db, psql
+from db_helpers import app_query, replace_inspections
 from helpers import ROOT
 
 sys.path.insert(0, str(ROOT / "src" / "dsv-app"))
 import app as app_module
-
-APP_PW = "app-pw"
 
 # (establishment_id, name, type, address/street, unit, status, date). A1 has
 # two rows on 2026-10-03 (two infractions, one inspection). H1 is the same
@@ -47,42 +43,24 @@ for _n in range(1, ZORBO + 1):
 
 
 @pytest.fixture(scope="module")
-def search_db():
-    env = {"DSV_DB_APP_PASSWORD": APP_PW, "DSV_DB_MIGRATOR_PASSWORD": "migrator-pw"}
-    with migrated_db(env) as name:
-        values = ", ".join(
-            "(" + ", ".join("NULL" if v is None else "'" + v + "'" for v in (eid, n, t, a, a, u, s, d)) + ")"
-            for eid, n, t, a, u, s, d in ROWS
-        )
-        result = psql(name, (
-            "INSERT INTO inspections (establishment_id, establishment_name, establishment_type,"
-            " establishment_address, street, unit, establishment_status, inspection_date)"
-            f" VALUES {values}"
-        ))
-        assert result.returncode == 0, result.stderr
-        yield name
-
-
-def _run(name, query):
-    """Run one (sql, params) pair as dinesafe_app. Returns the result dicts."""
-    conn = psycopg2.connect(
-        host=container_ip(name), dbname="dinesafe", user="dinesafe_app",
-        password=APP_PW, connect_timeout=5,
+def search_db(ready_db):
+    replace_inspections(
+        ready_db,
+        ("establishment_id", "establishment_name", "establishment_type", "establishment_address",
+         "street", "unit", "establishment_status", "inspection_date"),
+        [(eid, n, t, a, a, u, s, d) for eid, n, t, a, u, s, d in ROWS],
     )
-    with closing(conn), conn.cursor() as cur:
-        cur.execute(*query)
-        columns = [c.name for c in cur.description]
-        return [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
+    return ready_db
 
 
 def search(name, terms, page=1):
     """Run the app's search page query. Returns the result dicts."""
-    return _run(name, app_module.search_query(terms, page))
+    return app_query(name, app_module.search_query(terms, page))
 
 
 def count(name, terms):
     """Run the app's search count query. Returns the total."""
-    return _run(name, app_module.search_count_query(terms))[0]["total"]
+    return app_query(name, app_module.search_count_query(terms))[0]["total"]
 
 
 def test_pizza_ranks_prefix_then_recent(search_db):

@@ -1,7 +1,51 @@
-"""Test doubles for psycopg2 connections."""
+"""Test doubles for psycopg2 connections, and the rows they return."""
+from datetime import date
 from unittest.mock import MagicMock
 
 from psycopg2.extensions import TRANSACTION_STATUS_IDLE
+
+EST_ID = "001Vo000013QjdPIAS"
+
+
+def inspection_row(day=date(2024, 2, 14), status="Pass", details=None, severity=None,
+                   name="Pizza Pizza", street="123 Queen St W", unit=None, **columns):
+    """One row as app._INSPECTION_SELECT returns it (the /inspections and
+    restaurant page queries). columns overrides any other column by name."""
+    return {
+        "inspection_date": day,
+        "establishment_status": status,
+        "action": None,
+        "infraction_details": details,
+        "establishment_name": name,
+        "establishment_address": f"{street} M5V 2A1",
+        "establishment_type": None,
+        "street": street,
+        "unit": unit,
+        "postal_code": None,
+        "latitude": None,
+        "longitude": None,
+        "outcome": None,
+        "outcome_date": None,
+        "amount_fined": None,
+        "establishment_id": EST_ID,
+        "severity": severity,
+        "infraction_category": None,
+    } | columns
+
+
+def search_row(n=1, name="Pizza Pizza", status="Pass", est_type=None, unit=None):
+    """One row as the search page query returns it."""
+    return {
+        "establishment_id": f"001Vo0000000000{n:03d}",
+        "establishment_name": name,
+        "street": "123 Queen St W",
+        "unit": unit,
+        "establishment_status": status,
+        "last_inspected": date(2026, 10, 3),
+        "inspection_count": 14,
+        "first_inspected": date(2019, 3, 4),
+        "establishment_type": est_type,
+    }
 
 
 def fake_conn(cursor=None):
