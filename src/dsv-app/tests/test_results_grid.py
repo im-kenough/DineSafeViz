@@ -1,31 +1,15 @@
 """Search results sit in a 3/2/1 column grid of stacked cards, CSS only (#363)."""
 import re
-from datetime import date
 from functools import cache
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 import app as app_module
-from db_fakes import search_conn
+from db_fakes import search_conn, search_row
+from style_css import block_end, css_decls, css_rules, css_text, media_block
 
-_STYLE_CSS = Path(__file__).resolve().parent.parent / "static" / "style.css"
 _GRID_SELECTORS = (".results", ".results > li", ".result-card")
-
-
-def _result(n):
-    return {
-        "establishment_id": f"001Vo0000000000{n:03d}",
-        "establishment_name": f"Pizza {n}",
-        "street": "123 Queen St W",
-        "unit": None,
-        "establishment_status": "Pass",
-        "last_inspected": date(2026, 10, 3),
-        "inspection_count": 14,
-        "first_inspected": date(2019, 3, 4),
-        "establishment_type": None,
-    }
 
 
 def _search(client, q="pizza", page=None, total=157, rows=()):
@@ -36,41 +20,19 @@ def _search(client, q="pizza", page=None, total=157, rows=()):
     return resp.data.decode()
 
 
-def _css_rules(css):
-    """(selectors, body) pairs for the plain rules in css, comments stripped."""
-    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
-    return re.findall(r"([^{}]+)\{([^}]*)\}", css)
-
-
-def _block_end(css, start):
-    """Index just past the `}` that closes the block whose body starts at start."""
-    depth, i = 1, start
-    while depth:
-        depth += {"{": 1, "}": -1}.get(css[i], 0)
-        i += 1
-    return i
-
-
 @cache
 def _top_level_css():
-    """style.css with every @media block removed, so only base rules remain."""
-    css = _STYLE_CSS.read_text()
+    """style.css without comments or @media blocks, so only base rules remain."""
+    css = css_text()
     while (at := css.find("@media")) != -1:
-        css = css[:at] + css[_block_end(css, css.index("{", at) + 1):]
+        css = css[:at] + css[block_end(css, css.index("{", at) + 1):]
     return css
-
-
-def _media_block(query):
-    """Inner text of the first `@media <query>` block in style.css."""
-    css = _STYLE_CSS.read_text()
-    start = css.index("{", css.index(f"@media {query}")) + 1
-    return css[start:_block_end(css, start) - 1]
 
 
 def _own_rule(selector, css=None):
     """Body of the first rule whose whole selector list is exactly selector."""
-    for selectors, body in _css_rules(_top_level_css() if css is None else css):
-        if " ".join(selectors.split()) == selector:
+    for selectors, body in css_rules(_top_level_css() if css is None else css):
+        if ", ".join(selectors) == selector:
             return " ".join(body.split())
     return None
 
@@ -84,13 +46,13 @@ def test_results_base_grid_has_three_columns():
 
 
 def test_results_grid_has_two_columns_below_desktop():
-    rule = _own_rule(".results", _media_block("(max-width: 1023px)"))
+    rule = _own_rule(".results", media_block("(max-width: 1023px)"))
     assert rule is not None
     assert "grid-template-columns: repeat(2, minmax(0, 1fr))" in rule
 
 
 def test_results_grid_has_one_column_on_mobile():
-    rule = _own_rule(".results", _media_block("(max-width: 600px)"))
+    rule = _own_rule(".results", media_block("(max-width: 600px)"))
     assert rule is not None
     assert "grid-template-columns: minmax(0, 1fr)" in rule
 
@@ -104,23 +66,16 @@ def test_results_items_stretch_card_to_row_height():
         assert "display: grid" in rule
 
 
-def _decls(body):
-    """{property: value} for the declarations in a rule body."""
-    return dict(
-        (p.strip(), v.strip()) for p, _, v in (d.partition(":") for d in body.split(";")) if v
-    )
-
-
 def test_result_card_spacing_comes_from_gap_only():
-    assert _decls(_own_rule(".result-card")).get("margin-bottom") == "0"
-    assert _decls(_own_rule(".est-card, .result-card")).get("margin-bottom") == "0.6rem"
+    assert css_decls(_own_rule(".result-card")).get("margin-bottom") == "0"
+    assert css_decls(_own_rule(".est-card, .result-card")).get("margin-bottom") == "0.6rem"
 
 
 def test_result_cards_stack_at_every_width():
     card = _own_rule(".result-card")
     latest = _own_rule(".result-latest")
     badge = _own_rule(".result-latest .status-badge")
-    assert _decls(card).get("grid-template-columns") == "1fr"
+    assert css_decls(card).get("grid-template-columns") == "1fr"
     assert "1fr auto" not in card
     assert "text-align: left" in latest
     assert "text-align: right" not in latest
@@ -135,15 +90,14 @@ def test_long_text_cannot_widen_a_card():
 
 @pytest.mark.parametrize("selector", [".results", ".result-card"])
 def test_grid_keeps_dom_reading_order(selector):
-    css = _STYLE_CSS.read_text()
-    for selectors, body in _css_rules(css):
-        if selector in (" ".join(s.split()) for s in selectors.split(",")):
+    for selectors, body in css_rules():
+        if selector in selectors:
             assert not re.search(r"(^|[;\s])order\s*:", body)
             assert "dense" not in body
 
 
 def test_full_page_renders_one_list_with_pager_outside(client):
-    html = _search(client, rows=[_result(n) for n in range(app_module.SEARCH_LIMIT)], total=157)
+    html = _search(client, rows=[search_row(n, name=f"Pizza {n}") for n in range(app_module.SEARCH_LIMIT)], total=157)
     assert app_module.SEARCH_LIMIT == 50
     assert html.count('<ul class="results">') == 1
     start = html.index('<ul class="results">')
@@ -169,7 +123,6 @@ def test_no_data_messages_sit_outside_results_list(client, q, page, total):
 
 @pytest.mark.parametrize("selector", _GRID_SELECTORS)
 def test_grid_rules_add_no_hex_colours(selector):
-    css = _STYLE_CSS.read_text()
-    for selectors, body in _css_rules(css):
-        if " ".join(selectors.split()) == selector:
+    for selectors, body in css_rules():
+        if ", ".join(selectors) == selector:
             assert "#" not in body

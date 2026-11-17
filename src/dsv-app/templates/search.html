@@ -31,7 +31,7 @@
                 <a class="result-card {{ status_class.get(r.establishment_status, '') }}" href="{{ url_for('establishment', establishment_id=r.establishment_id) }}">
                     <span class="result-place">
                         <strong>{{ r.establishment_name or '—' }}</strong>
-                        <span>{{ r.street }}{% if r.unit %} {{ r.unit }}{% endif %}</span>
+                        <span>{{ r | street_line }}</span>
                         {% if r.establishment_type %}<span class="est-type">{{ r.establishment_type }}</span>{% endif %}
                     </span>
                     <span class="result-latest">

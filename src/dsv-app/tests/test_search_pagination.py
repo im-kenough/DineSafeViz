@@ -1,35 +1,18 @@
 """Search shows the total match count and pages through results, 50 per page (#353)."""
 import re
-from datetime import date
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 import app as app_module
-from db_fakes import search_conn
-
-_STYLE_CSS = Path(__file__).resolve().parent.parent / "static" / "style.css"
-
-
-def _result(n):
-    return {
-        "establishment_id": f"001Vo0000000000{n:03d}",
-        "establishment_name": f"Pizza {n}",
-        "street": "123 Queen St W",
-        "unit": None,
-        "establishment_status": "Pass",
-        "last_inspected": date(2026, 10, 3),
-        "inspection_count": 14,
-        "first_inspected": date(2019, 3, 4),
-        "establishment_type": None,
-    }
+from db_fakes import search_conn, search_row
+from style_css import css_rule, css_text
 
 
 def _page(total, page):
     """The fake rows for one page of a search with total matches."""
     start = (page - 1) * app_module.SEARCH_LIMIT
-    return [_result(n) for n in range(start, min(total, start + app_module.SEARCH_LIMIT))]
+    return [search_row(n, name=f"Pizza {n}") for n in range(start, min(total, start + app_module.SEARCH_LIMIT))]
 
 
 def _search(client, q="pizza", page=None, total=157, rows=None):
@@ -223,23 +206,12 @@ def test_pager_links_escape_script(client):
 
 # -- CSS -----------------------------------------------------------------------
 
-def _css():
-    return re.sub(r"/\*.*?\*/", "", _STYLE_CSS.read_text(), flags=re.S)
-
-
-def _css_rule(selector):
-    for selectors, body in re.findall(r"([^{}]+)\{([^}]*)\}", _css()):
-        if selector in (" ".join(s.split()) for s in selectors.split(",")):
-            return body
-    return None
-
-
 def test_pager_css():
-    pager = _css_rule(".pager")
+    pager = css_rule(".pager")
     assert pager is not None
     assert "display: flex" in pager and "flex-wrap: wrap" in pager and "justify-content: center" in pager
     assert "var(--border)" in pager
-    disabled = _css_rule(".nav-btn.disabled")
+    disabled = css_rule(".nav-btn.disabled")
     assert disabled is not None
     assert "color: var(--text-muted)" in disabled
     assert "pointer-events: none" in disabled
@@ -248,7 +220,7 @@ def test_pager_css():
 
 
 def test_pager_buttons_are_tap_sized():
-    body = _css_rule(".pager .nav-btn")
+    body = css_rule(".pager .nav-btn")
     assert body is not None
     for decl in ("box-sizing: border-box", "min-width: 44px", "min-height: 44px", "display: inline-flex",
                  "align-items: center", "justify-content: center"):
@@ -257,7 +229,7 @@ def test_pager_buttons_are_tap_sized():
 
 
 def test_pager_buttons_rule_is_not_in_media_block():
-    css = _css()
+    css = css_text()
     match = re.search(r"(?:^|[}\s])\.pager \.nav-btn\s*\{", css)
     assert match is not None
     before = css[:match.start()]

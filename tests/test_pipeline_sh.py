@@ -1,15 +1,11 @@
 """scripts/pipeline.sh with fake curl, az, and docker (tests/fakes)."""
 import pytest
 
-from helpers import MIGRATE, calls, first, run
+from helpers import MIGRATE, calls, first, ran, run
 
 
 def pipeline_sh(repo, env, *args):
     return run([repo / "scripts" / "pipeline.sh", *args], env, cwd=repo)
-
-
-def docker_calls(log):
-    return [line for line in calls(log) if line.startswith("docker ")]
 
 
 RUN = "docker compose --profile pipeline run --rm "
@@ -34,7 +30,7 @@ def run_calls(log):
 def test_rejects_bad_arguments(vm_repo, args):
     repo, env, log = vm_repo
     assert pipeline_sh(repo, env, *args).returncode == 2
-    assert docker_calls(log) == []
+    assert not ran(calls(log), "docker ")
 
 
 @pytest.mark.parametrize("command", ["run", "ingest", "load"])
@@ -90,15 +86,14 @@ def test_imds_failure_runs_nothing(vm_repo):
     result = pipeline_sh(repo, {**env, "FAKE_IMDS_DOWN": "1"}, "stg", "run")
     assert result.returncode == 1
     assert "IMDS" in result.stderr
-    assert docker_calls(log) == []
+    assert not ran(calls(log), "docker ")
 
 
 def test_dev_loads_with_az_token_and_builds(vm_repo):
     repo, env, log = vm_repo
     result = pipeline_sh(repo, env, "dev", "load", "--force")
     assert result.returncode == 0, result.stderr
-    assert any(line.startswith("az account get-access-token --resource https://storage.azure.com/")
-               for line in calls(log))
+    assert ran(calls(log), "az account get-access-token --resource https://storage.azure.com/")
     line = run_calls(log)[0]
     assert "--build" in line  # dev runs the working tree
     assert line.endswith("dsv-pipeline load --force")
@@ -178,7 +173,7 @@ def test_loads_apply_every_migration_first(vm_repo, env_name, command):
 def test_ingest_never_touches_the_database(vm_repo):
     repo, env, log = vm_repo
     assert pipeline_sh(repo, env, "stg", "ingest").returncode == 0
-    assert not [line for line in calls(log) if line.startswith(MIGRATE)]
+    assert not ran(calls(log), MIGRATE)
 
 
 def test_failed_migration_stops_before_the_load(vm_repo):

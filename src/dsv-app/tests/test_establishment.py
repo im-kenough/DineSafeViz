@@ -4,32 +4,7 @@ from unittest.mock import patch
 import pytest
 
 import app as app_module
-from db_fakes import rows_conn
-
-EST_ID = "001Vo000013QjdPIAS"
-
-
-def _row(day, status="Pass", details=None, severity=None, name="Pizza Pizza",
-         street="123 Queen St W", unit=None):
-    """One row as returned by _fetch_establishment's RealDictCursor query."""
-    return {
-        "inspection_date": day,
-        "establishment_status": status,
-        "action": None,
-        "infraction_details": details,
-        "establishment_name": name,
-        "establishment_address": f"{street} M5V 2A1",
-        "establishment_type": None,
-        "street": street,
-        "unit": unit,
-        "postal_code": None,
-        "outcome": None,
-        "outcome_date": None,
-        "amount_fined": None,
-        "establishment_id": EST_ID,
-        "severity": severity,
-        "infraction_category": None,
-    }
+from db_fakes import EST_ID, inspection_row, rows_conn
 
 
 def _get(client, url, rows=()):
@@ -40,9 +15,9 @@ def _get(client, url, rows=()):
 
 def test_build_history_groups_by_date_newest_first():
     rows = [
-        _row(date(2024, 3, 1), details="Minor thing", severity="M - Minor"),
-        _row(date(2026, 10, 3)),
-        _row(date(2024, 3, 1), details="Crucial thing", severity="C - Crucial"),
+        inspection_row(date(2024, 3, 1), details="Minor thing", severity="M - Minor"),
+        inspection_row(date(2026, 10, 3)),
+        inspection_row(date(2024, 3, 1), details="Crucial thing", severity="C - Crucial"),
     ]
     days = app_module.build_history(rows)
     assert [d for d, _ in days] == [date(2026, 10, 3), date(2024, 3, 1)]
@@ -52,8 +27,8 @@ def test_build_history_groups_by_date_newest_first():
 
 def test_establishment_page_lists_every_inspection_newest_first(client):
     rows = [
-        _row(date(2019, 3, 4), status="Conditional Pass", details="Pests", severity="S - Significant"),
-        _row(date(2026, 10, 3), name="Pizza Pizza Queen", unit="Unit 2"),
+        inspection_row(date(2019, 3, 4), status="Conditional Pass", details="Pests", severity="S - Significant"),
+        inspection_row(date(2026, 10, 3), name="Pizza Pizza Queen", unit="Unit 2"),
     ]
     resp, _ = _get(client, f"/establishment/{EST_ID}", rows)
     html = resp.data.decode()
@@ -68,8 +43,17 @@ def test_establishment_page_lists_every_inspection_newest_first(client):
 
 
 def test_establishment_page_with_one_inspection(client):
-    resp, _ = _get(client, f"/establishment/{EST_ID}", [_row(date(2026, 10, 3))])
+    resp, _ = _get(client, f"/establishment/{EST_ID}", [inspection_row(date(2026, 10, 3))])
     assert "1 inspection, October 3, 2026" in resp.data.decode()
+
+
+def test_establishment_page_without_address_has_no_stray_comma(client):
+    row = inspection_row(date(2026, 10, 3), street=None, establishment_address=None)
+    resp, _ = _get(client, f"/establishment/{EST_ID}", [row])
+    html = resp.data.decode()
+    assert resp.status_code == 200
+    assert "heading-address" not in html
+    assert ", Toronto, ON" not in html
 
 
 def test_unknown_id_is_404(client):
@@ -86,7 +70,7 @@ def test_malformed_id_is_404_without_db(client, bad_id):
 
 
 def test_inspection_cards_link_to_establishment_page(client):
-    row = _row(date(2024, 2, 14))
+    row = inspection_row(date(2024, 2, 14))
     resp, _ = _get(client, "/inspections/month?year=2024&m=2", [row])
     assert f'<a class="est-link" href="/establishment/{EST_ID}">Pizza Pizza</a>' in resp.data.decode()
 
@@ -94,7 +78,7 @@ def test_inspection_cards_link_to_establishment_page(client):
 def test_card_without_establishment_id_shows_plain_name(client):
     # The loader stores an empty Establishment ID as NULL, and url_for can't build
     # a link without one, so the name renders unlinked instead of a 500.
-    row = _row(date(2024, 2, 14)) | {"establishment_id": None}
+    row = inspection_row(date(2024, 2, 14)) | {"establishment_id": None}
     resp, _ = _get(client, "/inspections/month?year=2024&m=2", [row])
     html = resp.data.decode()
     assert resp.status_code == 200

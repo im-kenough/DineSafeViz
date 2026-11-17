@@ -10,13 +10,16 @@
     if (!pins.length) return;
 
     var TORONTO = [[43.58, -79.64], [43.86, -79.11]];
-    // Pin colours are the card-border colours from style.css.
+    // Pin colours are the card-border colours from style.css, outlined in the
+    // page background; a pin with no known status is muted text.
     var css = getComputedStyle(document.documentElement);
     var colours = {
         'status-closed': css.getPropertyValue('--dinesafe-red').trim(),
         'status-conditional': css.getPropertyValue('--dinesafe-yellow').trim(),
         'status-pass': css.getPropertyValue('--dinesafe-green').trim()
     };
+    var outline = css.getPropertyValue('--bg').trim() || '#0e1016';
+    var noStatus = css.getPropertyValue('--text-muted').trim() || '#83899d';
     var single = box.hasAttribute('data-single');
 
     function el(tag, className, text) {
@@ -54,8 +57,8 @@
         var marker = L.circleMarker([p.lat, p.lng], {
             radius: 7,
             weight: 2,
-            color: '#0e1016',
-            fillColor: colours[p.cls] || '#83899d',
+            color: outline,
+            fillColor: colours[p.cls] || noStatus,
             fillOpacity: 0.9
         }).addTo(map);
         // Auto-pan keeps an opened popup clear of the 44px zoom buttons (style.css).

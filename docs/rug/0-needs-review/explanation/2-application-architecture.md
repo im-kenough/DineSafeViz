@@ -66,9 +66,9 @@ graph LR
   Blocks `/metrics` externally (returns 404). Starts only after `dsv-app`
   passes its healthcheck.
 
-- **`dsv-app`** — `python:3.14-slim-bookworm` (multi-stage build).
-  Runs the Flask app under gunicorn (gthread worker, 1 worker, 4
-  threads) on port 8000. Internal-only — not exposed on the host.
+- **`dsv-app`** — `python:3.14.10-alpine3.24` (single stage; pip installs
+  straight into the runtime image). Runs the Flask app under gunicorn
+  (gthread worker, 1 worker, 4 threads) on port 8000. Internal-only — not exposed on the host.
   Runs as `nonroot` (UID/GID 65532). Connects to `dsv-db` using the
   `dinesafe_app` role (SELECT-only). Exposes `/healthz` and `/readyz`
   for health gating. Starts after `dsv-db` is healthy.
@@ -222,7 +222,7 @@ DineSafeViz/
     │       ├── dashboards/       (dashboard.yml, dinesafe.json)
     │       └── datasources/      (datasource.yml)
     ├── dsv-app/
-    │   ├── Dockerfile            (multi-stage; nonroot UID 65532)
+    │   ├── Dockerfile            (single stage; nonroot UID 65532)
     │   ├── gunicorn.conf.py      (1 worker + 4 gthreads for local; see file for prod notes)
     │   ├── app.py
     │   ├── requirements.txt

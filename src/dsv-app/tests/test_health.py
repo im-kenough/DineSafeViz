@@ -1,4 +1,6 @@
+import runpy
 import threading
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import psycopg2
@@ -245,4 +247,5 @@ def test_slow_connect_does_not_block_readyz(client):
 
 
 def test_pool_sized_to_gunicorn_threads():
-    assert app_module.POOL_MAXCONN == 4
+    conf = runpy.run_path(str(Path(app_module.__file__).with_name("gunicorn.conf.py")))
+    assert app_module.POOL_MAXCONN == conf["threads"]

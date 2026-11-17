@@ -56,35 +56,28 @@ account=$(require_setting "$settings" DSV_STORAGE_ACCOUNT)
 
 # Compose reads the secrets, and on the VMs the image tag, from .env. Without
 # it every DSV_* variable is blank and dsv-db exits on its empty password.
+# dev gets the token from your az login and builds the image from the working
+# tree; the VMs get it from IMDS and run the image that deploy.sh pulled.
 if [[ $env_name == dev ]]; then
   [[ -f .env ]] || die ".env is missing. Run scripts/deploy.sh dev first."
+  token=$(az account get-access-token --resource https://storage.azure.com/ \
+    --query accessToken -o tsv) \
+    || die "can't get a storage token. Run az login as dsv-ops01 first."
+  build=(--build)
 else
   # deploy.sh's image tags: prod vX.Y.Z is X.Y.Z, stg main is sha-<commit:0:7>.
   fix="Deploy first (scripts/deploy.sh $env_name), or write it without deploying: DSV_VERSION=<image tag, e.g. 0.5.0 or sha-abc1234> scripts/fetch-secrets.sh $env_name"
   [[ -f .env ]] || die ".env is missing. $fix"
   [[ -n $(setting .env DSV_VERSION) ]] \
     || die ".env has no DSV_VERSION, so Compose can't pick the image. $fix"
-fi
-
-if [[ $env_name == dev ]]; then
-  token=$(az account get-access-token --resource https://storage.azure.com/ \
-    --query accessToken -o tsv) \
-    || die "can't get a storage token. Run az login as dsv-ops01 first."
-else
   token=$(imds_token https%3A%2F%2Fstorage.azure.com%2F)
+  build=()
 fi
 [[ -n $token && $token != null ]] || die "got an empty storage token"
 
 token_dir=$(mktemp -d)
 trap 'rm -rf "$token_dir"' EXIT
 (umask 077 && printf '%s' "$token" >"$token_dir/token")
-
-# dev builds the image from the working tree; the VMs run the image that
-# deploy.sh pulled.
-build=()
-if [[ $env_name == dev ]]; then
-  build=(--build)
-fi
 
 # Loads need the current schema and dinesafe_migrator's grants, which a new
 # volume doesn't have until the migrations run. ingest never touches the DB.

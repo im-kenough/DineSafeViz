@@ -7,42 +7,17 @@ from unittest.mock import patch
 import pytest
 
 from db_fakes import search_conn
+from style_css import css_decls, css_rule, css_rules
 
 _APP = Path(__file__).resolve().parent.parent
-_STYLE_CSS = _APP / "static" / "style.css"
 _HOME_HTML = _APP / "templates" / "home.html"
 _HEX = re.compile(r"#[0-9a-fA-F]{3,8}\b")
 
 
-def _css_rules(css):
-    """(selectors, body) pairs for the plain rules in css, comments stripped."""
-    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
-    return [
-        (tuple(" ".join(s.split()) for s in selectors.split(",")), body)
-        for selectors, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css)
-    ]
-
-
-def _rule(rules, selector):
-    """Body of the first rule whose selector list includes selector."""
-    return next((body for selectors, body in rules if selector in selectors), None)
-
-
-def _decls(body):
-    """Declarations of a rule body as a {property: value} dict."""
-    return {
-        prop.strip(): value.strip()
-        for prop, value in (d.split(":", 1) for d in body.split(";") if d.strip())
-    }
-
-
-def _style_rules():
-    return _css_rules(_STYLE_CSS.read_text())
-
-
-def _home_rules(client):
+def _home_css(client):
+    """The <style> block in the rendered home page."""
     html = client.get("/").data.decode()
-    return _css_rules(html[html.index("<style>") + 7:html.index("</style>")])
+    return html[html.index("<style>") + 7:html.index("</style>")]
 
 
 def _home_explore(client):
@@ -52,18 +27,17 @@ def _home_explore(client):
 
 
 def test_search_input_border_uses_text_muted():
-    body = _rule(_style_rules(), ".search-form input")
-    assert _decls(body)["border"] == "1px solid var(--text-muted)"
+    body = css_rule(".search-form input")
+    assert css_decls(body)["border"] == "1px solid var(--text-muted)"
     assert "var(--border)" not in body
 
 
 def test_hero_search_button_is_filled_with_accent():
-    rules = _style_rules()
-    decls = _decls(_rule(rules, ".hero-search button"))
+    decls = css_decls(css_rule(".hero-search button"))
     assert decls["background"] == "var(--accent)"
     assert decls["color"] == "var(--bg)"
     # comes after the shared .search-form button rule
-    order = [selectors for selectors, _ in rules]
+    order = [selectors for selectors, _ in css_rules()]
     assert order.index((".hero-search button",)) > order.index((".search-form button",))
 
 
@@ -73,10 +47,9 @@ def test_search_macro_button_stays_nav_btn():
 
 
 def test_hero_button_hover_left_to_nav_btn_rule():
-    rules = _style_rules()
-    assert "!important" not in _rule(rules, ".hero-search button")
-    assert not [s for selectors, _ in rules for s in selectors if "hero-search" in s and ":hover" in s]
-    assert _decls(_rule(rules, ".nav-btn:hover:not(.active)"))["background"] == "#2952d9"
+    assert "!important" not in css_rule(".hero-search button")
+    assert not [s for selectors, _ in css_rules() for s in selectors if "hero-search" in s and ":hover" in s]
+    assert css_decls(css_rule(".nav-btn:hover:not(.active)"))["background"] == "#2952d9"
 
 
 def test_explore_cards_have_call_to_action(client):
@@ -88,7 +61,7 @@ def test_explore_cards_have_call_to_action(client):
 
 
 def test_nav_cta_style(client):
-    decls = _decls(_rule(_home_rules(client), ".nav-cta"))
+    decls = css_decls(css_rule(".nav-cta", _home_css(client)))
     assert decls["color"] == "var(--text)"
     assert decls["font-weight"] == "600"
     assert decls["text-decoration"] == "underline"
@@ -96,31 +69,31 @@ def test_nav_cta_style(client):
 
 
 def test_nav_card_hover_and_focus_highlight_whole_card(client):
-    rules = _home_rules(client)
+    home = _home_css(client)
+    rules = css_rules(home)
     hover = [body for selectors, body in rules if selectors == (".nav-card:hover", ".nav-card:focus-visible")]
     assert len(hover) == 1
-    assert _decls(hover[0])["box-shadow"] == "inset 0 0 0 1px var(--accent)"
+    assert css_decls(hover[0])["box-shadow"] == "inset 0 0 0 1px var(--accent)"
     focus = [body for selectors, body in rules if selectors == (".nav-card:focus-visible",)]
     assert len(focus) == 1
-    assert _decls(focus[0]) == {"outline": "2px solid var(--text)", "outline-offset": "2px"}
+    assert css_decls(focus[0]) == {"outline": "2px solid var(--text)", "outline-offset": "2px"}
     # the h3 accent hover stays
-    h3 = _rule(rules, ".nav-card:hover h3")
-    assert _decls(h3)["color"] == "var(--accent)"
+    h3 = css_rule(".nav-card:hover h3", home)
+    assert css_decls(h3)["color"] == "var(--accent)"
 
 
 def test_no_new_hex_colours(client):
     assert not _HEX.search(_HOME_HTML.read_text())
-    style_rules = _style_rules()
     # hex colours in style.css live only in :root and the two pre-existing hover rules
-    with_hex = [selectors for selectors, body in style_rules if _HEX.search(body)]
+    with_hex = [selectors for selectors, body in css_rules() if _HEX.search(body)]
     assert with_hex == [
         (":root",),
         (".nav-btn.active", ".nav-btn:hover:not(.active)"),
         (".timeline .month-link.current:hover",),
     ]
-    new_rules = [_rule(style_rules, ".hero-search button"), _rule(_home_rules(client), ".nav-cta")]
+    new_rules = [css_rule(".hero-search button"), css_rule(".nav-cta", _home_css(client))]
     for body in new_rules:
-        for prop, value in _decls(body).items():
+        for prop, value in css_decls(body).items():
             if "color" in prop or prop == "background":
                 assert value.startswith("var(--"), (prop, value)
 

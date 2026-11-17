@@ -14,7 +14,7 @@
                 {% else %}
                 <strong>{{ est.establishment_name or '—' }}</strong>
                 {% endif %}
-                {% if est.street %}<span>{{ est.street }}{% if est.unit %} {{ est.unit }}{% endif %}</span><span>Toronto, ON</span>{% if est.postal_code %}<span>{{ est.postal_code }}</span>{% endif %}{% else %}<span>—</span>{% endif %}
+                {% if est.street %}<span>{{ est | street_line }}</span><span>Toronto, ON</span>{% if est.postal_code %}<span>{{ est.postal_code }}</span>{% endif %}{% else %}<span>—</span>{% endif %}
                 {% if est.establishment_type %}<span class="est-type">{{ est.establishment_type }}</span>{% endif %}
                 {% if est.infractions %}
                 {% set crucial = est.severity_counts['C - Crucial'] %}

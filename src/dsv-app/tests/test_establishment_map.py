@@ -5,12 +5,11 @@ from datetime import date
 from unittest.mock import patch
 
 import app as app_module
-from db_fakes import rows_conn
-from test_establishment import EST_ID, _row
+from db_fakes import EST_ID, inspection_row, rows_conn
 
 
 def _located(day, lat=43.65, lng=-79.38, **kwargs):
-    return {**_row(day, **kwargs), "latitude": lat, "longitude": lng}
+    return inspection_row(day, latitude=lat, longitude=lng, **kwargs)
 
 
 def _get(client, rows):

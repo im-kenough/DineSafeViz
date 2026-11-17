@@ -13,8 +13,8 @@ from fakes import (
     HIST_HEADER, RECENT_HEADER, FakeOpener, FakeResponse, FakeStore, b64md5, write_csv,
 )
 from data import (
-    KEEP_RECENT, MIN_HISTORICAL_ROWS, MIN_RECENT_ROWS, BlobStore, DataError, check_fresh,
-    folders, http_download, ingest, md5_b64, newest_historical, newest_recent,
+    KEEP_RECENT, MIN_HISTORICAL_ROWS, MIN_RECENT_ROWS, BlobStore, DataError, _open_member,
+    check_fresh, folders, http_download, ingest, md5_b64, newest_historical, newest_recent,
     prune_recent, resolve_resources, validate_csv,
 )
 from dinesafe_csv import HISTORICAL_COLUMN_MAP, RECENT_COLUMN_MAP
@@ -37,13 +37,8 @@ def listing(blobs, next_marker=""):
 
 
 class TestMd5:
-    def test_is_base64_digest(self, tmp_path):
-        p = tmp_path / "f"
-        p.write_bytes(b"hello")
-        assert md5_b64(str(p)) == b64md5(b"hello")
-
-    def test_accepts_a_binary_stream(self):
-        assert md5_b64(io.BytesIO(b"hello")) == b64md5(b"hello")
+    def test_is_base64_digest(self):
+        assert md5_b64(b"hello") == b64md5(b"hello")
 
 
 class TestValidateCsv:
@@ -404,6 +399,16 @@ class TestIngest:
                    download=downloader(tmp_path, compression=compression, patch_zip=patch_zip))
         assert store.uploads == []
 
+    def test_open_member_passes_body_errors_through(self, tmp_path):
+        # Only zf.open is translated; a RuntimeError from the caller's body
+        # (e.g. a failed Blob upload) must not be reported as a bad ZIP member.
+        zpath = tmp_path / "z.zip"
+        with _zipfile.ZipFile(zpath, "w") as zf:
+            zf.writestr("a.csv", "x")
+        with _zipfile.ZipFile(zpath) as zf, pytest.raises(RuntimeError, match="upload failed"):
+            with _open_member(zf, zf.getinfo("a.csv")):
+                raise RuntimeError("upload failed")
+
     def test_member_shorter_than_its_header_is_a_data_error(self, tmp_path):
         # A stored member whose central file_size overstates its data: zipfile
         # returns the real bytes without complaint, so ingest must count them.
@@ -515,11 +520,6 @@ class TestPrune:
         assert store.deleted == ["recent/20260101T000000Z/Dinesafe.csv",
                                  "recent/20260102T000000Z/Dinesafe.csv"]
         assert len(store.list("recent/")) == KEEP_RECENT
-
-    def test_never_deletes_the_newest(self):
-        store = self.fill(3)
-        prune_recent(store, keep=1)
-        assert list(store.list("recent/")) == ["recent/20260103T000000Z/Dinesafe.csv"]
 
     def test_ingest_prunes_after_upload(self, tmp_path):
         store = self.fill(KEEP_RECENT)

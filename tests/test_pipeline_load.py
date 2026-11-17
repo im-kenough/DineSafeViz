@@ -4,7 +4,7 @@ import sys
 import psycopg2
 import pytest
 
-from db_helpers import container_ip, migrated_db
+from db_helpers import MIGRATOR_PW, connect
 from helpers import ROOT
 
 sys.path.insert(0, str(ROOT / "src" / "dsv-pipeline" / "tests"))
@@ -14,26 +14,14 @@ from fakes import FakeStore, historical_csv, historical_row, recent_csv, recent_
 import pipeline  # noqa: E402
 from data import DataError  # noqa: E402
 
-MIGRATOR_PW = "migrator-pw"
 HIST = "historical/20260601T113002Z/"
 OLD = "recent/20261009T113005Z/Dinesafe.csv"
 NEW = "recent/20261012T113012Z/Dinesafe.csv"
 
 
-@pytest.fixture(scope="module")
-def db():
-    with migrated_db({"DSV_DB_APP_PASSWORD": "app-pw", "DSV_DB_MIGRATOR_PASSWORD": MIGRATOR_PW}) as name:
-        yield name
-
-
-def connect(db):
-    return psycopg2.connect(host=container_ip(db), dbname="dinesafe",
-                            user="dinesafe_migrator", password=MIGRATOR_PW)
-
-
 @pytest.fixture
-def conn(db):
-    c = connect(db)
+def conn(ready_db):
+    c = connect(ready_db, "dinesafe_migrator", MIGRATOR_PW)
     with c.cursor() as cur:
         cur.execute("DELETE FROM inspections")
         cur.execute("DELETE FROM load_log")
@@ -142,10 +130,10 @@ def test_seed_without_complete_historical_is_an_error(conn, store):
 
 # Final review: a deploy's load overlapping the timer's load must not both
 # seed or both refresh. The second waits, then finds the data current.
-def test_concurrent_loads_wait_for_each_other(db, conn, store):
+def test_concurrent_loads_wait_for_each_other(ready_db, conn, store):
     import threading
 
-    other = connect(db)
+    other = connect(ready_db, "dinesafe_migrator", MIGRATOR_PW)
     try:
         with other.cursor() as cur:
             cur.execute("SELECT pg_advisory_lock(%s)", (pipeline.LOAD_LOCK,))

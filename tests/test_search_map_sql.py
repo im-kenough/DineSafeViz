@@ -1,17 +1,13 @@
 """The app's map query against the real Postgres image, migrated."""
 import sys
-from contextlib import closing
 
-import psycopg2
 import pytest
 
-from db_helpers import container_ip, migrated_db, psql
+from db_helpers import app_query, replace_inspections
 from helpers import ROOT
 
 sys.path.insert(0, str(ROOT / "src" / "dsv-app"))
 import app as app_module
-
-APP_PW = "app-pw"
 
 # (establishment_id, name, street, status, date, latitude, longitude).
 # A1 moved: its newest coordinates win. B1's newest row has no coordinates,
@@ -27,50 +23,23 @@ ROWS = [
 ]
 
 
-def _sql_value(v):
-    if v is None:
-        return "NULL"
-    if isinstance(v, float):
-        return repr(v)
-    return "'" + v + "'"
-
-
 @pytest.fixture(scope="module")
-def map_db():
-    env = {"DSV_DB_APP_PASSWORD": APP_PW, "DSV_DB_MIGRATOR_PASSWORD": "migrator-pw"}
-    with migrated_db(env) as name:
-        values = ", ".join(
-            "(" + ", ".join(_sql_value(v) for v in (eid, n, a, a, s, d, lat, lng)) + ")"
-            for eid, n, a, s, d, lat, lng in ROWS
-        )
-        result = psql(name, (
-            "INSERT INTO inspections (establishment_id, establishment_name,"
-            " establishment_address, street, establishment_status, inspection_date,"
-            " latitude, longitude)"
-            f" VALUES {values}"
-        ))
-        assert result.returncode == 0, result.stderr
-        yield name
-
-
-def _run(name, query):
-    """Run one (sql, params) pair as dinesafe_app. Returns the result dicts."""
-    conn = psycopg2.connect(
-        host=container_ip(name), dbname="dinesafe", user="dinesafe_app",
-        password=APP_PW, connect_timeout=5,
+def map_db(ready_db):
+    replace_inspections(
+        ready_db,
+        ("establishment_id", "establishment_name", "establishment_address", "street",
+         "establishment_status", "inspection_date", "latitude", "longitude"),
+        [(eid, n, a, a, s, d, lat, lng) for eid, n, a, s, d, lat, lng in ROWS],
     )
-    with closing(conn), conn.cursor() as cur:
-        cur.execute(*query)
-        columns = [c.name for c in cur.description]
-        return [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
+    return ready_db
 
 
 def pins(name, terms):
-    return _run(name, app_module.search_map_query(terms))
+    return app_query(name, app_module.search_map_query(terms))
 
 
 def test_pins_follow_list_order_and_skip_unlocated(map_db):
-    listed = [r["establishment_id"] for r in _run(map_db, app_module.search_query(["pizza"]))]
+    listed = [r["establishment_id"] for r in app_query(map_db, app_module.search_query(["pizza"]))]
     pinned = [r["establishment_id"] for r in pins(map_db, ["pizza"])]
     assert listed == ["A1", "B1", "N1"]
     assert pinned == ["A1", "B1"]

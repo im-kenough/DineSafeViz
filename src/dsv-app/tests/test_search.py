@@ -4,24 +4,9 @@ from unittest.mock import patch
 import pytest
 
 import app as app_module
-from db_fakes import search_conn
+from db_fakes import search_conn, search_row
 
 HINT = "Search by restaurant name or address, like pizza or queen."
-
-
-def _result(n=1, name="Pizza Pizza", status="Pass", est_type="Restaurant", unit=None):
-    """One row as returned by the search query's RealDictCursor."""
-    return {
-        "establishment_id": f"001Vo0000000000{n:03d}",
-        "establishment_name": name,
-        "street": "123 Queen St W",
-        "unit": unit,
-        "establishment_status": status,
-        "last_inspected": date(2026, 10, 3),
-        "inspection_count": 14,
-        "first_inspected": date(2019, 3, 4),
-        "establishment_type": est_type,
-    }
 
 
 def _search(client, q, rows=()):
@@ -75,7 +60,7 @@ def test_short_words_only_asks_for_three_characters_without_db(client):
 
 
 def test_results_render_cards_linking_to_history(client):
-    rows = [_result(1), _result(2, name="Pizza Nova", status="Conditional Pass", unit="Unit 2")]
+    rows = [search_row(1), search_row(2, name="Pizza Nova", status="Conditional Pass", unit="Unit 2")]
     html, _, _ = _search(client, "pizza", rows)
     assert 'Results for "pizza"' in html
     assert "2 restaurants</span>" in html
@@ -90,12 +75,12 @@ def test_results_render_cards_linking_to_history(client):
 
 
 def test_one_result_is_singular(client):
-    html, _, _ = _search(client, "pizza", [_result()])
+    html, _, _ = _search(client, "pizza", [search_row()])
     assert "1 restaurant</span>" in html
 
 
 def test_result_without_type_hides_type(client):
-    html, _, _ = _search(client, "pizza", [_result(est_type=None)])
+    html, _, _ = _search(client, "pizza", [search_row(est_type=None)])
     assert "None" not in html
     assert '<span class="est-type">Restaurant</span>' not in html
 
@@ -108,7 +93,7 @@ def test_no_matches_shows_message_and_hint(client):
 
 
 def test_search_sql_has_no_user_input(client):
-    _, _, cur = _search(client, "Pizza'; DROP TABLE inspections;--", [_result()])
+    _, _, cur = _search(client, "Pizza'; DROP TABLE inspections;--", [search_row()])
     (count, count_params), (pins, pin_params), (query, params) = (
         c.args for c in cur.execute.call_args_list
     )
@@ -133,7 +118,7 @@ def test_query_is_html_escaped(client):
 
 
 def test_search_page_is_noindex_with_title(client):
-    html, _, _ = _search(client, "pizza", [_result()])
+    html, _, _ = _search(client, "pizza", [search_row()])
     assert '<meta name="robots" content="noindex, nofollow">' in html
     assert 'content="noindex">' not in html
     assert "<title>DineSafeViz - Search</title>" in html
@@ -164,7 +149,7 @@ def test_nul_in_query_returns_200(client):
 
 
 def test_null_name_renders_dash_not_none(client):
-    html, _, _ = _search(client, "pizza", [_result(name=None)])
+    html, _, _ = _search(client, "pizza", [search_row(name=None)])
     assert "<strong>—</strong>" in html
     assert "<strong>None</strong>" not in html
 
@@ -176,5 +161,5 @@ def test_longdate_filter():
 
 
 def test_search_result_last_inspected_long_date(client):
-    html, _, _ = _search(client, "pizza", [_result()])
+    html, _, _ = _search(client, "pizza", [search_row()])
     assert "October 3, 2026" in html

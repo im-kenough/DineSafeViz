@@ -4,32 +4,22 @@ from pathlib import Path
 from unittest.mock import patch
 
 import psycopg2
+import pytest
 
-from db_fakes import rows_conn
+from app import quarter_of
+from db_fakes import inspection_row, rows_conn
 
 
 def _row(name="Pasta Palace", address="99 King St W", est_type="Restaurant",
                status="Pass", details="Improper storage", severity="M - Minor",
                category="Food storage", street="99 King St W", unit=None, postal=None):
     """One row as returned by the /inspections route's RealDictCursor query."""
-    return {
-        "inspection_date": date(2024, 2, 14),
-        "establishment_status": status,
-        "action": "Notice to Comply",
-        "infraction_details": details,
-        "establishment_name": name,
-        "establishment_address": address,
-        "establishment_type": est_type,
-        "street": street,
-        "unit": unit,
-        "postal_code": postal,
-        "outcome": "Pass",
-        "outcome_date": "2024-02-20",
-        "amount_fined": "0.00",
-        "establishment_id": "10002",
-        "severity": severity,
-        "infraction_category": category,
-    }
+    return inspection_row(
+        status=status, details=details, severity=severity, name=name, street=street, unit=unit,
+        action="Notice to Comply", establishment_address=address, establishment_type=est_type,
+        postal_code=postal, outcome="Pass", outcome_date="2024-02-20", amount_fined="0.00",
+        establishment_id="10002", infraction_category=category,
+    )
 
 
 def _render(client, rows):
@@ -95,10 +85,10 @@ def test_route_returns_200(client):
     assert resp.status_code == 200
 
 
-def test_route_renders_day_boxes(client):
-    with patch("app.psycopg2.connect", return_value=rows_conn([])):
-        resp = client.get("/inspections")
-    assert b"day-box" in resp.data
+def test_route_renders_day_boxes_with_no_data_text(client):
+    html = _render_page(client, url="/inspections")
+    assert "day-box" in html
+    assert "No data" in html
 
 
 def test_route_shows_inspection_data(client):
@@ -116,12 +106,6 @@ def test_route_invalid_params_returns_200(client):
     with patch("app.psycopg2.connect", return_value=rows_conn([])):
         resp = client.get("/inspections?year=1900&q=99")
     assert resp.status_code == 200
-
-
-def test_route_no_data_day_shows_no_data_text(client):
-    with patch("app.psycopg2.connect", return_value=rows_conn([])):
-        resp = client.get("/inspections")
-    assert b"No data" in resp.data
 
 
 def test_status_class_on_row(client):
@@ -146,8 +130,9 @@ def _older_years(html):
     return picker[picker.index('class="picker-archive"'):]
 
 
-def test_dropdown_menu_present(client):
-    resp = client.get("/")
+@pytest.mark.parametrize("url", ["/", "/dashboard", "/info"])
+def test_dropdown_menu_present(client, url):
+    resp = client.get(url)
     assert b'<details class="dropdown"' in resp.data
     assert b'class="dropdown-menu"' in resp.data
 
@@ -219,8 +204,9 @@ def test_timeline_omits_next_at_latest_quarter(client):
     assert 'rel="next"' not in bar
 
 
-def test_dropdown_has_year_and_quarter_links(client):
-    resp = client.get("/")
+@pytest.mark.parametrize("url", ["/", "/dashboard", "/info"])
+def test_dropdown_has_year_and_quarter_links(client, url):
+    resp = client.get(url)
     assert b'href="/inspections?year=2023&q=4"' in resp.data
     assert b'href="/inspections?year=2023&q=1"' in resp.data
     assert b'href="/inspections?year=2024&q=1"' in resp.data
@@ -231,30 +217,6 @@ def test_standalone_year_tabs_removed(client):
     resp = client.get("/")
     assert b'href="/inspections?year=2024"' not in resp.data
     assert b'href="/inspections?year=2023"' not in resp.data
-
-
-def test_dropdown_present_on_dashboard(client):
-    resp = client.get("/dashboard")
-    assert b'<details class="dropdown"' in resp.data
-    assert b'class="dropdown-menu"' in resp.data
-
-
-def test_dropdown_has_links_on_dashboard(client):
-    resp = client.get("/dashboard")
-    assert b'href="/inspections?year=2023&q=4"' in resp.data
-    assert b'href="/inspections?year=2024&q=1"' in resp.data
-
-
-def test_dropdown_present_on_info(client):
-    resp = client.get("/info")
-    assert b'<details class="dropdown"' in resp.data
-    assert b'class="dropdown-menu"' in resp.data
-
-
-def test_dropdown_has_links_on_info(client):
-    resp = client.get("/info")
-    assert b'href="/inspections?year=2023&q=4"' in resp.data
-    assert b'href="/inspections?year=2024&q=1"' in resp.data
 
 
 def test_nav_matches_db_range(client):
@@ -280,9 +242,7 @@ def test_info_nav_active_class(client):
 
 
 def test_index_nav_active_class(client):
-    with patch("app.psycopg2.connect", return_value=rows_conn([])):
-        resp = client.get("/inspections")
-    assert b'class="nav-btn active">Inspections' in resp.data
+    assert 'class="nav-btn active">Inspections' in _render_page(client, url="/inspections")
 
 
 def test_location_left_of_results(client):
@@ -392,10 +352,9 @@ def test_heading_shows_quarter_and_date_range(client):
 
 def test_heading_end_date_is_today_for_current_quarter(client):
     today = date.today()
-    q = (today.month - 1) // 3 + 1
+    q = quarter_of(today.month)
     start = date(today.year, 3 * q - 2, 1)
-    with patch("app.psycopg2.connect", return_value=rows_conn([])):
-        html = client.get(f"/inspections?year={today.year}&q={q}").data.decode()
+    html = _render_page(client, url=f"/inspections?year={today.year}&q={q}")
     expected = (f'DineSafe Inspections | Q{q} {today.year}'
                 f'<span class="heading-dates">{start.strftime("%B %-d, %Y")} - {today.strftime("%B %-d, %Y")}</span>')
     assert f'<h2 class="page-heading">{expected}</h2>' in html

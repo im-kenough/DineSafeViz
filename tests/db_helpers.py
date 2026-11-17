@@ -4,7 +4,9 @@ import re
 import subprocess
 import time
 import uuid
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
+
+import psycopg2
 
 from helpers import ROOT, compose_image, docker
 
@@ -18,6 +20,11 @@ INIT_FILES = {
 MIGRATIONS = sorted((DB_DIR / "migrations").glob("*.sql"))
 # Read from apply_migrations, so these tests run the real command line.
 MIGRATE_PSQL = re.search(r"'(psql [^']*)'", (ROOT / "scripts" / "lib.sh").read_text())[1]
+# The role passwords for start_db. The quote and the dollar sign prove the psql
+# quoting in set-passwords.sh.
+APP_PW = "app'pw$x"
+MIGRATOR_PW = "migrator-pw"
+ROLE_PASSWORDS = {"DSV_DB_APP_PASSWORD": APP_PW, "DSV_DB_MIGRATOR_PASSWORD": MIGRATOR_PW}
 
 
 def start_db(env):
@@ -54,7 +61,7 @@ def wait_ready(name, timeout=90):
         )
         if ready.returncode == 0:
             return True
-        time.sleep(1)
+        time.sleep(0.2)
     raise TimeoutError(f"{name} didn't become ready in {timeout}s")
 
 
@@ -77,9 +84,9 @@ def migrate(name):
 
 
 @contextmanager
-def migrated_db(env):
-    """A started, ready, fully migrated container, removed on exit."""
-    name = start_db(env)
+def migrated_db():
+    """A started, ready, fully migrated container with ROLE_PASSWORDS, removed on exit."""
+    name = start_db(ROLE_PASSWORDS)
     try:
         assert wait_ready(name), docker("logs", name).stderr
         result = migrate(name)
@@ -104,3 +111,29 @@ def psql(name, sql, user="test_superuser", password="superpw"):
         "-d", "dinesafe", "-tAc", sql,
         check=False,
     )
+
+
+def connect(name, user, password):
+    """A psycopg2 connection to the container's dinesafe database."""
+    return psycopg2.connect(host=container_ip(name), dbname="dinesafe", user=user,
+                            password=password, connect_timeout=5)
+
+
+def app_query(name, query):
+    """Run one (sql, params) pair as dinesafe_app. Returns the result dicts."""
+    conn = connect(name, "dinesafe_app", APP_PW)
+    with closing(conn), conn.cursor() as cur:
+        cur.execute(*query)
+        columns = [c.name for c in cur.description]
+        return [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
+
+
+def replace_inspections(name, columns, rows):
+    """Empty inspections, then insert rows (tuples in columns' order), as the superuser."""
+    conn = connect(name, "test_superuser", "superpw")
+    with closing(conn), conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM inspections")
+        cur.executemany(
+            f"INSERT INTO inspections ({', '.join(columns)}) VALUES ({', '.join(['%s'] * len(columns))})",
+            rows,
+        )
