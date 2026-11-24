@@ -1,0 +1,34 @@
+# Images
+
+DineSafeViz uses the following images. Use the latest LTS or stable release when possible.
+
+## Cloudflare tunnel
+
+- https://github.com/cloudflare/cloudflared/releases
+- https://hub.docker.com/r/cloudflare/cloudflared/tags
+
+## Nginx
+- https://nginx.org/en/download.html
+- https://hub.docker.com/_/nginx/tags
+  
+
+## Postgres
+- https://hub.docker.com/_/postgres/tags
+- https://www.postgresql.org/support/versioning/
+- https://endoflife.date/postgresql
+
+## Grafana
+- https://github.com/grafana/grafana/releases
+- https://hub.docker.com/r/grafana/grafana/tags
+  
+
+
+## Python
+- https://hub.docker.com/_/python/tags
+- https://alpinelinux.org/releases/
+- https://www.python.org/downloads/
+- https://www.debian.org/releases/
+
+
+- [curlimages/curl:8.21.0](https://hub.docker.com/r/curlimages/curl/tags)
+  - https://curl.se/download.html
