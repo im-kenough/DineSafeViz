@@ -72,10 +72,14 @@ jobs:
                `mcp__github_inline_comment__create_inline_comment`
                (`confirmed: true`): severity (CRITICAL/HIGH/MEDIUM/LOW), what
                is wrong, how it is exploited, and the fix.
-            4. Post one summary comment:
+            4. Always post one summary comment, even when there are no
+               findings:
                `gh pr comment ${{ github.event.pull_request.number }} --body "..."`
                titled "Claude security review", listing findings or
                "No security issues found".
+
+            Only post GitHub comments. Do not put the review in your final
+            message: nobody reads it.
           claude_args: >-
             --model claude-sonnet-5-5
             --effort low
