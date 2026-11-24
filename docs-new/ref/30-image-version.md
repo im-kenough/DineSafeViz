@@ -2,6 +2,8 @@
 
 DineSafeViz uses the following images. Use the latest LTS or stable release when possible.
 
+Always use images from the official vendor.
+
 ## Cloudflare tunnel
 
 - https://github.com/cloudflare/cloudflared/releases
