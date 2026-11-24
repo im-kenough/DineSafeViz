@@ -42,9 +42,11 @@ updates:
       - dependency-name: "python"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
-  # Upstream images pinned in the Compose files. Postgres major versions need
-  # a data migration, not just a new tag, so they're ignored. Grafana and
-  # nginx majors need a manual review of breaking changes.
+  # Upstream images pinned in the Compose files. Version rules live in
+  # docs-new/ref/20-dependencies.md. Postgres major versions need a data
+  # migration, not just a new tag, so they're ignored. Grafana and nginx majors
+  # need a manual review of breaking changes. nginx minors are ignored because
+  # odd minors are mainline; the project stays on the stable branch (1.30.x).
   - package-ecosystem: "docker-compose"
     directory: "/"
     schedule:
@@ -60,7 +62,7 @@ updates:
       - dependency-name: "grafana/grafana"
         update-types: ["version-update:semver-major"]
       - dependency-name: "nginx"
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   # Terraform providers and lock files for both stacks. Provider majors have
   # breaking changes, so they're ignored.

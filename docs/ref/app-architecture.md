@@ -32,15 +32,17 @@ updates as soon as the first seed commits.
 
 Every component runs as a Docker Compose service. `docker-compose.yml`
 defines the local stack, and `docker-compose.vm.yml` adds the VM settings:
-published images, networks, hardening, and memory limits.
+published images, networks, hardening, and memory limits. The table shows
+version lines; for the standards, see
+[Dependencies](../../docs-new/ref/20-dependencies.md).
 
 | Service         | Image                                 | Networks (VM)       | Memory (VM) | Role                                                       |
 | --------------- | ------------------------------------- | ------------------- | ----------- | ---------------------------------------------------------- |
-| `dsv-tunnel`    | `cloudflare/cloudflared:2026.11.0`    | `edge`              | 64 MiB      | Outbound tunnel to Cloudflare. VM only.                    |
-| `dsv-nginx`     | `nginx:1.31.8-alpine3.24-slim`        | `edge`, `backend`   | 64 MiB      | Reverse proxy for the app and `/analytics/`.               |
+| `dsv-tunnel`    | `cloudflare/cloudflared:2026.x`       | `edge`              | 64 MiB      | Outbound tunnel to Cloudflare. VM only.                    |
+| `dsv-nginx`     | `nginx:1.30.x-alpine3.24-slim`        | `edge`, `backend`   | 64 MiB      | Reverse proxy for the app and `/analytics/`.               |
 | `dsv-app`       | `ghcr.io/im-kenough/dsv-app`          | `backend`           | 192 MiB     | Flask app. Read-only database role.                        |
-| `dsv-db`        | `postgres:18.7-alpine3.24`            | `backend`           | 320 MiB     | Postgres with the `inspections` and `load_log` tables.     |
-| `dsv-analytics` | `grafana/grafana:13.3.1`              | `backend`           | 320 MiB     | Dashboard. Read-only database role.                        |
+| `dsv-db`        | `postgres:18.x-alpine3.24`            | `backend`           | 320 MiB     | Postgres with the `inspections` and `load_log` tables.     |
+| `dsv-analytics` | `grafana/grafana:13.x`                | `backend`           | 320 MiB     | Dashboard. Read-only database role.                        |
 | `dsv-pipeline`  | `ghcr.io/im-kenough/dsv-pipeline`     | `egress`, `backend` | 256 MiB     | On demand: `ingest`, `load`, or `run`. Profile `pipeline`. |
 
 Locally, Compose builds `dsv-app` and `dsv-pipeline` from `src/dsv-app` and
