@@ -73,22 +73,7 @@
     <main>
     {% block content %}{% endblock %}
     </main>
-    <script>
-    (function () {
-        // <details> handles open/close and keyboard; close it on outside click or Escape.
-        var dropdown = document.querySelector('details.dropdown');
-        if (!dropdown) return;
-        document.addEventListener('click', function (e) {
-            if (!dropdown.contains(e.target)) dropdown.open = false;
-        });
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && dropdown.open) {
-                dropdown.open = false;
-                dropdown.querySelector('summary').focus();
-            }
-        });
-    }());
-    </script>
+    <script src="{{ url_for('static', filename='nav.js') }}"></script>
     <footer>
         &copy; {{ current_year }} Kenneth Ho<br>
         DineSafeViz v{{ version }}

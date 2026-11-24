@@ -163,3 +163,50 @@ def test_analytics_repeats_proxy_headers():
     conf = (ROOT / "src/dsv-nginx/nginx.conf").read_text()
     own = [" ".join(h.split()) for h in proxy_headers(location_block(conf, "location /analytics/ {"))]
     assert [h for h in own if not h.startswith(("Upgrade", "Connection"))] == PROXY_HEADERS
+
+
+# Security headers (Mozilla Observatory). Set once in server {}; a location's
+# own add_header would silently drop them all, so none may have one.
+SECURITY_HEADERS = {
+    "Strict-Transport-Security": "max-age=300; includeSubDomains",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "SAMEORIGIN",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Cross-Origin-Resource-Policy": "same-origin",
+}
+
+
+@pytest.mark.parametrize("path", ["/", "/search?q=que", "/analytics/"])
+def test_security_headers_on_every_route(local_nginx, path):
+    _, url = local_nginx
+    _, headers = get(url + path, headers={"CF-Connecting-IP": "203.0.113.20"})
+    for name, value in SECURITY_HEADERS.items():
+        assert headers.get_all(name) == [value], name
+
+
+def test_vm_login_404_keeps_security_headers(vm_nginx):
+    _, url = vm_nginx
+    _, headers = get(url + "/analytics/login")
+    assert headers["X-Frame-Options"] == "SAMEORIGIN"
+
+
+def test_app_pages_get_strict_csp(local_nginx):
+    _, url = local_nginx
+    _, headers = get(url + "/")
+    directives = dict(d.strip().split(" ", 1) for d in headers["Content-Security-Policy"].split(";"))
+    assert directives["script-src"] == "'self'"
+    assert directives["frame-ancestors"] == "'self'"
+    assert directives["object-src"] == "'none'"
+
+
+def test_grafana_gets_no_csp(local_nginx):
+    _, url = local_nginx
+    _, headers = get(url + "/analytics/")
+    assert headers["Content-Security-Policy"] is None
+
+
+def test_no_location_sets_its_own_add_header():
+    conf = (ROOT / "src/dsv-nginx/nginx.conf").read_text()
+    for header in ["location /analytics/ {", "location = /search {", "location / {"]:
+        assert "add_header" not in location_block(conf, header), header
+    assert "add_header" not in (ROOT / "src/dsv-nginx/snippets/vm-public.conf").read_text()

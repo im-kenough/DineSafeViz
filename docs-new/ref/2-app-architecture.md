@@ -10,6 +10,9 @@ DineSafeViz shows the City of Toronto's DineSafe restaurant inspections.
 - Cloudflare Tunnel brings visitors in. The VM publishes no ports.
 - nginx routes `/analytics/` to the inspections dashboard (Grafana) and
   everything else to the Flask app.
+- nginx adds security headers (HSTS, CSP, X-Frame-Options and others) to
+  every response. The Flask pages get a strict CSP with no inline scripts;
+  Grafana gets no CSP. See `src/dsv-nginx/nginx.conf`.
 - The Flask app and the inspections dashboard (Grafana) read the same Postgres
   database. The dashboard shows statistics about the dataset, not monitoring.
 - A data pipeline, on a weekday timer or on demand, loads the data:
