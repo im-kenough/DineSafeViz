@@ -1,0 +1,83 @@
+# Security-only Claude review of every non-draft pull request into main.
+# Trial setup: Sonnet on low effort to keep cost down. The general review is
+# in claude-code-review.yml. anthropics/claude-code-security-review is not
+# used because it needs an API key and has no effort setting; this reuses the
+# OAuth token the other Claude workflows use.
+name: Claude Security Review
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, ready_for_review, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: claude-security-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  claude-security-review:
+    name: Claude security review
+    # Same skips as claude-code-review.yml: drafts, fork PRs (no secrets), and
+    # bots (claude-code-action refuses bot actors).
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !endsWith(github.actor, '[bot]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write # OIDC exchange for the Claude GitHub App token
+    steps:
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run Claude security review
+        uses: anthropics/claude-code-action@cc98b3ae241b0fcfb6a42a2690751afffecb4452 # v1.0.278
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Do a security review of this pull request. Only look at code the
+            PR changes. Report only findings you are confident are real and
+            exploitable or a clear security regression. No style notes, no
+            hardening wishlists, no issues in unchanged code.
+
+            DineSafeViz is a dockerized Flask + Postgres + Grafana app behind
+            nginx, with a data pipeline (Blob Storage -> Postgres), Terraform
+            for Azure, and GitHub Actions workflows.
+
+            Look for: injection (SQL, command, template), XSS, broken auth or
+            access control, secrets or credentials in code, unsafe
+            deserialization, SSRF, path traversal, insecure crypto, exposed
+            ports or services, over-broad IAM/RBAC or workflow permissions,
+            unpinned actions or images, and GitHub expressions used inside
+            `run:` steps.
+
+            Steps:
+            1. Read the PR with `gh pr view` and `gh pr diff`. Read existing
+               comments (`gh pr view --comments`) and do not repeat a finding
+               already posted.
+            2. Check each finding against the code before posting. Drop any
+               you are not sure of.
+            3. Post one inline comment per finding with
+               `mcp__github_inline_comment__create_inline_comment`
+               (`confirmed: true`): severity (CRITICAL/HIGH/MEDIUM/LOW), what
+               is wrong, how it is exploited, and the fix.
+            4. Post one summary comment:
+               `gh pr comment ${{ github.event.pull_request.number }} --body "..."`
+               titled "Claude security review", listing findings or
+               "No security issues found".
+          claude_args: >-
+            --model claude-sonnet-5-5
+            --effort low
+            --allowedTools "Read,Glob,Grep,mcp__github_inline_comment__create_inline_comment,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment ${{ github.event.pull_request.number }}:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
+            --disallowedTools "Edit,Write,NotebookEdit,WebFetch,WebSearch"
