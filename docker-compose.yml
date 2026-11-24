@@ -16,7 +16,7 @@ x-db-app-env: &db-app-env
 
 services:
   dsv-nginx:
-    image: nginx:1.31.8-alpine3.24-slim@sha256:4c734d33ee731135dc9f2349914a34551c920f4451fca8bb05bf5880eb9079e8
+    image: nginx:1.31.10-alpine3.24-slim@sha256:c293b28729906d97fa5302fce3bd79bd27a3ea9a5d9604e21c6ff0ebf14549fc
     ports:
       - "8080:80"
     volumes:
@@ -44,7 +44,7 @@ services:
         condition: service_healthy
 
   dsv-db:
-    image: postgres:18.7-alpine3.24@sha256:75dcac3dfb1cd01ca3536910bbc84128759362f8b118bf8c55b38a94f68f3b73
+    image: postgres:18.7-alpine3.24@sha256:0115267ab5a509022df9319c77be365cef335adb71556c75f60f5360ee247e71
     environment:
       POSTGRES_USER: ${DSV_DB_USER}
       POSTGRES_PASSWORD: ${DSV_DB_PASSWORD}
@@ -86,7 +86,7 @@ services:
   dsv-analytics:
     # Bundles the PostgreSQL plugin (13.0.4); the -slim variant doesn't.
     # See docs/ref/app-notes.md.
-    image: grafana/grafana:13.3.1@sha256:0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf
+    image: grafana/grafana:13.3.2@sha256:81556409ba48b2b922e0adb69a2511337d8ba7578f11962eefa6149a2d815101
     ports:
       - "3000:3000"
     environment:
