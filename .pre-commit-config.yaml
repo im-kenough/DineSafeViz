@@ -15,7 +15,7 @@ repos:
     hooks:
       - id: detect-private-key
         # These hold REPLACE_WITH_... or dummy placeholder keys, not real ones.
-        exclude: '^(infra/rug/ansible/vault/example-secrets\.yml|docs/rug/.*\.md)$'
+        exclude: '^(infra/(archived/)?rug/ansible/vault/example-secrets\.yml|docs/(archived/docs/)?rug/.*\.md)$'
   # Blocks Terraform state, secret variable, and plan files even if someone
   # force-adds them past .gitignore. The committed envs/<env>/*.tfvars and
   # *.tfvars.example files stay allowed.
