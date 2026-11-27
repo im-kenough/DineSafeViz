@@ -20,12 +20,13 @@ concurrency:
 jobs:
   claude-security-review:
     name: Claude security review
-    # Same skips as claude-code-review.yml: drafts, fork PRs (no secrets), and
-    # bots (claude-code-action refuses bot actors).
+    # Same skips as claude-code-review.yml: drafts, and anything that isn't
+    # the owner's own PR from this repo (forks, collaborators, bots).
     if: >-
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      !endsWith(github.actor, '[bot]')
+      github.event.pull_request.user.login == github.repository_owner &&
+      github.actor == github.repository_owner
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
