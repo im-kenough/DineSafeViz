@@ -1,0 +1,9 @@
+# Example azurerm backend settings. Copy to <env>.backend.hcl (gitignored),
+# fill in real values, then run:
+#   terraform init -backend-config=<env>.backend.hcl
+# Credentials come from ARM_* environment variables, not this file.
+
+resource_group_name  = "rg-dsv-tf-stg99"
+storage_account_name = "stdsvtfstg990a1b2c3d"
+container_name       = "tfstate"
+key                  = "stg99.tfstate"
