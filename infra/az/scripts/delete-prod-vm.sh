@@ -42,7 +42,7 @@ NIC_IDS=()
 SNAPSHOT_IDS=()
 VM_IP=""
 
-# shellcheck source=infra/az/vm-lib.sh
+# shellcheck source=infra/az/scripts/vm-lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/vm-lib.sh"
 
 #################################

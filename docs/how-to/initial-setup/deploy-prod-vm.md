@@ -156,7 +156,7 @@ cd ~/DineSafeViz && ./scripts/deploy.sh prod v0.4.0
 
 ## Next steps
 
-- [Azure checklist](../../../docs/how-to/azure-vm/azure-checklist.md):
+- [Azure checklist](../../../docs/archived/docs/how-to/azure-vm/azure-checklist.md):
   snapshot restore, locks, and secret rotation runbooks.
-- [CI and CD](../../../docs/explanation/azure-vm/ci-cd.md): how tags become
+- [CI and CD](../../../docs/archived/docs/explanation/azure-vm/ci-cd.md): how tags become
   images and releases.

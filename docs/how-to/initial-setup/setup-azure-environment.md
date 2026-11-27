@@ -5,7 +5,7 @@ DineSafeViz to a new environment (`stg` or `prod`). Work through it in order,
 once per environment.
 
 - Detailed portal and CLI steps are in the
-  [Azure checklist](../../../docs/how-to/azure-vm/azure-checklist.md).
+  [Azure checklist](../../../docs/archived/docs/how-to/azure-vm/azure-checklist.md).
 - Resource names and purposes are in [Azure resources](../../ref/6-azure-resources.md).
 
 ## 1. Domain names

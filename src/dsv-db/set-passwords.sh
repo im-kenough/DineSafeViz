@@ -3,7 +3,7 @@
 #
 # The Postgres image runs this once, after init.sql, when the data volume is
 # empty. Changing a secret later doesn't rerun it: use ALTER ROLE instead
-# (see "Rotate a database password" in docs/how-to/azure-vm/azure-checklist.md).
+# (see "Rotate a database password" in docs/archived/docs/how-to/azure-vm/azure-checklist.md).
 set -euo pipefail
 
 : "${DSV_DB_APP_PASSWORD:?DSV_DB_APP_PASSWORD must be set}"

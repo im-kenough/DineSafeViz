@@ -5,7 +5,7 @@
 # Tags: main gets `main` and `sha-<7>`; v* tags get `X.Y.Z` and `X.Y`.
 # CodeQL and the full Trivy IaC report are in code-scanning.yml, and the weekly
 # rescan of published images is in rescan-images.yml.
-# Details: docs/explanation/azure-vm/ci-cd.md
+# Details: docs/archived/docs/explanation/azure-vm/ci-cd.md
 name: CI
 
 on:

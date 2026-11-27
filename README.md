@@ -7,7 +7,7 @@ interactive analytics from Toronto Public Health's food safety data.
 The app retrieves and parses the DineSafe dataset (Toronto Public Health's food
 safety program) from the City of Toronto's Open Data Portal.
 
-![DineSafeViz home page](docs/img/root-readme/dsv-home-1.png)
+![DineSafeViz home page](docs/archived/docs/img/root-readme/dsv-home-1.png)
 
 ## 2. Features
 
@@ -16,13 +16,13 @@ safety program) from the City of Toronto's Open Data Portal.
 Check when an establishment was inspected and whether there were any health
 code violations.
 
-![Inspection results page](docs/img/root-readme/dsv-inspect-1.png)
+![Inspection results page](docs/archived/docs/img/root-readme/dsv-inspect-1.png)
 
 ### 2.2 Analytics dashboard
 
 Explore and get a statistical breakdown of **over 26 years** of inspection data.
 
-![DineSafeViz analytics dashboard](docs/img/root-readme/dsv-dash-1.png)
+![DineSafeViz analytics dashboard](docs/archived/docs/img/root-readme/dsv-dash-1.png)
 
 ## 3. Technology stack
 

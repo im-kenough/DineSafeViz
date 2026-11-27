@@ -7,7 +7,7 @@ extends: default
 ignore: |
   .claude/
   .superpowers/
-  infra/rug/ansible/vault/secrets.yml
+  infra/archived/rug/ansible/vault/secrets.yml
 
 rules:
   # Pinned action SHAs and Compose image digests make long lines unavoidable.

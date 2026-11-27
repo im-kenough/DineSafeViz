@@ -69,7 +69,7 @@ them. Two layers enforce this:
 
 - `.gitignore` excludes `*.tfstate*`, `terraform.tfvars`, `*.secret.tfvars`,
   `*.auto.tfvars`, `*.tfplan`, crash logs, and override files. The
-  `infra/terraform/envs/<env>/*.tfvars` files hold only non-secret settings, so
+  `infra/archived/terraform/envs/<env>/*.tfvars` files hold only non-secret settings, so
   they're committed along with `*.tfvars.example` files.
 - The pre-commit hooks run gitleaks, `detect-private-key`, and a local hook
   that blocks those file types even when someone force-adds them. Put secret

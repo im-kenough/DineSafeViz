@@ -8,7 +8,7 @@ deploy time, so it has to be in the vault before the first deploy.
 
 - The tunnel `tun-dsv-<env>01` exists, and its token is saved in Bitwarden.
   To create it, see
-  [azure-checklist step 5.1](../../../docs/how-to/azure-vm/azure-checklist.md#51-create-the-tunnel-and-store-its-token).
+  [azure-checklist step 5.1](../../../docs/archived/docs/how-to/azure-vm/azure-checklist.md#51-create-the-tunnel-and-store-its-token).
 - Signed in as `dsv-ops01` (`az login`). The operators group manages the
   vault's secrets.
 - On your home network. The vault firewall only allows your home IP and
@@ -47,5 +47,5 @@ az keyvault secret show --vault-name "kv-dsv-${ENV}01" -n dsv-tunnel-token \
 ## Next
 
 - Route the hostname to nginx, see
-  [azure-checklist step 5.2](../../../docs/how-to/azure-vm/azure-checklist.md#52-route-the-hostname-to-nginx).
+  [azure-checklist step 5.2](../../../docs/archived/docs/how-to/azure-vm/azure-checklist.md#52-route-the-hostname-to-nginx).
 - Deploy, see [Deploy to prod](../deploy/deploy-prod.md).
