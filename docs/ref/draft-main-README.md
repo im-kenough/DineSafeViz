@@ -51,6 +51,14 @@ Show basic logical diagram of the physical infra (azure diagram)
 
 ### 5.2 CD - Continuous Delivery
 
+## 6. AI™️ 🌈
+
+Built using Claude Code, leveraging skills, worklows and software factories. 
+
+Integrated Claude into Github Actions to perform:
+- code review
+- security review
+- issue labeling
 
 ## n. Repository structure
 

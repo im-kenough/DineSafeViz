@@ -14,12 +14,13 @@ permissions:
 jobs:
   label:
     name: Claude label
-    # Fork PRs get no secrets. PRs opened with a label already keep it, so
-    # the one-label rule holds. claude-code-action refuses bot actors, so
-    # skip bots (e.g. Dependabot).
+    # Claude costs tokens and the repo is public, so only the owner's own PRs
+    # from this repo run it (no forks, collaborators, or bots). PRs opened
+    # with a label already keep it, so the one-label rule holds.
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
-      !endsWith(github.actor, '[bot]') &&
+      github.event.pull_request.user.login == github.repository_owner &&
+      github.actor == github.repository_owner &&
       toJSON(github.event.pull_request.labels) == '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 10

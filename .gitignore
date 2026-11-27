@@ -276,6 +276,8 @@ src/dsv-pipeline/**/*.zip
 **/*_override.tf.json
 **/.terraformrc
 **/terraform.rc
+**/*.lock.hcl
+**/*.backend.hcl
 
 # Packer
 infra/packer/variables.pkrvars.hcl
