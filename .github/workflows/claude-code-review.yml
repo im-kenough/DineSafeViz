@@ -18,12 +18,15 @@ concurrency:
 jobs:
   claude-review:
     name: Claude review
-    # Drafts wait for ready_for_review. Fork PRs get no secrets, so skip them.
-    # claude-code-action refuses bot actors, so skip bots (e.g. Dependabot).
+    # Drafts wait for ready_for_review. Claude costs tokens and the repo is
+    # public, so only the owner's own PRs from this repo run it: fork PRs,
+    # collaborators, and bots (e.g. Dependabot) are skipped. The actor check
+    # also stops someone else's push to the owner's PR from triggering a run.
     if: >-
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      !endsWith(github.actor, '[bot]')
+      github.event.pull_request.user.login == github.repository_owner &&
+      github.actor == github.repository_owner
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
