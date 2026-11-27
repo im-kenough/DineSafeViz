@@ -1,4 +1,4 @@
-# Installed by docs/how-to/azure-vm/vm-first-time-setup.md, which fills in
+# Installed by docs/archived/docs/how-to/azure-vm/vm-first-time-setup.md, which fills in
 # @ADMIN_USER@, @REPO_DIR@, and @ENV@. A failed run (Toronto Open Data down,
 # validation failed, or data over 10 days old) shows as failed, and the site
 # keeps serving the data it already has.

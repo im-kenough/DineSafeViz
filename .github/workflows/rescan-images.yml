@@ -1,7 +1,7 @@
 # Weekly (or manual): rescan the deployed GHCR tags and the pinned upstream
 # images for newly published vulnerabilities, and report them to
 # Security > Code scanning. Builds and publishing live in ci.yml.
-# Details: docs/explanation/azure-vm/ci-cd.md
+# Details: docs/archived/docs/explanation/azure-vm/ci-cd.md
 name: Rescan images
 
 on:

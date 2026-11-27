@@ -114,4 +114,4 @@ cd ~/DineSafeViz && ./scripts/deploy.sh prod v0.5.0
 | `pipeline: historical/ has no complete folder` | `./scripts/pipeline.sh prod ingest --historical`, then rerun. |
 | `a container reached IMDS` | `sudo systemctl restart dsv-imds-block`, then rerun. |
 | Fails with `dsv-tunnel` logs | Check `dsv-tunnel-token` in `kv-dsv-prod01`. |
-| SSH times out | Home IP changed, see [this guide](../../../docs/how-to/azure-vm/troubleshoot-home-ip-change.md). |
+| SSH times out | Home IP changed, see [this guide](../../../docs/archived/docs/how-to/azure-vm/troubleshoot-home-ip-change.md). |

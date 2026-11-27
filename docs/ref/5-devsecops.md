@@ -37,7 +37,7 @@ Controls that run on your machine and on the repository itself, before CI.
 - The pre-commit hook is opt-in. Each clone needs `pre-commit install`. CI
   rescans the history, so a skipped hook fails later, at the PR.
 - The Packer seed VM's SSH password is committed in
-  `infra/rug/packer/ubuntu-seed.pkr.hcl`. It's accepted in `.gitleaksignore`.
+  `infra/archived/rug/packer/ubuntu-seed.pkr.hcl`. It's accepted in `.gitleaksignore`.
 - There's no `SECURITY.md` telling reporters how to report a vulnerability.
 - Secret scanning for non-provider patterns is off.
 

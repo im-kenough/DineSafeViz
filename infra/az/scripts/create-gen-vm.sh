@@ -55,7 +55,7 @@ SSH_CONFIG=${SSH_CONFIG:-$HOME/.ssh/config}
 
 DRY_RUN=${DRY_RUN:-}
 
-# shellcheck source=infra/az/vm-lib.sh
+# shellcheck source=infra/az/scripts/vm-lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/vm-lib.sh"
 
 #################################

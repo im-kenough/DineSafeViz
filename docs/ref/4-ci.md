@@ -216,5 +216,5 @@ These limits follow from the current workflows.
 
 Continuous deployment isn't covered. Deploys are manual: an operator runs
 `scripts/deploy.sh` on the VM. For the deploy flow, see
-[CI and CD for the Azure VM deployment](../../docs/explanation/azure-vm/ci-cd.md).
+[CI and CD for the Azure VM deployment](../../docs/archived/docs/explanation/azure-vm/ci-cd.md).
 For the security controls at each stage, see [DevSecOps](5-devsecops.md).

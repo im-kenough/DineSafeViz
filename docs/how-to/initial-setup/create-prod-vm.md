@@ -126,4 +126,4 @@ cp deploy/prod.env-example deploy/prod.env
 | `no disk ... and no snapshot of it` | Use `--overwrite`. |
 | `az maintenance extension missing` | `az extension add -n maintenance` |
 | `can't tell stg from prod by the hostname` | `setup-vm.sh` ran on a VM not named `vm01-dsv-prod01`. Check `hostname`. |
-| SSH times out | Home IP changed, see [this guide](../../../docs/how-to/azure-vm/troubleshoot-home-ip-change.md). |
+| SSH times out | Home IP changed, see [this guide](../../../docs/archived/docs/how-to/azure-vm/troubleshoot-home-ip-change.md). |

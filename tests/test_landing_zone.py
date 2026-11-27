@@ -6,7 +6,9 @@ import pytest
 
 from helpers import ROOT, ignored
 
-TF = ROOT / "infra" / "terraform"
+pytestmark = pytest.skip("Terraform is being reimplemented; old stack archived.", allow_module_level=True)
+
+TF = ROOT / "infra" / "archived" / "terraform"
 LZ = TF / "landing-zone"
 
 
@@ -193,9 +195,9 @@ def test_budget():
 
 
 def committed_files():
-    """Files under infra/terraform that git tracks or would add (not ignored)."""
+    """Files under infra/archived/terraform that git tracks or would add (not ignored)."""
     out = subprocess.run(
-        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "infra/terraform"],
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "infra/archived/terraform"],
         cwd=ROOT, capture_output=True, text=True, check=True,
     ).stdout
     return [ROOT / line for line in out.splitlines() if (ROOT / line).is_file()]

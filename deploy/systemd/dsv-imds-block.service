@@ -3,7 +3,7 @@
 # WireServer (168.63.129.16). DOCKER-USER runs before Docker's own FORWARD
 # rules and Docker never edits it. The host's own traffic (OUTPUT chain,
 # used by fetch-secrets.sh and pipeline.sh) isn't affected.
-# Installed by docs/how-to/azure-vm/vm-first-time-setup.md.
+# Installed by docs/archived/docs/how-to/azure-vm/vm-first-time-setup.md.
 [Unit]
 Description=Block container access to Azure IMDS and WireServer
 After=docker.service

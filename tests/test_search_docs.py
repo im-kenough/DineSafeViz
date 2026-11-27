@@ -1,7 +1,7 @@
 """The search reference describes the count query and pagination (#353)."""
 from helpers import ROOT
 
-DOC = ROOT / "docs-new" / "ref" / "3-11-search.md"
+DOC = ROOT / "docs" / "ref" / "3-11-search.md"
 
 
 def test_search_doc_describes_count_and_pages():

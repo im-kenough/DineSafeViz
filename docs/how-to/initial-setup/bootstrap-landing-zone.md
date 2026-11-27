@@ -8,7 +8,7 @@ workstation. CI never applies the landing zone.
 The first apply can't store its state in the account it's creating, so it
 uses a local state file. `make migrate` then moves that state into the new
 account. For the identities and roles it creates, see
-[Identity and access management](../../../docs/ref/iam.md).
+[Identity and access management](../../../docs/archived/docs/ref/iam.md).
 
 ## Before you begin
 
@@ -19,7 +19,7 @@ You need the following:
 - The operator account `dsv-ops-<env>01`, created in the Entra admin center
   with the alias (mail nickname) `dsv-ops-<env>01`, and signed in to once to
   enroll MFA.
-- `infra/terraform/envs/<env>/landing-zone.secret.tfvars`, copied from the
+- `infra/archived/terraform/envs/<env>/landing-zone.secret.tfvars`, copied from the
   `.example` file next to it, with the budget's contact address.
 
 ## Plan the first apply
@@ -91,7 +91,7 @@ apply, make your change, then set it back to `true` and apply again.
 
 ## Next steps
 
-- [Identity and access management](../../../docs/ref/iam.md) lists every
+- [Identity and access management](../../../docs/archived/docs/ref/iam.md) lists every
   identity and role this creates.
 - [Azure resources](../../ref/6-azure-resources.md) lists the resources by
   layer.

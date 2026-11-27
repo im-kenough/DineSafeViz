@@ -16,7 +16,7 @@ x-db-app-env: &db-app-env
 
 services:
   dsv-nginx:
-    # Stable branch (1.30.x), not mainline. See docs-new/ref/20-dependencies.md.
+    # Stable branch (1.30.x), not mainline. See docs/ref/20-dependencies.md.
     image: nginx:1.30.8-alpine3.24-slim@sha256:e9eaa7298465eab06d618c51556fdcf3fb5061f9ff40bd28ee898fbd7ee7f900
     ports:
       - "8080:80"
@@ -86,7 +86,7 @@ services:
 
   dsv-analytics:
     # Bundles the PostgreSQL plugin (13.0.7 in 13.3.2); the -slim variant doesn't.
-    # See docs/ref/app-notes.md.
+    # See docs/archived/docs/ref/app-notes.md.
     image: grafana/grafana:13.3.2@sha256:81556409ba48b2b922e0adb69a2511337d8ba7578f11962eefa6149a2d815101
     ports:
       - "3000:3000"

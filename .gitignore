@@ -261,7 +261,7 @@ src/dsv-pipeline/**/*.zip
 **/*.tfstate*
 **/terraform.tfvars
 # Secret variable files, plan files, and crash logs can hold secret values.
-# The per-environment infra/terraform/envs/<env>/*.tfvars files hold only
+# The per-environment infra/archived/terraform/envs/<env>/*.tfvars files hold only
 # non-secret settings and are committed, as are the *.tfvars.example files.
 **/*.secret.tfvars
 **/*.tfvars.json
