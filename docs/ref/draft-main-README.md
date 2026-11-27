@@ -11,10 +11,9 @@ safety program) from the City of Toronto's Open Data Portal.
 
 ## 2. Features
 
-### 2.1 Inspection results
+### 2.1 Search
 
-Check when an establishment was inspected and whether there were any health
-code violations.
+Type in a restaurant name to see their inspection record for any health code violations.
 
 ![Inspection results page](docs/img/root-readme/dsv-inspect-1.png)
 
@@ -24,7 +23,15 @@ Explore and get a statistical breakdown of **over 26 years** of inspection data.
 
 ![DineSafeViz analytics dashboard](docs/img/root-readme/dsv-dash-1.png)
 
-## 3. Technology stack
+### 2.3 Inspections data
+
+See a daily breakdown of which establishments were inspected and their results.
+
+## 3. Application Architecture
+
+Show basic logical diagram of the application
+
+Technology stack
 
 | Layer          | Technology                               |
 | -------------- | ---------------------------------------- |
@@ -33,3 +40,18 @@ Explore and get a statistical breakdown of **over 26 years** of inspection data.
 | Analytics      | Grafana                                  |
 | Reverse proxy  | nginx                                    |
 | Containers     | Docker, Docker Compose                   |
+
+## 4. Infrastructure
+
+Show basic logical diagram of the physical infra (azure diagram)
+
+## 5. Automation
+
+### 5.1 CI - Continuous Integration
+
+### 5.2 CD - Continuous Delivery
+
+
+## n. Repository structure
+
+Include a breakdown of the repo structure
